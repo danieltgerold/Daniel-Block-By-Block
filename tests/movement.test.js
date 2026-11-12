@@ -21,7 +21,7 @@ const tick = (controller, input = {}) => controller.update(MOVEMENT.fixedStep, i
 function movingController(mode) {
   const controller = new MovementController(new VoxelWorld());
   controller.keyDown('KeyW');
-  if (mode !== 'walk') controller.keyDown('ShiftLeft');
+  if (mode !== 'walk') controller.keyDown('KeyR');
   if (mode === 'sprintJump') controller.keyDown('Space');
   return controller;
 }
@@ -79,7 +79,7 @@ test('tick order: sprint takeoff gets one yaw-only boost, ground acceleration an
   near(player.z - before.z, before.vz);
   near(player.vx, (before.vx - 0.02548) * 0.91);
   assert.equal(player.sprintImpulseCount, 1, 'No second boost in the air');
-  assert.equal(player.sprinting, true, 'Sprint persists after Shift release');
+  assert.equal(player.sprinting, true, 'Sprint persists after R release');
 });
 
 test('diagonal sprint takeoff impulse follows yaw, not the diagonal movement direction', () => {
@@ -112,7 +112,7 @@ test('walking and sprinting jumps peak near 1.25 blocks and land on tick 12', ()
   for (const sprint of [false, true]) {
     const controller = new MovementController();
     controller.keyDown('Space');
-    if (sprint) { controller.keyDown('KeyW'); controller.keyDown('ShiftLeft'); }
+    if (sprint) { controller.keyDown('KeyW'); controller.keyDown('KeyR'); }
     for (let i = 1; i <= 11; i++) {
       tick(controller);
       assert.equal(controller.player.grounded, false);
@@ -194,15 +194,15 @@ test('diagonals are normalized with the requested 1/0.98 adjustment on ground an
   }
 });
 
-test('Shift starts a forward sprint; release keeps it active through flight and landing', () => {
+test('R starts a forward sprint; release keeps it active through flight and landing', () => {
   const controller = new MovementController();
-  controller.keyDown('ShiftLeft');
+  controller.keyDown('KeyR');
   tick(controller);
   assert.equal(controller.player.sprinting, false, 'Shift alone cannot sprint');
   controller.keyDown('KeyW');
   tick(controller);
   assert.equal(controller.player.sprinting, true);
-  controller.keyUp('ShiftLeft');
+  controller.keyUp('KeyR');
   controller.keyDown('Space');
   for (let i = 0; i < 25; i++) {
     tick(controller);
@@ -214,13 +214,13 @@ test('Shift starts a forward sprint; release keeps it active through flight and 
   assert.equal(controller.player.sprinting, false);
 });
 
-test('Shift pressed after W starts sprint, Right Shift does not, and opposing input stops it', () => {
+test('R pressed after W starts sprint, Right Shift does not, and opposing input stops it', () => {
   const controller = new MovementController();
   controller.keyDown('KeyW');
   controller.keyDown('ShiftRight');
   tick(controller);
   assert.equal(controller.player.sprinting, false);
-  controller.keyDown('ShiftLeft');
+  controller.keyDown('KeyR');
   tick(controller);
   assert.equal(controller.player.sprinting, true);
   controller.keyDown('KeyS');
@@ -290,7 +290,7 @@ test('FOV moves halfway per physics tick and interpolates between ticks', () => 
   controller.update(0.025);
   near(controller.player.fovMultiplier, 1.1125);
   near(controller.renderState().fovMultiplier, 1.075);
-  controller.keyUp('ShiftLeft');
+  controller.keyUp('KeyR');
   tick(controller);
   near(controller.player.fovMultiplier, 1.13125);
   controller.keyUp('KeyW');
@@ -302,7 +302,7 @@ test('FOV target stays tied to sprint state through repeated jump impulses', () 
   const controller = movingController('sprintJump');
   for (let i = 1; i <= 48; i++) {
     tick(controller);
-    if (i === 1) controller.keyUp('ShiftLeft');
+    if (i === 1) controller.keyUp('KeyR');
     near(controller.player.fovMultiplier, 1.15 - 0.15 * (0.5 ** i));
   }
   assert.equal(controller.player.jumpCount, 4);
@@ -324,9 +324,9 @@ test('rendered walking stays smooth between 20 Hz ticks at high and uneven frame
   }
 });
 
-test('size-one player has a 1.8m hitbox and 1.6m eye level', () => {
+test('size-one player has a 1.8m hitbox and 1.62m eye level', () => {
   near(MOVEMENT.playerHeight, 1.8);
-  near(MOVEMENT.eyeHeight, 1.6);
+  near(MOVEMENT.eyeHeight, 1.62);
   near(MOVEMENT.fixedStep, 0.05);
 });
 

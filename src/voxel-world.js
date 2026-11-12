@@ -8,7 +8,7 @@ const blockKey = (x, y, z) => `${x},${y},${z}`;
 const tolerance = (min, max) => Math.min(EPSILON, Math.max(0, max - min) * 1e-6);
 const overlaps = (min, max, block) => AXES.every(axis => max[axis] > block[axis] + tolerance(min[axis], max[axis])
   && min[axis] < block[axis] + 1 - tolerance(min[axis], max[axis]));
-function playerBounds(player, halfWidth = 0.3 * (player.size ?? 1), height = 1.8 * (player.size ?? 1)) {
+export function playerBounds(player, halfWidth = 0.3 * (player.size ?? 1), height = (player.crouching ? 1.5 : 1.8) * (player.size ?? 1)) {
   return { min: { x: player.x - halfWidth, y: player.y, z: player.z - halfWidth },
     max: { x: player.x + halfWidth, y: player.y + height, z: player.z + halfWidth } };
 }
@@ -176,8 +176,13 @@ export class VoxelWorld {
     return this.hasSolidInBox({ x: player.x - halfWidth, y: y - 0.5, z: player.z - halfWidth },
       { x: player.x + halfWidth, y, z: player.z + halfWidth });
   }
-  movePlayer(player, velocity, halfWidth = 0.3 * (player.size ?? 1), height = 1.8 * (player.size ?? 1)) {
-    const p = { x: player.x, y: player.y, z: player.z, size: player.size ?? 1 };
+  supportProbe(player, depth = 0.6 * (player.size ?? 1)) {
+    const half = 0.3 * (player.size ?? 1);
+    return this.hasSolidInBox({ x: player.x - half, y: player.y - depth, z: player.z - half },
+      { x: player.x + half, y: player.y, z: player.z + half });
+  }
+  movePlayer(player, velocity, halfWidth = 0.3 * (player.size ?? 1), height = (player.crouching ? 1.5 : 1.8) * (player.size ?? 1)) {
+    const p = { x: player.x, y: player.y, z: player.z, size: player.size ?? 1, crouching: player.crouching };
     const moved = { x: 0, y: 0, z: 0 }, blocked = { x: false, y: false, z: false };
     for (const axis of ['y', 'x', 'z']) {
       const wanted = velocity[axis];

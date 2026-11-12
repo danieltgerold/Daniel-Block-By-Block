@@ -8,7 +8,7 @@ export const isTextEntry = target => Boolean(target?.closest?.('input, textarea,
 // production; tests inject only the browser capture/unlock boundaries.
 export class ChatUI {
   constructor({ document, window, controller, clearInput, requestCapture, requestUnlock,
-    onModeChange = () => {}, onCameraCycle = () => {}, storage, createId, broadcast, now }) {
+    onModeChange = () => {}, onCameraCycle = () => {}, onHitboxToggle = () => {}, storage, createId, broadcast, now }) {
     this.document = document;
     this.window = window;
     this.controller = controller;
@@ -17,17 +17,33 @@ export class ChatUI {
     this.requestUnlock = requestUnlock;
     this.onModeChange = onModeChange;
     this.onCameraCycle = onCameraCycle;
+    this.onHitboxToggle = onHitboxToggle;
+    this.f3Held = false;
+    this.bHeld = false;
+    this.now = now ?? (() => performance.now());
+    this.lastMessageAt = -Infinity;
     this.pointerLocked = false;
     this.mode = null;
     this.developerSequence = new DeveloperSequence({ now });
     this.completion = null;
     this.elements = Object.fromEntries(['chat-panel', 'chat-log', 'chat-form', 'chat-input',
-      'name-form', 'player-name', 'name-error', 'resume-note', 'chat-completions'].map(id => [id, document.getElementById(id)]));
+      'name-form', 'player-name', 'name-error', 'resume-note', 'chat-completions', 'show-first-person-body'].map(id => [id, document.getElementById(id)]));
+    this.showFirstPersonBody = false;
+    try { this.showFirstPersonBody = storage?.getItem('block-by-block.first-person-body') === 'true'; } catch { /* Session preference still works. */ }
+    this.elements['show-first-person-body'].checked = this.showFirstPersonBody;
+    this.elements['show-first-person-body'].addEventListener('change', () => {
+      this.showFirstPersonBody = this.elements['show-first-person-body'].checked;
+      try { storage?.setItem('block-by-block.first-person-body', String(this.showFirstPersonBody)); } catch { /* Keep session preference. */ }
+    });
     this.profile = new LocalPlayerProfile(storage, createId);
     this.service = new ChatService({ profile: this.profile, controller, broadcast });
     this.elements['player-name'].value = this.profile.player.displayName;
     this.onKeyDown = event => this.handleKeyDown(event);
-    this.onKeyUp = event => controller.keyUp(event.code);
+    this.onKeyUp = event => {
+      if (event.code === 'F3') this.f3Held = false;
+      if (event.code === 'KeyB') this.bHeld = false;
+      controller.keyUp(event.code);
+    };
     window.addEventListener('keydown', this.onKeyDown, { capture: true });
     window.addEventListener('keyup', this.onKeyUp);
     this.elements['name-form'].addEventListener('submit', event => {
@@ -48,13 +64,14 @@ export class ChatUI {
       this.completion = null;
       this.renderCompletions(this.service.completions(this.elements['chat-input'].value));
     });
-    this.unsubscribe = this.service.subscribe(() => this.renderHistory());
+    this.unsubscribe = this.service.subscribe(() => { this.lastMessageAt = this.now(); this.renderHistory(); });
     this.setMode('menu');
   }
 
   setMode(mode) {
     if (this.mode === mode) return;
     this.mode = mode;
+    if (mode !== 'playing') this.f3Held = this.bHeld = false;
     if (mode !== 'chat') { this.completion = null; this.renderCompletions([]); }
     this.clearInput();
     this.document.body.classList.toggle('chat-open', mode === 'chat');
@@ -114,6 +131,24 @@ export class ChatUI {
   }
 
   handleKeyDown(event) {
+    if (this.mode === 'playing' && !isTextEntry(event.target)) {
+      if (event.code === 'F3') {
+        event.preventDefault(); event.stopPropagation();
+        this.developerSequence.feed(event);
+        if (!event.repeat) this.f3Held = true;
+        return;
+      }
+      if (event.code === 'KeyB') {
+        const wasHeld = this.bHeld;
+        this.bHeld = true;
+        if (this.f3Held) {
+          event.preventDefault(); event.stopPropagation();
+          this.developerSequence.feed(event);
+          if (!event.repeat && !wasHeld) this.onHitboxToggle();
+          return;
+        }
+      }
+    }
     if (this.developerSequence.feed(event)) {
       event.preventDefault(); event.stopPropagation();
       if (this.controller.enableDeveloperMode()) this.service.reply('You have entered developer mode.');
@@ -123,7 +158,7 @@ export class ChatUI {
       if (event.key === 'Tab') {
         event.preventDefault(); event.stopPropagation(); this.complete(event.shiftKey); return;
       }
-      if (event.code === 'F5') { event.preventDefault(); event.stopPropagation(); return; }
+      if (event.code === 'F5' || event.code === 'F3') { event.preventDefault(); event.stopPropagation(); return; }
       if (!event.isComposing && (event.key === 'Enter' || event.key === 'Escape')) {
         event.preventDefault(); event.stopPropagation();
         if (!event.repeat) this.closeChat(event.key === 'Enter');
@@ -131,7 +166,7 @@ export class ChatUI {
       return;
     }
     if (isTextEntry(event.target)) {
-      if (event.code === 'F5') { event.preventDefault(); event.stopPropagation(); }
+      if (event.code === 'F5' || event.code === 'F3') { event.preventDefault(); event.stopPropagation(); }
       return;
     }
     if (!['playing', 'ready'].includes(this.mode)) return;
@@ -151,7 +186,7 @@ export class ChatUI {
       if (!event.repeat) this.onCameraCycle();
       return;
     }
-    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft'].includes(event.code)) event.preventDefault();
+    if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'KeyR'].includes(event.code)) event.preventDefault();
     this.controller.keyDown(event.code, event.repeat);
   }
 
@@ -196,7 +231,6 @@ export class ChatUI {
     }
     const open = this.mode === 'chat';
     const panel = this.elements['chat-panel'];
-    panel.hidden = this.mode === 'menu' || (!open && this.service.messages.length === 0);
     panel.classList.toggle('is-open', open);
     this.elements['chat-form'].hidden = !open;
     const nodes = this.service.messages.slice(open ? -50 : -8).map(message => {
@@ -210,6 +244,16 @@ export class ChatUI {
     const log = this.elements['chat-log'];
     log.replaceChildren(...nodes);
     log.scrollTop = log.scrollHeight;
+    this.updateVisibility();
+  }
+
+  updateVisibility(time = this.now()) {
+    const open = this.mode === 'chat';
+    const age = time - this.lastMessageAt;
+    const opacity = open ? 1 : Math.max(0, Math.min(1, 1 - (age - 10_000) / 1000));
+    const panel = this.elements['chat-panel'];
+    panel.hidden = this.mode === 'menu' || (!open && (this.service.messages.length === 0 || opacity === 0));
+    panel.style.opacity = String(opacity);
   }
 
   dispose() {

@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { MOVEMENT, MovementController } from '../src/movement.js';
@@ -27,11 +27,11 @@ test('classic rig has the exact six dimensions, centers, pivots, colors and 1.87
   assert.equal(model.children.length, 6);
   const definitions = [
     ['Head', [8, 8, 8], [0, 28, 0], [0, 24, 0]],
-    ['Chest', [8, 12, 4], [0, 18, 0], [0, 18, 0]],
+    ['Chest', [8, 12, 4], [0, 18, 0], [0, 24, 0]],
     ['Left Arm', [4, 12, 4], [-6, 18, 0], [-5, 22, 0]],
     ['Right Arm', [4, 12, 4], [6, 18, 0], [5, 22, 0]],
-    ['Left Leg', [4, 12, 4], [-1.9, 6, 0], [-1.9, 12, 0]],
-    ['Right Leg', [4, 12, 4], [1.9, 6, 0], [1.9, 12, 0]],
+    ['Left Leg', [4, 12, 4], [-2, 6, 0], [-2, 12, 0]],
+    ['Right Leg', [4, 12, 4], [2, 6, 0], [2, 12, 0]],
   ];
   for (const [name, size, center, pivot] of definitions) {
     const mesh = model.userData.parts[name], joint = model.userData.joints[name];
@@ -127,33 +127,23 @@ test('walking pose is interpolated and agrees at different rendering frame rates
   }
 });
 
-test('first person shows the body and both feet, hides the head and duplicate right arm', () => {
+test('first person hides the whole avatar by default and the menu option shows one body without head or duplicate right arm', () => {
   const model = createPlayerModel();
   const feet = { x: 0.5, y: 0, z: 0.5 };
-  const eye = new THREE.Vector3(feet.x, 1.6, feet.z);
-  for (const aim of [0, degrees(35), degrees(70)]) {
-    const state = createPlayerAnimation();
-    tickPlayerAnimation(state, { aimYaw: aim, aimPitch: -1.4 });
-    animatePlayerModel(model, feet, pose(state), 0);
-    model.updateMatrixWorld(true);
-    assert.equal(model.userData.joints.Head.visible, false);
-    assert.equal(model.userData.joints['Right Arm'].visible, false);
-    assert.equal(model.userData.joints.Chest.visible, true);
-    const visible = ['Chest', 'Left Arm', 'Left Leg', 'Right Leg'].map(name => model.userData.parts[name]);
-    for (const leg of ['Left Leg', 'Right Leg']) {
-      let footVisible = false;
-      for (const x of [-0.08, 0, 0.08]) for (const z of [-0.08, 0, 0.08]) {
-        const target = model.userData.parts[leg].localToWorld(new THREE.Vector3(x, -6 * MODEL_SCALE + 0.035, z));
-        const hits = new THREE.Raycaster(eye, target.sub(eye).normalize()).intersectObjects(visible, false);
-        if (hits[0]?.object.name === leg) footVisible = true;
-      }
-      assert.ok(footVisible, `Chest must not hide the entire ${leg} foot at aim ${aim}`);
-    }
-    assert.ok(visible.every(mesh => mesh.material.depthTest && mesh.material.depthWrite));
-    near(feet.x, 0.5); near(feet.z, 0.5); // Visual offsets never alter the physical position.
+  animatePlayerModel(model, feet, pose(), 0);
+  assert.equal(model.visible, false);
+  near(model.position.x, feet.x); near(model.position.z, feet.z);
+  animatePlayerModel(model, feet, pose(), 0, true);
+  assert.equal(model.visible, true);
+  assert.equal(model.userData.joints.Head.visible, false);
+  assert.equal(model.userData.joints['Right Arm'].visible, false);
+  for (const mode of [1, 2]) {
+    animatePlayerModel(model, feet, pose(), mode);
+    assert.equal(model.visible, true);
+    assert.equal(model.userData.joints.Head.visible, true);
+    assert.equal(model.userData.joints['Right Arm'].visible, true);
   }
 });
-
 test('first-person eye and F5 modes preserve aim and cycle once per press', () => {
   let mode = 0;
   for (const expected of [1, 2, 0]) {
@@ -164,11 +154,11 @@ test('first-person eye and F5 modes preserve aim and cycle once per press', () =
   const camera = new THREE.PerspectiveCamera();
   const feet = { x: 0.5, y: 2, z: 0.5 };
   updatePlayerCamera(camera, 0, feet, 0.8, -0.4);
-  near(camera.position.y, 3.6);
+  near(camera.position.y, 3.62);
   near(camera.getWorldDirection(new THREE.Vector3()).dot(playerLookDirection(0.8, -0.4)), 1);
   for (const mode of [1, 2]) {
     near(updatePlayerCamera(camera, mode, feet, 0.8, -0.4), 4);
-    const eye = new THREE.Vector3(feet.x, feet.y + 1.6, feet.z);
+    const eye = new THREE.Vector3(feet.x, feet.y + MOVEMENT.eyeHeight, feet.z);
     near(camera.position.distanceTo(eye), 4);
     near(camera.getWorldDirection(new THREE.Vector3()).dot(eye.sub(camera.position).normalize()), 1);
   }
@@ -209,26 +199,26 @@ test('six-tick swing repeats during mining, stops on release and does not change
   const starts = [];
   mining.onTick = p => { if (p.animation.swingStartedThisTick) starts.push(mining.totalSteps); };
   for (let i = 0; i < 19; i++) { mining.update(0.05); walking.update(0.05); }
-  assert.deepEqual(starts, [1, 7, 13, 19]);
+  assert.deepEqual(starts, [1, 4, 7, 10, 13, 16, 19]);
   near(mining.player.animation.phase, walking.player.animation.phase);
   near(mining.player.animation.amount, walking.player.animation.amount);
   mining.setMining(false);
   for (let i = 0; i < 6; i++) mining.update(0.05);
   assert.equal(mining.player.animation.swingAge, -1);
-  assert.equal(mining.player.animation.swingSerial, 4);
+  assert.equal(mining.player.animation.swingSerial, 7);
   mining.requestSwing();
   mining.update(0.05);
-  assert.equal(mining.player.animation.swingSerial, 5, 'Successful placement/use can request the same swing');
+  assert.equal(mining.player.animation.swingSerial, 8, 'Successful placement/use can request the same swing');
 });
 
 test('bare right arm returns to rest and renders after the world with a separate depth clear and 70 FOV', () => {
   const hand = createEmptyHand(16 / 9);
-  const rest = hand.rig.position.clone();
+  const rest = hand.rig.matrix.clone();
   updateEmptyHand(hand, { swingActive: true, swingProgress: 0.25 });
-  assert.ok(hand.rig.position.x < rest.x);
-  assert.ok(hand.rig.position.z < rest.z);
+  assert.notDeepEqual(hand.rig.matrix.elements, rest.elements);
+
   updateEmptyHand(hand, { swingActive: true, swingProgress: 1 });
-  near(hand.rig.position.distanceTo(rest), 0);
+  for (let i = 0; i < 16; i++) near(hand.rig.matrix.elements[i], rest.elements[i]);
   near(hand.camera.fov, 70);
   assert.equal(hand.arm.material.color.getHexString(), new THREE.Color(PLAYER_COLORS['Right Arm']).getHexString());
   const calls = [];

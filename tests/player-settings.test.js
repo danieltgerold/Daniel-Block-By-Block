@@ -112,11 +112,11 @@ test('size scales the eye and reach in every F5 mode and targeting stays eye-bas
   chat.submit('/size 2');
   world.setBlock(0, 3, -8, true);
   const ray = controller.interactionRay(controller.player, 0, 0);
-  near(ray.origin.y, 3.2); near(ray.reach, 9);
+  near(ray.origin.y, 3.24); near(ray.reach, 9);
   for (const mode of [0, 1, 2]) {
     const camera = new THREE.PerspectiveCamera();
     updatePlayerCamera(camera, mode, controller.renderState(), 0, 0, world);
-    near(camera.position.y, 3.2);
+    near(camera.position.y, 3.24);
     assert.equal(controller.targetBlock(controller.renderState(), 0, 0).z, -8);
   }
 });
