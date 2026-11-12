@@ -99,7 +99,7 @@ export class VoxelWorld {
       && !players.some(player => blockIntersectsPlayer(x, y, z, player));
   }
   raycast(origin, direction, reach = BLOCK_REACH) {
-    const length = Math.hypot(direction.x, direction.y, direction.z);
+    const length = Math.sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
     if (!length || reach < 0) return null;
     const d = Object.fromEntries(AXES.map(a => [a, direction[a] / length]));
     let best = null;
