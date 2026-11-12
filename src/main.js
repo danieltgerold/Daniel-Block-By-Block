@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { MovementController, MOVEMENT } from './movement.js';
+import { VoxelWorld } from './voxel-world.js';
+import { ChunkRenderer } from './chunk-renderer.js';
 import './style.css';
 
 const canvas = document.querySelector('#world');
@@ -10,7 +12,9 @@ const crosshair = document.querySelector('#crosshair');
 const playingHint = document.querySelector('#playing-hint');
 const status = document.querySelector('#status');
 const readouts = Object.fromEntries(['speed', 'height', 'apex', 'airtime'].map(id => [id, document.getElementById(id)]));
-const controller = new MovementController();
+const world = new VoxelWorld();
+const controller = new MovementController(world);
+controller.respawn(world.findSpawn());
 let yaw = 0;
 let pitch = -0.12;
 let active = false;
@@ -23,13 +27,12 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#c6dfe9');
-scene.fog = new THREE.Fog('#c6dfe9', 35, 180);
+scene.fog = new THREE.Fog('#c6dfe9', 55, 140);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 500);
 const baseFov = camera.fov;
 camera.rotation.order = 'YXZ';
 
-// One texture tile covers exactly 1 m². Mipmaps average subpixel lines instead
-// of letting them flicker on/off; anisotropic filtering handles grazing angles.
+// One texture tile covers one block face; retain filtered lines without shimmer.
 const gridCanvas = document.createElement('canvas');
 gridCanvas.width = gridCanvas.height = 128;
 const gridContext = gridCanvas.getContext('2d');
@@ -44,18 +47,43 @@ gridContext.stroke();
 const gridTexture = new THREE.CanvasTexture(gridCanvas);
 gridTexture.colorSpace = THREE.SRGBColorSpace;
 gridTexture.wrapS = gridTexture.wrapT = THREE.RepeatWrapping;
-gridTexture.repeat.set(512, 512);
 gridTexture.minFilter = THREE.LinearMipmapLinearFilter;
 gridTexture.magFilter = THREE.LinearFilter;
 gridTexture.generateMipmaps = true;
 gridTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-const material = new THREE.MeshBasicMaterial({ map: gridTexture, fog: true });
-// Keep geometry and UV coordinates modest for precision. Shift only by whole
-// meters, so the grid stays anchored in the world. Edges stay beyond the fog.
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(512, 512), material);
-floor.rotation.x = -Math.PI / 2;
-floor.updateMatrixWorld();
-scene.add(floor);
+const material = new THREE.MeshBasicMaterial({ map: gridTexture, vertexColors: true, fog: true });
+const chunks = new ChunkRenderer(world, scene, material);
+const selection = new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
+  new THREE.LineBasicMaterial({ color: '#fff4ad' }),
+);
+selection.visible = false;
+scene.add(selection);
+const lookDirection = new THREE.Vector3();
+
+function targetBlock() {
+  camera.rotation.set(pitch, yaw, 0);
+  camera.updateMatrixWorld();
+  camera.getWorldDirection(lookDirection);
+  return world.raycast(camera.position, lookDirection, 6);
+}
+
+canvas.addEventListener('contextmenu', event => event.preventDefault());
+canvas.addEventListener('mousedown', event => {
+  // The click that captures the mouse does not also break a block.
+  if (!active || (event.button !== 0 && event.button !== 2)) return;
+  event.preventDefault();
+  const hit = targetBlock();
+  if (!hit) return;
+  let { x, y, z } = hit;
+  if (event.button === 2) {
+    if (!Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return;
+    x += hit.normal.x; y += hit.normal.y; z += hit.normal.z;
+    // Include the interpolated body, so a placed cube cannot intersect the view.
+    if (!world.canPlaceBlock(x, y, z, [controller.player, controller.renderState()])) return;
+  }
+  if (world.setBlock(x, y, z, event.button === 2)) chunks.invalidateBlock(x, z);
+});
 
 function clearInput() { controller.pause(); }
 function setActive(value) {
@@ -112,6 +140,7 @@ function animate(time) {
   previousTime = time;
   if (active) {
     controller.update(dt, { yaw });
+    if (controller.player.y < -32) controller.respawn(world.findSpawn());
   }
   const p = controller.player;
   const position = controller.renderState();
@@ -122,7 +151,10 @@ function animate(time) {
     camera.fov = fov;
     camera.updateProjectionMatrix();
   }
-  floor.position.set(Math.floor(position.x / 32) * 32, 0, Math.floor(position.z / 32) * 32);
+  chunks.update(camera);
+  const target = active ? targetBlock() : null;
+  selection.visible = Boolean(target);
+  if (target) selection.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
   readouts.speed.textContent = p.speed.toFixed(3);
   readouts.height.textContent = p.y.toFixed(3);
   if (p.lastJump) {

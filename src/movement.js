@@ -25,7 +25,7 @@ export function createPlayer() {
   return {
     x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
     grounded: true, sprinting: false, speed: 0,
-    jumpCooldown: 0, jumpTicks: 0, jumpApex: 0,
+    jumpCooldown: 0, jumpTicks: 0, jumpApex: 0, jumpStartY: 0, jumpInProgress: false,
     jumpCount: 0, sprintImpulseCount: 0, lastJump: null,
     fovMultiplier: 1,
   };
@@ -33,7 +33,9 @@ export function createPlayer() {
 
 // Exactly one 50 ms physics tick. This snapshot drives both acceleration and
 // drag, including takeoff and landing ticks.
-export function stepPlayer(player, input = {}) {
+export function stepPlayer(player, input = {}, world = null) {
+  // A block edit can remove last tick's support before the next tick begins.
+  if (world && player.grounded && !world.isSupported(player)) player.grounded = false;
   const startedGrounded = player.grounded;
   let forward = input.forward || 0;
   let right = input.right || 0;
@@ -54,6 +56,8 @@ export function stepPlayer(player, input = {}) {
     player.jumpCooldown = MOVEMENT.jumpCooldownTicks;
     player.jumpTicks = 0;
     player.jumpApex = 0;
+    player.jumpStartY = player.y;
+    player.jumpInProgress = true;
     player.jumpCount++;
     if (player.sprinting) {
       player.vx -= sinYaw * MOVEMENT.sprintJumpImpulse;
@@ -75,21 +79,32 @@ export function stepPlayer(player, input = {}) {
   player.vz += (-right * sinYaw - forward * cosYaw) * acceleration;
 
   // 3. Move, resolve the floor, then apply drag using the PREVIOUS grounded state.
-  player.x += player.vx;
-  player.z += player.vz;
-  player.y += player.vy;
-  player.speed = Math.hypot(player.vx, player.vz) * MOVEMENT.ticksPerSecond;
-  player.grounded = player.y <= 0 && player.vy <= 0;
-  if (player.grounded) player.y = 0;
-  if (takeoff || !startedGrounded) {
+  if (world) {
+    const motion = world.movePlayer(player, { x: player.vx, y: player.vy, z: player.vz }, undefined, MOVEMENT.playerHeight);
+    player.x = motion.x; player.y = motion.y; player.z = motion.z;
+    if (motion.blocked.x) player.vx = 0;
+    if (motion.blocked.y) player.vy = 0;
+    if (motion.blocked.z) player.vz = 0;
+    player.speed = Math.hypot(motion.moved.x, motion.moved.z) * MOVEMENT.ticksPerSecond;
+    player.grounded = motion.grounded;
+  } else {
+    player.x += player.vx;
+    player.z += player.vz;
+    player.y += player.vy;
+    player.speed = Math.hypot(player.vx, player.vz) * MOVEMENT.ticksPerSecond;
+    player.grounded = player.y <= 0 && player.vy <= 0;
+    if (player.grounded) player.y = 0;
+  }
+  if (player.jumpInProgress) {
     player.jumpTicks++;
-    player.jumpApex = Math.max(player.jumpApex, player.y);
+    player.jumpApex = Math.max(player.jumpApex, player.y - player.jumpStartY);
     if (player.grounded) {
       player.lastJump = {
         height: player.jumpApex,
         ticks: player.jumpTicks,
         airtime: player.jumpTicks * MOVEMENT.fixedStep,
       };
+      player.jumpInProgress = false;
     }
   }
   const drag = startedGrounded ? MOVEMENT.groundDrag : MOVEMENT.airDrag;
@@ -104,7 +119,8 @@ const supportedKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLe
 const snapshot = p => ({ x: p.x, y: p.y, z: p.z, fovMultiplier: p.fovMultiplier });
 
 export class MovementController {
-  constructor() {
+  constructor(world = null) {
+    this.world = world;
     this.player = createPlayer();
     this.accumulator = 0;
     this.previous = snapshot(this.player);
@@ -156,7 +172,7 @@ export class MovementController {
     while (this.accumulator + 1e-9 >= MOVEMENT.fixedStep) {
       this.previous = snapshot(this.player);
       // Overrides let deterministic measurements exercise this exact controller.
-      stepPlayer(this.player, { ...this.readInput(), ...input });
+      stepPlayer(this.player, { ...this.readInput(), ...input }, this.world);
       this.sprintRequested = false;
       this.accumulator -= MOVEMENT.fixedStep;
       this.totalSteps++;
@@ -171,6 +187,11 @@ export class MovementController {
       result[key] = this.previous[key] + (this.player[key] - this.previous[key]) * alpha;
     }
     return result;
+  }
+
+  respawn(position) {
+    this.player = { ...createPlayer(), ...position };
+    this.pause();
   }
 
   pause() {

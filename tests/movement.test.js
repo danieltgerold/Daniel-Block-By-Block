@@ -1,6 +1,7 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MovementController, MOVEMENT, createPlayer, stepPlayer } from '../src/movement.js';
+import { VoxelWorld } from '../src/voxel-world.js';
 
 function near(actual, expected, tolerance = 1e-9) {
   assert.ok(Math.abs(actual - expected) <= tolerance, `Expected ${expected}, measured ${actual}`);
@@ -18,7 +19,7 @@ function advance(controller, seconds, pattern = [1 / 60], input = {}) {
 const tick = (controller, input = {}) => controller.update(MOVEMENT.fixedStep, input);
 
 function movingController(mode) {
-  const controller = new MovementController();
+  const controller = new MovementController(new VoxelWorld());
   controller.keyDown('KeyW');
   if (mode !== 'walk') controller.keyDown('ShiftLeft');
   if (mode === 'sprintJump') controller.keyDown('Space');

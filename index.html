@@ -8,7 +8,7 @@
     <title>Block By Block · Movement test</title>
   </head>
   <body>
-    <canvas id="world" aria-label="First-person movement test: flat gridded floor and open sky"></canvas>
+    <canvas id="world" aria-label="First-person voxel test: editable blocks and open sky"></canvas>
     <header class="masthead">
       <a class="wordmark" href="./" aria-label="Block By Block home"><span class="brand-icon" aria-hidden="true">▦</span> BLOCK BY BLOCK</a>
       <span class="milestone"><i></i> MOVEMENT TEST <span class="version">/ 001</span></span>
@@ -16,34 +16,34 @@
 
     <main id="intro" class="intro">
       <section class="intro-card" aria-labelledby="intro-title">
-        <p class="eyebrow">A SMALL START. AN OPEN WORLD.</p>
-        <h1 id="intro-title">Find your footing<span>.</span></h1>
-        <p class="description">Just you, the ground, and a little room to move.<br />Every square beneath you is one meter.</p>
+        <h1 id="intro-title">Block test</h1>
+        <p class="description">Blocks are 1 m × 1 m × 1 m. Ground is three blocks deep.<br />Aim at a block within 6 m to edit it.</p>
         <div class="controls">
           <div><span class="key-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Walk</span></div>
           <div><span class="key-group"><kbd class="wide">MOUSE</kbd></span><span>Look around</span></div>
           <div><span class="key-group"><kbd>W</kbd><kbd class="wide">L SHIFT</kbd></span><span>Sprint (or double-tap W)</span></div>
           <div><span class="key-group"><kbd class="wide">SPACE</kbd></span><span>Jump (hold to repeat)</span></div>
+          <div><span class="key-group"><kbd>LMB</kbd><kbd>RMB</kbd></span><span>Break / place block</span></div>
           <div><span class="key-group"><kbd>ESC</kbd></span><span>Release mouse</span></div>
         </div>
-        <button id="start" type="button">Step into the world <span aria-hidden="true">↗</span></button>
+        <button id="start" type="button">Click to play</button>
         <p id="start-note" class="start-note" role="status">Click to capture your mouse · Keyboard & mouse required</p>
       </section>
     </main>
 
     <div id="crosshair" class="crosshair" hidden aria-hidden="true"></div>
-    <div id="playing-hint" class="playing-hint" hidden>WASD move <span>·</span> W + L SHIFT / double W sprint <span>·</span> Hold SPACE jump <span>·</span> ESC pause</div>
+    <div id="playing-hint" class="playing-hint" hidden>WASD move <span>·</span> W + L SHIFT / double W sprint <span>·</span> Hold SPACE jump <span>·</span> Left click break / right click place <span>·</span> ESC pause</div>
 
     <footer class="telemetry" aria-label="Live movement measurements">
       <div class="telemetry-heading"><span class="status-dot"></span><span id="status">READY TO EXPLORE</span><span class="live-label">LIVE TELEMETRY</span></div>
       <div class="readouts">
         <div class="readout"><span class="label">MOVEMENT SPEED</span><p><span id="speed">0.000</span><small>m/s</small></p><span class="detail">Walk 4.317 / sprint 5.612</span></div>
-        <div class="readout"><span class="label">FEET ABOVE GROUND</span><p><span id="height">0.000</span><small>m</small></p><span class="detail">Player height 2.00 m</span></div>
+        <div class="readout"><span class="label">FEET Y POSITION</span><p><span id="height">0.000</span><small>m</small></p><span class="detail">Player height 2.00 m</span></div>
         <div class="readout"><span class="label">LAST JUMP APEX</span><p><span id="apex">—</span><small>m</small></p><span class="detail">Target 1.25 m</span></div>
         <div class="readout"><span class="label">LAST AIRTIME</span><p><span id="airtime">—</span><small>s</small></p><span class="detail">Target 0.60 s</span></div>
       </div>
     </footer>
-    <div class="scale-note"><span class="scale-line"></span>1 BLOCK = 1 m × 1 m</div>
+    <div class="scale-note"><span class="scale-line"></span>1 BLOCK = 1 m³ · GROUND = 3 BLOCKS DEEP</div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
