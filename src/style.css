@@ -68,3 +68,22 @@ button span { font-size: 19px; }
   .controls { padding: 15px 0; gap: 7px; }
   .telemetry { bottom: 20px; }
 }
+
+/* Functional chat and name controls; retain the existing world and artwork. */
+.intro-card { max-height: 100%; overflow-y: auto; }
+.name-form { margin: 0 0 15px; font-size: 12px; }
+.name-form label { display: block; margin-bottom: 6px; }
+.name-row { display: flex; gap: 7px; }
+.name-row input { min-width: 0; flex: 1; padding: 8px; border: 1px solid #9da995; border-radius: 3px; font: inherit; }
+.name-row button { width: auto; padding: 8px 12px; white-space: nowrap; }
+.name-error { display: block; margin-top: 5px; color: #a52d27; font-size: 11px; }
+.chat-panel { position: fixed; z-index: 4; left: 16px; bottom: 190px; width: min(580px, calc(100vw - 32px)); font: 14px/1.5 Consolas, monospace; color: #fff; }
+.chat-panel.is-open { bottom: 16px; }
+.chat-log { list-style: none; padding: 0; margin: 0 0 7px; max-height: 180px; overflow-y: auto; overflow-wrap: anywhere; text-shadow: 1px 1px #000; }
+.chat-log li { padding: 2px 7px; background: #0009; white-space: pre-wrap; }
+.chat-sender { color: #72d8ff; }
+.chat-server { color: #ffe381; }
+#chat-input { width: 100%; padding: 8px; border: 1px solid #bfc9bb; outline-offset: 2px; background: #111e; color: #fff; font: inherit; }
+.chat-open .telemetry { visibility: hidden; }
+.resume-note { position: fixed; z-index: 4; top: 90px; left: 50%; transform: translateX(-50%); width: auto; padding: 8px 14px; font-size: 12px; }
+@media (max-width: 600px) { .chat-panel { bottom: 235px; } .chat-panel.is-open { bottom: 16px; } }

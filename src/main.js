@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MovementController, MOVEMENT } from './movement.js';
 import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
+import { ChatUI, isTextEntry } from './chat-ui.js';
 import { createPlayerModel, animatePlayerModel, nextCameraMode, playerLookDirection, updatePlayerCamera,
   createEmptyHand, updateEmptyHand, renderPlayerScene } from './player-visuals.js';
 import './style.css';
@@ -75,13 +76,6 @@ function targetBlock(feet = controller.renderState()) {
   return world.raycast(reachOrigin, lookDirection);
 }
 
-window.addEventListener('keydown', event => {
-  if (event.code !== 'F5' || !active) return;
-  event.preventDefault();
-  event.stopPropagation();
-  cameraMode = nextCameraMode(cameraMode, event.repeat);
-}, { capture: true });
-
 canvas.addEventListener('contextmenu', event => event.preventDefault());
 function editBlock(place, feet = controller.renderState()) {
   const hit = targetBlock(feet);
@@ -117,28 +111,40 @@ canvas.addEventListener('mousedown', event => {
 document.addEventListener('mouseup', event => { if (event.button === 0) controller.setMining(false); });
 
 function clearInput() { primaryClickQueued = false; controller.pause(); }
-function setActive(value) {
-  active = value;
-  intro.hidden = value;
-  crosshair.hidden = !value;
-  playingHint.hidden = !value;
-  document.body.classList.toggle('is-playing', value);
-  clearInput();
+function renderInputMode(mode) {
+  active = mode === 'playing';
+  intro.hidden = mode !== 'menu';
+  crosshair.hidden = !active;
+  playingHint.hidden = !active;
+  document.body.classList.toggle('is-playing', active);
   previousTime = null;
-  status.textContent = value ? 'ON THE GROUND' : 'READY TO EXPLORE';
+  status.textContent = active ? 'ON THE GROUND' : (mode === 'chat' ? 'CHATTING' : 'PAUSED');
 }
 
+let profileStorage = null;
+try { profileStorage = window.localStorage; } catch { /* Session identity still works without browser storage. */ }
+const chatUI = new ChatUI({ document, window, controller, clearInput, requestCapture: captureMouse,
+  requestUnlock: () => { if (document.pointerLockElement === canvas) document.exitPointerLock(); },
+  onModeChange: renderInputMode,
+  onCameraCycle: () => { cameraMode = nextCameraMode(cameraMode); }, storage: profileStorage });
+
 async function captureMouse() {
+  if (chatUI.mode === 'chat') return false;
+  if (isTextEntry(document.activeElement)) document.activeElement.blur();
   try {
     if (!canvas.requestPointerLock) throw new Error('Pointer lock unavailable');
     await canvas.requestPointerLock();
+    if (document.pointerLockElement === canvas) chatUI.onPointerLockChange(true);
+    return true;
   } catch {
     startNote.textContent = 'Mouse capture was blocked. Click again, or open this page directly in a desktop browser.';
+    if (chatUI.mode === 'ready') document.getElementById('resume-note').hidden = false;
+    return false;
   }
 }
 startButton.addEventListener('click', captureMouse);
-canvas.addEventListener('click', () => { if (!active) captureMouse(); });
-document.addEventListener('pointerlockchange', () => setActive(document.pointerLockElement === canvas));
+canvas.addEventListener('click', () => { if (!active && chatUI.mode !== 'chat') captureMouse(); });
+document.addEventListener('pointerlockchange', () => chatUI.onPointerLockChange(document.pointerLockElement === canvas));
 document.addEventListener('pointerlockerror', () => {
   startNote.textContent = 'Mouse capture was blocked. Click again, or open this page directly in a desktop browser.';
 });
@@ -147,15 +153,8 @@ document.addEventListener('mousemove', event => {
   yaw -= event.movementX * 0.002;
   pitch = THREE.MathUtils.clamp(pitch - event.movementY * 0.002, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
 });
-document.addEventListener('keydown', event => {
-  if (!active) return;
-  if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft'].includes(event.code)) event.preventDefault();
-  controller.keyDown(event.code, event.repeat);
-});
-document.addEventListener('keyup', event => controller.keyUp(event.code));
 function releaseMouse() {
-  if (document.pointerLockElement === canvas) document.exitPointerLock();
-  setActive(false);
+  chatUI.pause();
 }
 window.addEventListener('blur', releaseMouse);
 document.addEventListener('visibilitychange', () => { if (document.hidden) releaseMouse(); });
@@ -190,6 +189,7 @@ function animate(time) {
   selection.visible = Boolean(target);
   if (target) selection.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
   readouts.speed.textContent = p.speed.toFixed(3);
+  document.getElementById('speed-target').textContent = `Walk ${controller.walkSpeed.toFixed(3)} / sprint ${(controller.walkSpeed * 1.3).toFixed(3)}`;
   readouts.height.textContent = p.y.toFixed(3);
   if (p.lastJump) {
     readouts.apex.textContent = p.lastJump.height.toFixed(3);

@@ -38,6 +38,41 @@ ignored; source files and the package lock are tracked.
 - Esc releases the mouse. Unlocking, switching windows, or hiding the tab clears
   held inputs, sprint, and double-tap history. Click again to resume.
 
+## Chat, name, and speed commands
+
+Press **T** while playing for an empty chat field or **/** for a command field
+prefilled with one slash. **Enter** sends and closes; **Escape** discards the
+draft without opening the pause menu. Movement and game shortcuts are blocked
+while typing. Closing chat requests mouse capture again; if the browser denies
+that request, use **Click to resume mouse look** or click the world.
+
+Recent messages remain visible above the input after chat closes. Player text
+and names are inserted as literal text. The sender name has its own color.
+Command replies use the reserved `server` sender and are private to the caller.
+
+- `/help` lists commands and usage.
+- `/speed <positive number>` changes current walking speed in blocks/s, including
+  decimal values. Sprint retains its 1.3 multiplier (walking 6 means sprint 7.8).
+- `/speed default` restores the normal 4.3171806 blocks/s walking speed.
+
+The existing Escape screen has a **Player name** field and **Save name** button.
+The default is `player 1`. Accepted names are trimmed and saved in local storage;
+blank names and all capitalizations of `server` are rejected beside the field.
+Invalid changes retain the last valid name. Player identity is a separate stable
+local ID, independent of display name. The reusable player directory checks join
+and rename uniqueness without case sensitivity and allocates the first free
+`player N` default for future multiplayer. An actual server will own that
+registry and authenticate IDs; the current game remains single-player.
+
+All messages go through one delivery path. Public outgoing messages have an
+optional future broadcast hook; incoming messages are not rebroadcast. Private
+command replies are filtered by recipient identity and never use that hook.
+
+Keyboard/form checks run in an isolated Happy DOM document and real controller
+tests, without controlling the user's desktop or browser. Native pointer-lock
+permission behavior still depends on the browser and is handled with a resume
+button when recapture is denied.
+
 ## Blocks and collision
 
 Every block is **1 m x 1 m x 1 m**. The ground contains exactly **three layers**:

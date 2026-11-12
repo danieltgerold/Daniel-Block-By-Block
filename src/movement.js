@@ -1,6 +1,7 @@
 ﻿// Position is in blocks (1 block = 1 meter); velocity is blocks per physics tick.
 // y is always the player's feet. Constants follow the requested Java rules.
 import { createPlayerAnimation, tickPlayerAnimation, interpolatePlayerAnimation } from './player-animation.js';
+export const DEFAULT_WALK_SPEED = 0.098 / (1 - 0.546) * 20;
 export const MOVEMENT = Object.freeze({
   ticksPerSecond: 20,
   fixedStep: 1 / 20,
@@ -77,6 +78,7 @@ export function stepPlayer(player, input = {}, world = null) {
     ? (player.sprinting ? MOVEMENT.groundSprintAcceleration : MOVEMENT.groundWalkAcceleration)
     : (player.sprinting ? MOVEMENT.airSprintAcceleration : MOVEMENT.airWalkAcceleration);
   if (diagonal) acceleration /= MOVEMENT.diagonalAdjustment;
+  acceleration *= input.walkSpeedScale ?? 1;
   // Only new acceleration is rotated by yaw; momentum stays in world space.
   player.vx += (right * cosYaw - forward * sinYaw) * acceleration;
   player.vz += (-right * sinYaw - forward * cosYaw) * acceleration;
@@ -136,7 +138,14 @@ export class MovementController {
     this.miningHeld = false;
     this.swingQueued = false;
     this.onTick = null;
+    this.walkSpeed = DEFAULT_WALK_SPEED;
   }
+
+  setWalkSpeed(value) {
+    if (!Number.isFinite(value) || value <= 0) throw new RangeError('Walking speed must be finite and positive.');
+    this.walkSpeed = value;
+  }
+  resetWalkSpeed() { this.walkSpeed = DEFAULT_WALK_SPEED; }
 
   setMining(held) { this.miningHeld = held; }
   requestSwing() { this.swingQueued = true; }
@@ -183,7 +192,8 @@ export class MovementController {
     while (this.accumulator + 1e-9 >= MOVEMENT.fixedStep) {
       this.previous = snapshot(this.player);
       // Overrides let deterministic measurements exercise this exact controller.
-      stepPlayer(this.player, { ...this.readInput(), mining: this.miningHeld, swing: this.swingQueued, ...input }, this.world);
+      stepPlayer(this.player, { ...this.readInput(), mining: this.miningHeld, swing: this.swingQueued, ...input,
+        walkSpeedScale: this.walkSpeed / DEFAULT_WALK_SPEED }, this.world);
       if (this.player.animation.swingStartedThisTick) this.swingQueued = false;
       this.sprintRequested = false;
       this.accumulator -= MOVEMENT.fixedStep;
