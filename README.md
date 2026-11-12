@@ -42,8 +42,12 @@ ignored; source files and the package lock are tracked.
   held inputs, sprint, and double-tap history. Click again to resume.
 - **F3 + B** toggles depth-tested collision outlines, including the local player
   in either third-person view. Keyboard repeats are ignored.
-- The Escape menu's **Show body in first person** checkbox is off by default
-  and saved locally. It shows the body without the head or duplicate right arm.
+- The Escape menu has independent **Show Coordinates** and **Show FPS** toggles,
+  both on by default and saved locally. The top-left display uses feet X/Y/Z,
+  rounded to whole blocks without changing physics precision. Positive X is
+  east, Y is up, and Z is south; the world origin stays fixed. Half values round
+  away from zero, and negative zero displays as zero. FPS averages rendered
+  frame intervals and updates twice per second.
 
 ## Chat, names, and player settings
 
@@ -73,6 +77,11 @@ such as `/s`. Enter submits the completed command.
 All accept decimals and `default`; each reset changes only its own setting.
 `/default` resets all four settings together, subject to the same resize checks.
 `/help` is one compact multiline server reply, with range details kept in errors.
+`/tp <x> <y> <z>` teleports the feet to exact finite coordinates, including air
+or inside blocks. Commas also work, for example `/tp 10, 64, -20`. Negative and
+decimal values are accepted. Teleporting clears velocity, held inputs and
+interpolation, and immediately refreshes the camera, hitbox and nearby chunks.
+Aim and player settings are preserved. `/tp` also appears in help and autocomplete.
 Values are stored independently. Effective speed, reach and jump height are
 their size-1 values times size. Thus speed 6 at size 2 is 12 blocks/s; sprint
 retains its 1.3 multiplier. Zero speed, reach and jump height are supported.
@@ -123,8 +132,9 @@ The world model scales uniformly about the feet. Growth is rejected if the new
 box intersects a solid voxel. Placement checks use the same scaled body.
 Swept collision against the actual unit blocks handles walls, floors, ceilings,
 placed blocks, and holes. Digging all three layers opens the void; there is no
-invisible floor below them. Falling below y=-32 respawns you at a supported
+invisible floor below them. Falling across y=-32 respawns you at a supported
 column near the original spawn, with movement inputs cleared.
+An explicit teleport below that boundary stays at the requested destination.
 
 Jump peak is measured internally relative to the takeoff surface. The former
 Live Telemetry panel and block-unit label have been removed from the game UI.
@@ -149,8 +159,8 @@ Actions steer toward aim; otherwise idle torso yaw holds. The head stays within
 50 degrees, shifting the torso only as needed. Yaw interpolation wraps across
 180 degrees. From rest, aim 35 leaves torso 0; aim 70 gives torso 20/head 50.
 
-First-person hides the entire world avatar by default. The Escape-menu body
-toggle enables the depth-tested body, hiding its head and world right arm.
+First-person always hides the entire world avatar; the body toggle and its
+saved setting have been removed.
 The rig stays rooted at the feet without a first-person position offset.
 The one visible right arm renders in a separate camera-space scene after the
 world with a depth clear and its own 70-degree vertical FOV. Six-tick action
@@ -231,6 +241,9 @@ Focused automated checks also cover both scaled F5 cameras, size-two wall
 collision, leg separation, forward action swings, neutral hand rest, crouch
 speed (1.295154 blocks/s at size one), low-ceiling standing rejection, diagonal
 ledge overhang at sizes one and two, chat fading and revival, compact help,
-the four-setting reset, the body checkbox, and F3+B collision bounds. These
+the four-setting reset, and F3+B collision bounds. HUD checks cover independent
+saved toggles, coordinate rounding around zero, stable FPS samples, teleport
+formats and errors, exact positions and reset motion, plus destination cameras,
+collision outlines and chunk loading. These
 checks run without taking control of the user's computer; visual playtesting
 remains with the user.

@@ -27,14 +27,8 @@ export class ChatUI {
     this.developerSequence = new DeveloperSequence({ now });
     this.completion = null;
     this.elements = Object.fromEntries(['chat-panel', 'chat-log', 'chat-form', 'chat-input',
-      'name-form', 'player-name', 'name-error', 'resume-note', 'chat-completions', 'show-first-person-body'].map(id => [id, document.getElementById(id)]));
-    this.showFirstPersonBody = false;
-    try { this.showFirstPersonBody = storage?.getItem('block-by-block.first-person-body') === 'true'; } catch { /* Session preference still works. */ }
-    this.elements['show-first-person-body'].checked = this.showFirstPersonBody;
-    this.elements['show-first-person-body'].addEventListener('change', () => {
-      this.showFirstPersonBody = this.elements['show-first-person-body'].checked;
-      try { storage?.setItem('block-by-block.first-person-body', String(this.showFirstPersonBody)); } catch { /* Keep session preference. */ }
-    });
+      'name-form', 'player-name', 'name-error', 'resume-note', 'chat-completions'].map(id => [id, document.getElementById(id)]));
+    try { storage?.removeItem('block-by-block.first-person-body'); } catch { /* Remove obsolete preference when storage allows. */ }
     this.profile = new LocalPlayerProfile(storage, createId);
     this.service = new ChatService({ profile: this.profile, controller, broadcast });
     this.elements['player-name'].value = this.profile.player.displayName;

@@ -26,7 +26,8 @@
           </div>
           <span id="name-error" class="name-error" role="alert"></span>
         </form>
-        <label class="menu-toggle"><input id="show-first-person-body" type="checkbox" /> Show body in first person</label>
+        <label class="menu-toggle"><input id="show-coordinates" type="checkbox" checked /> Show Coordinates</label>
+        <label class="menu-toggle"><input id="show-fps" type="checkbox" checked /> Show FPS</label>
         <div class="controls">
           <div><span class="key-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Walk</span></div>
           <div><span class="key-group"><kbd class="wide">MOUSE</kbd><kbd>F5</kbd></span><span>Look / switch camera</span></div>
@@ -43,6 +44,10 @@
       </section>
     </main>
 
+    <div id="world-hud" class="world-hud" hidden>
+      <div id="coordinates" title="Feet position: +X east, +Y up, +Z south">X: 0 Y: 0 Z: 0</div>
+      <div id="fps">FPS: —</div>
+    </div>
     <div id="crosshair" class="crosshair" hidden aria-hidden="true"></div>
     <button id="resume-note" class="resume-note" type="button" hidden>Click to resume mouse look</button>
     <section id="chat-panel" class="chat-panel" aria-label="Chat" hidden>

@@ -60,11 +60,11 @@ export function createPlayerModel() {
   return model;
 }
 
-export function animatePlayerModel(model, feet, pose, cameraMode = 0, showFirstPersonBody = false) {
+export function animatePlayerModel(model, feet, pose, cameraMode = 0) {
   model.scale.setScalar(feet.size ?? 1);
   model.position.set(feet.x, feet.y, feet.z);
   model.rotation.set(0, pose.torsoYaw, 0);
-  model.visible = cameraMode !== 0 || showFirstPersonBody;
+  model.visible = cameraMode !== 0;
   const j = model.userData.joints;
   j.Head.visible = cameraMode !== 0;
   j['Right Arm'].visible = cameraMode !== 0;

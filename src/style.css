@@ -57,7 +57,7 @@ button span { font-size: 19px; }
 .name-error { display: block; margin-top: 5px; color: #a52d27; font-size: 11px; }
 .chat-panel { position: fixed; z-index: 4; left: 16px; bottom: 16px; width: min(580px, calc(100vw - 32px)); font: 14px/1.5 Consolas, monospace; color: #fff; }
 .chat-panel.is-open { bottom: 16px; }
-.chat-log { list-style: none; padding: 0; margin: 0 0 7px; max-height: 180px; overflow-y: auto; overflow-wrap: anywhere; text-shadow: 1px 1px #000; }
+.chat-log { list-style: none; padding: 0; margin: 0 0 7px; max-height: 220px; overflow-y: auto; overflow-wrap: anywhere; text-shadow: 1px 1px #000; }
 .chat-log li { padding: 2px 7px; background: #0009; white-space: pre-wrap; }
 .chat-sender { color: #72d8ff; }
 .chat-server { color: #ffe381; }
@@ -67,3 +67,6 @@ button span { font-size: 19px; }
 #chat-completions { padding: 5px 8px; background: #111e; color: #cdd7ca; white-space: pre-wrap; }
 #chat-completions .completion-selected { color: #ffe381; text-decoration: underline; }
 .menu-toggle { display: flex; gap: 8px; align-items: center; margin: 12px 0; font-size: 12px; }
+.world-hud { position: fixed; z-index: 2; top: 16px; left: 16px; color: #fff; font: 14px/1.5 Consolas, monospace; text-shadow: 1px 1px 2px #000; pointer-events: none; }
+.world-hud > div { width: max-content; padding: 1px 5px; background: #0007; }
+body.world-view .wordmark { visibility: hidden; }

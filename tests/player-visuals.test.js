@@ -127,14 +127,12 @@ test('walking pose is interpolated and agrees at different rendering frame rates
   }
 });
 
-test('first person hides the whole avatar by default and the menu option shows one body without head or duplicate right arm', () => {
+test('first person hides the whole avatar and both third-person views show it', () => {
   const model = createPlayerModel();
   const feet = { x: 0.5, y: 0, z: 0.5 };
   animatePlayerModel(model, feet, pose(), 0);
   assert.equal(model.visible, false);
   near(model.position.x, feet.x); near(model.position.z, feet.z);
-  animatePlayerModel(model, feet, pose(), 0, true);
-  assert.equal(model.visible, true);
   assert.equal(model.userData.joints.Head.visible, false);
   assert.equal(model.userData.joints['Right Arm'].visible, false);
   for (const mode of [1, 2]) {

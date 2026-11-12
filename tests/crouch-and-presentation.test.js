@@ -38,16 +38,13 @@ test('help is one compact multiline server reply, /default resets the four setti
   assert.equal((text.match(/<server>/g) || []).length, 1);
   assert.match(text, /^<server>: Commands\n\/help — Show commands\n\/speed <value> — Walking speed/);
   assert.match(text, /\/default — Reset all player settings/);
-  assert.equal(text.split('\n').length, 8);
+  assert.equal(text.split('\n').length, 9);
   for (const command of ['/speed 6', '/reach 10', '/jump 3', '/size 2', '/default']) f.ui.service.submit(command);
   assert.deepEqual(f.controller.settings, DEFAULT_SETTINGS);
   assert.equal(f.document.querySelector('.telemetry'), null);
   assert.equal(f.document.querySelector('.scale-note'), null);
   assert.doesNotMatch(f.document.body.textContent, /LIVE TELEMETRY|1 BLOCK =|m³/);
-  const body = f.ui.elements['show-first-person-body'];
-  assert.equal(f.ui.showFirstPersonBody, false);
-  body.checked = true; body.dispatchEvent(new f.window.Event('change'));
-  assert.equal(f.ui.showFirstPersonBody, true);
+  assert.equal(f.document.getElementById('show-first-person-body'), null);
 });
 
 test('both F5 cameras scale to 2/8/4 blocks, sweep a larger camera box at size two, and restore distance', () => {

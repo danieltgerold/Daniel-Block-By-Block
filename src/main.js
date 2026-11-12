@@ -3,6 +3,7 @@ import { MovementController } from './movement.js';
 import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
 import { EntityHitboxes } from './entity-hitboxes.js';
+import { GameplayHUD } from './gameplay-hud.js';
 import { ChatUI, isTextEntry } from './chat-ui.js';
 import { createPlayerModel, animatePlayerModel, nextCameraMode, updatePlayerCamera,
   createEmptyHand, updateEmptyHand, renderPlayerScene } from './player-visuals.js';
@@ -114,16 +115,24 @@ function renderInputMode(mode) {
   crosshair.hidden = !active;
   playingHint.hidden = !active;
   document.body.classList.toggle('is-playing', active);
+  document.body.classList.toggle('world-view', mode !== 'menu');
+  hud.root.hidden = mode === 'menu';
   previousTime = null;
 }
 
 let profileStorage = null;
 try { profileStorage = window.localStorage; } catch { /* Session identity still works without browser storage. */ }
+const hud = new GameplayHUD(document, profileStorage);
 const chatUI = new ChatUI({ document, window, controller, clearInput, requestCapture: captureMouse,
   requestUnlock: () => { if (document.pointerLockElement === canvas) document.exitPointerLock(); },
   onModeChange: renderInputMode,
   onCameraCycle: () => { cameraMode = nextCameraMode(cameraMode); },
   onHitboxToggle: () => { hitboxesVisible = !hitboxesVisible; }, storage: profileStorage });
+controller.onTeleport = () => {
+  primaryClickQueued = false;
+  previousTime = null;
+  refreshWorldView();
+};
 
 async function captureMouse() {
   if (chatUI.mode === 'chat') return false;
@@ -168,11 +177,21 @@ function animate(time) {
   const dt = previousTime === null ? 0 : (time - previousTime) / 1000;
   previousTime = time;
   if (active) {
+    const previousY = controller.player.y;
     controller.update(dt, { yaw, pitch });
-    if (controller.player.y < -32) controller.respawn(world.findSpawn(controller.size));
+    // Keep explicit teleports below the void boundary; respawn ordinary falls
+    // when they cross that boundary from above.
+    if (previousY >= -32 && controller.player.y < -32) controller.respawn(world.findSpawn(controller.size));
   }
+  const position = refreshWorldView();
+  chatUI.updateVisibility();
+  renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);
+  hud.renderedFrame(time, position);
+}
+
+function refreshWorldView() {
   const position = controller.renderState();
-  animatePlayerModel(playerModel, position, position.animation, cameraMode, chatUI.showFirstPersonBody);
+  animatePlayerModel(playerModel, position, position.animation, cameraMode);
   updateEmptyHand(emptyHand, position.animation);
   updatePlayerCamera(camera, cameraMode, position, yaw, pitch, world);
   const fov = baseFov * position.fovMultiplier;
@@ -184,8 +203,8 @@ function animate(time) {
   const target = active ? targetBlock() : null;
   selection.visible = Boolean(target);
   if (target) selection.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
-  chatUI.updateVisibility();
   hitboxes.update([{ id: chatUI.profile.player.id, ...position, local: true }], cameraMode, hitboxesVisible);
-  renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);
+  hud.updatePosition(position);
+  return position;
 }
 renderer.setAnimationLoop(animate);

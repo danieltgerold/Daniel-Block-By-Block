@@ -283,6 +283,16 @@ export class MovementController {
     this.pause();
   }
 
+  teleport(position) {
+    if (!['x', 'y', 'z'].every(axis => Number.isFinite(position[axis]))) return false;
+    // Deliberately allow air and solid destinations. No collision correction or
+    // rounding: the next physics tick resumes normally at these exact feet.
+    this.respawn({ x: position.x, y: position.y, z: position.z });
+    this.player.grounded = this.world ? this.world.isSupported(this.player) : position.y === 0;
+    this.onTeleport?.();
+    return true;
+  }
+
   pause() {
     this.miningHeld = false;
     this.swingQueued = false;

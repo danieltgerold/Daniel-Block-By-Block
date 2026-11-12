@@ -8,13 +8,14 @@ export const COMMANDS = Object.freeze([
   { name: '/jump', setting: 'jump', label: 'Jump apex', unit: 'blocks', min: 0, max: 255, description: 'jump apex above takeoff at size 1' },
   { name: '/size', setting: 'size', label: 'Size', unit: 'multiplier', min: 0.1, max: 4, description: 'player size multiplier' },
   { name: '/default', action: 'defaults', description: 'Reset all player settings' },
+  { name: '/tp', action: 'teleport', usage: '/tp <x> <y> <z>', description: 'Teleport feet' },
 ].map(Object.freeze));
 export const numberText = value => String(Number(value.toPrecision(8)));
 export function commandHelp() {
   const labels = { speed: 'Walking speed', reach: 'Interaction distance', jump: 'Jump height', size: 'Player size' };
   return 'Commands\n' + COMMANDS.map(command => command.setting
     ? `${command.name} <value> — ${labels[command.setting]}`
-    : `${command.name} — ${command.description}`).join('\n')
+    : `${command.usage ?? command.name} — ${command.description}`).join('\n')
     + '\nUse default in place of a value to reset that setting.';
 }
 export function commandCompletions(text) {
@@ -30,6 +31,18 @@ export function applyCommand(service, text) {
   const [name, ...args] = text.split(/\s+/);
   const command = COMMANDS.find(item => item.name === name.toLowerCase());
   if (!command) { service.reply('Unknown command. Type /help for available commands.'); return; }
+  if (command.action === 'teleport') {
+    const number = '[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?';
+    const values = text.slice(name.length).trim();
+    const whitespace = new RegExp(`^(${number})\\s+(${number})\\s+(${number})$`, 'i');
+    const commas = new RegExp(`^(${number})\\s*,\\s*(${number})\\s*,\\s*(${number})$`, 'i');
+    const match = whitespace.exec(values) ?? commas.exec(values);
+    const coords = match?.slice(1).map(Number);
+    if (!coords?.every(Number.isFinite)) { service.reply(`Usage: ${command.usage}`); return; }
+    service.controller.teleport({ x: coords[0], y: coords[1], z: coords[2] });
+    service.reply(`Teleported to ${coords.join(', ')}.`);
+    return;
+  }
   if (!command.setting) {
     if (args.length) service.reply(`Usage: ${command.name}. See /help for commands.`);
     else if (command.action === 'defaults') {
