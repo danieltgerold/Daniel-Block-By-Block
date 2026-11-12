@@ -83,7 +83,7 @@ export function stepPlayer(player, input = {}, world = null) {
   const sneak = player.crouching ? 0.30 : 1;
   forward *= sneak * MOVEMENT.diagonalAdjustment;
   right *= sneak * MOVEMENT.diagonalAdjustment;
-  const length = Math.hypot(forward, right);
+  const length = Math.sqrt(forward * forward + right * right);
   if (length > 1) { forward /= length; right /= length; }
   let acceleration = startedGrounded
     ? (player.sprinting ? MOVEMENT.groundSprintAcceleration : MOVEMENT.groundWalkAcceleration)
@@ -106,13 +106,13 @@ export function stepPlayer(player, input = {}, world = null) {
     if (motion.blocked.x) player.vx = 0;
     if (motion.blocked.y) player.vy = 0;
     if (motion.blocked.z) player.vz = 0;
-    player.speed = Math.hypot(motion.moved.x, motion.moved.z) * MOVEMENT.ticksPerSecond;
+    player.speed = Math.sqrt(motion.moved.x * motion.moved.x + motion.moved.z * motion.moved.z) * MOVEMENT.ticksPerSecond;
     player.grounded = motion.grounded;
   } else {
     player.x += player.vx;
     player.z += player.vz;
     player.y += player.vy;
-    player.speed = Math.hypot(player.vx, player.vz) * MOVEMENT.ticksPerSecond;
+    player.speed = Math.sqrt(player.vx * player.vx + player.vz * player.vz) * MOVEMENT.ticksPerSecond;
     player.grounded = player.y <= 0 && player.vy <= 0;
     if (player.grounded) player.y = 0;
   }

@@ -1,0 +1,65 @@
+# Checks every pull request. Three independent jobs:
+#   web    - the game's own tests and build, with no Java installed (frontend work never needs a JDK)
+#   core   - the Java core's tests, including bit-exact parity against the golden traces
+#   golden - regenerates the golden traces from the current JS rules; a diff means a rule changed
+#            (usually via a merge from main) and the Java port must be updated to match
+name: parity
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v5 # also validates the committed Gradle wrapper jar
+      - run: ./gradlew :core:test
+      - name: Trig golden file is current
+        run: |
+          ./gradlew :core:writeTrigGolden
+          git diff --exit-code -- tests/golden/trig
+
+  golden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run golden
+      - name: Golden traces match the JS rules
+        run: |
+          if [ -n "$(git status --porcelain -- tests/golden)" ]; then
+            git status --short -- tests/golden
+            echo "::error::The JS rules changed. Run 'npm run golden', port the change to core/, and commit both."
+            exit 1
+          fi
