@@ -38,7 +38,7 @@ test('DDA respects reach and resolves negative coordinates and placement face no
   const world = new VoxelWorld({ depth: 0 });
   world.setBlock(-3, 0, 0, true);
   assert.equal(world.raycast({ x: 0.5, y: 0.5, z: 0.5 }, { x: -1, y: 0, z: 0 }, 2), null);
-  const hit = world.raycast({ x: 0.5, y: 0.5, z: 0.5 }, { x: -2, y: 0, z: 0 }, 6);
+  const hit = world.raycast({ x: 0.5, y: 0.5, z: 0.5 }, { x: -2, y: 0, z: 0 });
   assert.equal(hit.x, -3);
   near(hit.distance, 2.5);
   assert.deepEqual(hit.normal, { x: 1, y: 0, z: 0 });

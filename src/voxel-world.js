@@ -1,5 +1,6 @@
 ﻿export const CHUNK_SIZE = 16;
 export const PLAYER_HALF_WIDTH = 0.3;
+export const BLOCK_REACH = 4.5;
 const EPSILON = 1e-7;
 export const chunkKey = (x, z) => `${x},${z}`;
 const blockKey = (x, y, z) => `${x},${y},${z}`;
@@ -55,7 +56,7 @@ export class VoxelWorld {
   }
 
   // Grid DDA hits actual voxels, independently of visible meshes or their LOD.
-  raycast(origin, direction, reach = 6) {
+  raycast(origin, direction, reach = BLOCK_REACH) {
     const magnitude = Math.hypot(direction.x, direction.y, direction.z);
     if (!magnitude || reach < 0) return null;
     const d = [direction.x / magnitude, direction.y / magnitude, direction.z / magnitude];

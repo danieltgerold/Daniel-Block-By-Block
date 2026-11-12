@@ -28,7 +28,9 @@ ignored; source files and the package lock are tracked.
 - Release Shift while holding W to keep sprinting, including in the air and after
   landing. Releasing forward input, or canceling it with S, stops sprinting.
 - Hold Space to jump repeatedly whenever grounded and the cooldown permits.
-- Aim at a block within **6 m**. The outline marks the targeted block.
+- F5 cycles first-person, third-person rear, and third-person front views.
+  Held-key repeats do not cycle again; F5's normal page reload is suppressed.
+- Aim at a block within **4.5 blocks (4.5 m)**. The outline marks the targeted block.
 - **Left click** removes the targeted block immediately.
 - **Right click** places a block against the targeted face. Placement inside the
   player's physical or interpolated body is rejected. The context menu is suppressed.
@@ -42,7 +44,7 @@ voxel y=-1, -2, and -3, with the initial walking surface at y=0. The world exten
 horizontally as you travel; only edits are stored. Edits remain while traveling
 away and back, but are currently session-only and reset on page reload.
 
-The player is 0.6 m wide and **2 m tall**, with eyes 1.8 m above the feet.
+The player is 0.6 m wide and **2 m tall**, with eyes 1.6 m above the feet.
 Swept collision against the actual unit blocks handles walls, floors, ceilings,
 placed blocks, and holes. Digging all three layers opens the void; there is no
 invisible floor below them. Falling below y=-32 respawns you at a supported
@@ -52,6 +54,19 @@ The feet readout shows world Y. Jump peak is measured relative to the takeoff
 surface, so jumping on a placed block still measures approximately 1.25 m.
 
 ## Rendering and distance detail
+
+The player model is a `THREE.Group` with six separate brightly colored meshes:
+green head, yellow chest, red left arm, magenta right arm, blue left leg, and cyan
+right leg. It follows the interpolated feet position and player yaw. Limbs pivot
+at shoulders and hips; opposite arm/leg pairs use the cosine swing formula
+`cos(limbSwingTime * 0.6662) * 1.4 * speedAmount`. Movement distance drives cadence,
+and movement speed drives amplitude, easing smoothly back to zero when stopped.
+
+First-person hides the model and uses normal mouse-look at eye height 1.6 m.
+Third-person rear/front place the camera exactly 4 m behind/in front along the
+player's full look vector, looking at feet + 1.6 m. This fixed offset can clip
+through nearby blocks. Editing always traces from the player's eyes along the
+player's look direction with the same 4.5 m reach, independently of camera mode.
 
 - Terrain is divided into **16 x 16 block chunks**.
 - Only exposed block faces are meshed. Adjacent coplanar faces are greedily merged;

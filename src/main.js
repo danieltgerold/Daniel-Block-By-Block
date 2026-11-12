@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { MovementController, MOVEMENT } from './movement.js';
 import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
+import { createPlayerModel, animatePlayerModel, nextCameraMode, playerLookDirection, updatePlayerCamera } from './player-visuals.js';
 import './style.css';
 
 const canvas = document.querySelector('#world');
@@ -19,6 +20,7 @@ let yaw = 0;
 let pitch = -0.12;
 let active = false;
 let previousTime = null;
+let cameraMode = 0;
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -28,6 +30,8 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#c6dfe9');
 scene.fog = new THREE.Fog('#c6dfe9', 55, 140);
+const playerModel = createPlayerModel();
+scene.add(playerModel);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 500);
 const baseFov = camera.fov;
 camera.rotation.order = 'YXZ';
@@ -60,13 +64,21 @@ const selection = new THREE.LineSegments(
 selection.visible = false;
 scene.add(selection);
 const lookDirection = new THREE.Vector3();
+const reachOrigin = new THREE.Vector3();
 
 function targetBlock() {
-  camera.rotation.set(pitch, yaw, 0);
-  camera.updateMatrixWorld();
-  camera.getWorldDirection(lookDirection);
-  return world.raycast(camera.position, lookDirection, 6);
+  const feet = controller.renderState();
+  reachOrigin.set(feet.x, feet.y + MOVEMENT.eyeHeight, feet.z);
+  playerLookDirection(yaw, pitch, lookDirection);
+  return world.raycast(reachOrigin, lookDirection);
 }
+
+window.addEventListener('keydown', event => {
+  if (event.code !== 'F5') return;
+  event.preventDefault();
+  event.stopPropagation();
+  cameraMode = nextCameraMode(cameraMode, event.repeat);
+}, { capture: true });
 
 canvas.addEventListener('contextmenu', event => event.preventDefault());
 canvas.addEventListener('mousedown', event => {
@@ -144,8 +156,12 @@ function animate(time) {
   }
   const p = controller.player;
   const position = controller.renderState();
-  camera.position.set(position.x, position.y + MOVEMENT.eyeHeight, position.z);
-  camera.rotation.set(pitch, yaw, 0);
+  playerModel.position.set(position.x, position.y, position.z);
+  playerModel.rotation.y = yaw;
+  playerModel.userData.parts.Head.rotation.x = pitch;
+  playerModel.visible = cameraMode !== 0;
+  animatePlayerModel(playerModel, active ? p.speed : 0, dt);
+  updatePlayerCamera(camera, cameraMode, position, yaw, pitch);
   const fov = baseFov * position.fovMultiplier;
   if (Math.abs(camera.fov - fov) > 1e-8) {
     camera.fov = fov;

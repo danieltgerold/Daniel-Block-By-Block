@@ -18,7 +18,7 @@ export const MOVEMENT = Object.freeze({
   verticalDrag: 0.98,
   sprintFovMultiplier: 1.15,
   playerHeight: 2,
-  eyeHeight: 1.8,
+  eyeHeight: 1.6,
 });
 
 export function createPlayer() {

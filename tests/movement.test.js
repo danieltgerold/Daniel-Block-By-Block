@@ -324,9 +324,9 @@ test('rendered walking stays smooth between 20 Hz ticks at high and uneven frame
   }
 });
 
-test('player stays 2m tall with a 1.8m eye level', () => {
+test('player stays 2m tall with a 1.6m eye level', () => {
   near(MOVEMENT.playerHeight, 2);
-  near(MOVEMENT.eyeHeight, 1.8);
+  near(MOVEMENT.eyeHeight, 1.6);
   near(MOVEMENT.fixedStep, 0.05);
 });
 
