@@ -1,6 +1,6 @@
 ﻿import * as THREE from 'three';
 import { MOVEMENT } from './movement.js';
-import { angleDifference, swingCurves } from './player-animation.js';
+import { swingCurves } from './player-animation.js';
 
 export const MODEL_SCALE = 0.9375 / 16;
 export const THIRD_PERSON_DISTANCE = 4;
@@ -37,12 +37,12 @@ export function createPlayerModel() {
     joints[name] = joint;
   }
   part('Head', [8, 8, 8], [0, 28, 0], [0, 24, 0]);
-  part('Chest', [8, 12, 4], [0, 18, 0]);
+  part('Chest', [8, 12, 4], [0, 18, 0], [0, 24, 0]);
   // With forward -Z and right +X, negative X is the player's left.
   part('Left Arm', [4, 12, 4], [-6, 18, 0], [-5, 22, 0]);
   part('Right Arm', [4, 12, 4], [6, 18, 0], [5, 22, 0]);
-  part('Left Leg', [4, 12, 4], [-1.9, 6, 0], [-1.9, 12, 0]);
-  part('Right Leg', [4, 12, 4], [1.9, 6, 0], [1.9, 12, 0]);
+  part('Left Leg', [4, 12, 4], [-2, 6, 0], [-2, 12, 0]);
+  part('Right Leg', [4, 12, 4], [2, 6, 0], [2, 12, 0]);
   // An original five-rectangle face on -Z, using no imported skins or artwork.
   function faceRect(w, h, x, y, color, layer = 0) {
     const rect = new THREE.Mesh(new THREE.PlaneGeometry(w * MODEL_SCALE, h * MODEL_SCALE), new THREE.MeshBasicMaterial({ color }));
@@ -60,34 +60,36 @@ export function createPlayerModel() {
   return model;
 }
 
-export function animatePlayerModel(model, feet, pose, cameraMode = 0) {
-  const size = feet.size ?? 1;
-  model.scale.setScalar(size);
+export function animatePlayerModel(model, feet, pose, cameraMode = 0, showFirstPersonBody = false) {
+  model.scale.setScalar(feet.size ?? 1);
   model.position.set(feet.x, feet.y, feet.z);
-  model.rotation.y = pose.torsoYaw;
-  const joints = model.userData.joints;
-  joints.Head.visible = cameraMode !== 0;
-  joints['Right Arm'].visible = cameraMode !== 0;
-  if (cameraMode === 0) {
-    // Move only the visual rig behind the eye. The front of the chest stays
-    // behind the eye ray even when the torso and head point different ways.
-    const relative = angleDifference(pose.aimYaw, pose.torsoYaw);
-    const back = Math.abs(Math.cos(relative)) * 2 * MODEL_SCALE
-      + Math.abs(Math.sin(relative)) * 4 * MODEL_SCALE + 0.2;
-    model.position.x += Math.sin(pose.aimYaw) * back * size;
-    model.position.z += Math.cos(pose.aimYaw) * back * size;
-  }
-  joints.Head.rotation.set(pose.aimPitch, pose.headYaw, 0);
+  model.rotation.set(0, pose.torsoYaw, 0);
+  model.visible = cameraMode !== 0 || showFirstPersonBody;
+  const j = model.userData.joints;
+  j.Head.visible = cameraMode !== 0;
+  j['Right Arm'].visible = cameraMode !== 0;
   const s = Math.cos(pose.phase * 0.6662) * pose.amount;
-  joints['Left Arm'].rotation.x = s;
-  joints['Right Arm'].rotation.x = -s;
-  joints['Right Leg'].rotation.x = 1.4 * s;
-  joints['Left Leg'].rotation.x = -1.4 * s;
-  const action = swingCurves(pose.swingProgress, pose.swingActive);
-  joints['Right Arm'].rotation.x -= action.reach * 1.0;
-  joints['Right Arm'].rotation.y = -action.inward * 0.5;
+  const c = pose.crouch ?? 0;
+  const p = pose.swingActive ? pose.swingProgress : 0;
+  const t = pose.swingActive ? 0.20 * Math.sin(2 * Math.PI * Math.sqrt(p)) : 0;
+  const headPitchMC = -pose.aimPitch;
+  const u = 1 - (1 - p) ** 4;
+  const attack = pose.swingActive ? 1.2 * Math.sin(Math.PI * u)
+    + 0.75 * Math.sin(Math.PI * p) * (0.7 - headPitchMC) : 0;
+  // Build in MC (+Y down, right shoulder -X), then convert X/Y rotations once.
+  j.Chest.position.set(0, (24 - 3.2 * c) * MODEL_SCALE, 0);
+  j.Chest.rotation.set(-0.5 * c, -t, 0);
+  j.Head.position.set(0, (24 - 4.2 * c) * MODEL_SCALE, 0);
+  j.Head.rotation.set(pose.aimPitch, pose.headYaw, 0);
+  j['Right Arm'].position.set(5 * Math.cos(t) * MODEL_SCALE, (22 - 3.2 * c) * MODEL_SCALE, 5 * Math.sin(t) * MODEL_SCALE);
+  j['Left Arm'].position.set(-5 * Math.cos(t) * MODEL_SCALE, (22 - 3.2 * c) * MODEL_SCALE, -5 * Math.sin(t) * MODEL_SCALE);
+  j['Right Arm'].rotation.set(-(s + 0.4 * c - attack), -3 * t, -0.4 * Math.sin(Math.PI * p));
+  j['Left Arm'].rotation.set(-(-s + 0.4 * c + t), -t, 0);
+  j['Right Leg'].position.set(2 * MODEL_SCALE, 12 * MODEL_SCALE, 4 * c * MODEL_SCALE);
+  j['Left Leg'].position.set(-2 * MODEL_SCALE, 12 * MODEL_SCALE, 4 * c * MODEL_SCALE);
+  j['Right Leg'].rotation.set(1.4 * s, 0, 0);
+  j['Left Leg'].rotation.set(-1.4 * s, 0, 0);
 }
-
 export function nextCameraMode(mode, repeat = false) {
   return repeat ? mode : (mode + 1) % 3;
 }
@@ -100,7 +102,7 @@ const headTarget = new THREE.Vector3();
 const forward = new THREE.Vector3();
 const path = new THREE.Vector3();
 export function updatePlayerCamera(camera, mode, feet, yaw, pitch, world = null) {
-  headTarget.set(feet.x, feet.y + MOVEMENT.eyeHeight * (feet.size ?? 1), feet.z);
+  headTarget.set(feet.x, feet.y + (feet.eyeHeight ?? feet.eyeOffset ?? MOVEMENT.eyeHeight * (feet.size ?? 1)), feet.z);
   camera.position.copy(headTarget);
   camera.rotation.order = 'YXZ';
   if (mode === 0) {
@@ -108,11 +110,13 @@ export function updatePlayerCamera(camera, mode, feet, yaw, pitch, world = null)
     return 0;
   }
   playerLookDirection(yaw, pitch, forward);
-  path.copy(forward).multiplyScalar(mode === 1 ? -THIRD_PERSON_DISTANCE : THIRD_PERSON_DISTANCE);
-  const fraction = world ? world.sweepBox(headTarget, path, 0.1) : 1;
+  const size = feet.size ?? 1;
+  const distance = THIRD_PERSON_DISTANCE * size;
+  path.copy(forward).multiplyScalar(mode === 1 ? -distance : distance);
+  const fraction = world ? world.sweepBox(headTarget, path, 0.1 * size) : 1;
   camera.position.addScaledVector(path, fraction);
   camera.rotation.set(mode === 2 ? -pitch : pitch, mode === 2 ? yaw + Math.PI : yaw, 0);
-  return THIRD_PERSON_DISTANCE * fraction;
+  return distance * fraction;
 }
 
 export function createEmptyHand(aspect = 1) {
@@ -122,7 +126,7 @@ export function createEmptyHand(aspect = 1) {
   rig.name = 'First Person Right Arm';
   const arm = coloredBox([4, 12, 4].map(n => n * MODEL_SCALE), PLAYER_COLORS['Right Arm']);
   arm.name = 'Right Arm';
-  arm.geometry.translate(0, 6 * MODEL_SCALE, 0);
+  arm.geometry.translate(0, 10 * MODEL_SCALE, 0);
   rig.add(arm);
   scene.add(rig);
   const hand = { scene, camera, rig, arm };
@@ -130,12 +134,24 @@ export function createEmptyHand(aspect = 1) {
   return hand;
 }
 
+const fixedArmAlignment = new THREE.Matrix4().makeTranslation(-1, 3.6, 3.5)
+  .multiply(new THREE.Matrix4().makeRotationZ(120 * Math.PI / 180))
+  .multiply(new THREE.Matrix4().makeRotationX(200 * Math.PI / 180))
+  .multiply(new THREE.Matrix4().makeRotationY(-135 * Math.PI / 180))
+  .multiply(new THREE.Matrix4().makeTranslation(5.6, 0, 0));
+const handRotation = new THREE.Matrix4();
 export function updateEmptyHand(hand, pose) {
-  const { inward, vertical, reach } = swingCurves(pose.swingProgress, pose.swingActive);
-  hand.rig.position.set(0.5 - 0.32 * inward, -0.8 + 0.12 * vertical, -0.65 - 0.22 * reach);
-  hand.rig.rotation.set(-0.6 - 0.4 * inward, -0.15 - 0.8 * inward, 0.2 - 0.25 * reach);
+  const p = pose.swingActive ? pose.swingProgress : 0;
+  const { inward: q, vertical: r, reach: a } = swingCurves(p, pose.swingActive);
+  const b = Math.sin(Math.PI * p * p);
+  hand.rig.matrixAutoUpdate = false;
+  // Written matrix order: T · Ry · Rz · fixed arm alignment. No walk/idle bob.
+  hand.rig.matrix.makeTranslation(0.64 - 0.30 * q, -0.60 + 0.40 * r, -0.72 - 0.40 * a)
+    .multiply(handRotation.makeRotationY((45 + 70 * q) * Math.PI / 180))
+    .multiply(handRotation.makeRotationZ(-20 * b * Math.PI / 180))
+    .multiply(fixedArmAlignment);
+  hand.rig.matrixWorldNeedsUpdate = true;
 }
-
 export function renderPlayerScene(renderer, scene, camera, hand, mode) {
   const autoClear = renderer.autoClear;
   renderer.autoClear = false;

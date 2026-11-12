@@ -2,18 +2,20 @@
 
 // One registry drives parsing, help, and Tab completions.
 export const COMMANDS = Object.freeze([
-  { name: '/help', description: 'List commands, units, ranges, and reset syntax.' },
+  { name: '/help', description: 'Show commands' },
   { name: '/speed', setting: 'speed', label: 'Walking speed', unit: 'blocks/s', min: 0, max: 255, description: 'walking speed at size 1' },
   { name: '/reach', setting: 'reach', label: 'Reach', unit: 'blocks', min: 0, max: 255, description: 'eye-to-hit interaction distance at size 1' },
   { name: '/jump', setting: 'jump', label: 'Jump apex', unit: 'blocks', min: 0, max: 255, description: 'jump apex above takeoff at size 1' },
   { name: '/size', setting: 'size', label: 'Size', unit: 'multiplier', min: 0.1, max: 4, description: 'player size multiplier' },
+  { name: '/default', action: 'defaults', description: 'Reset all player settings' },
 ].map(Object.freeze));
 export const numberText = value => String(Number(value.toPrecision(8)));
-export function commandHelp(developerMode = false) {
-  const help = COMMANDS.map(command => command.setting
-    ? `${command.name} <number|default> — ${command.description}, ${command.unit}; ${command.min}–${command.max}. ${command.name} default resets only this setting (default ${numberText(DEFAULT_SETTINGS[command.setting])}).`
-    : `${command.name} — ${command.description}`).join('\n');
-  return help + (developerMode ? '\nDeveloper mode: ranges bypassed; values must be finite (size > 0; others >= 0), with no effective overflow.' : '');
+export function commandHelp() {
+  const labels = { speed: 'Walking speed', reach: 'Interaction distance', jump: 'Jump height', size: 'Player size' };
+  return 'Commands\n' + COMMANDS.map(command => command.setting
+    ? `${command.name} <value> — ${labels[command.setting]}`
+    : `${command.name} — ${command.description}`).join('\n')
+    + '\nUse default in place of a value to reset that setting.';
 }
 export function commandCompletions(text) {
   const match = /^\/(\S*)(\s+)?(.*)$/.exec(text);
@@ -29,7 +31,11 @@ export function applyCommand(service, text) {
   const command = COMMANDS.find(item => item.name === name.toLowerCase());
   if (!command) { service.reply('Unknown command. Type /help for available commands.'); return; }
   if (!command.setting) {
-    service.reply(args.length ? 'Usage: /help. See /help for commands.' : commandHelp(service.controller.developerMode));
+    if (args.length) service.reply(`Usage: ${command.name}. See /help for commands.`);
+    else if (command.action === 'defaults') {
+      const result = service.controller.resetAllSettings();
+      service.reply(result.ok ? 'Speed, reach, jump height, and size reset to default.' : result.error);
+    } else service.reply(commandHelp());
     return;
   }
   const reset = args.length === 1 && args[0].toLowerCase() === 'default';

@@ -6,11 +6,12 @@ export const lerpAngle = (from, to, alpha) => wrapAngle(from + angleDifference(f
 
 export function createPlayerAnimation(aimYaw = 0, aimPitch = 0) {
   return { amount: 0, phase: 0, aimYaw, aimPitch, torsoYaw: aimYaw,
-    swingAge: -1, swingSerial: 0, swingStartedThisTick: false };
+    swingAge: -1, swingSerial: 0, swingStartedThisTick: false, crouch: 0 };
 }
 
 export function tickPlayerAnimation(state, { dx = 0, dz = 0, aimYaw = state.aimYaw,
-  aimPitch = state.aimPitch, swing = false, mining = false } = {}) {
+  aimPitch = state.aimPitch, swing = false, mining = false, crouching = false } = {}) {
+  state.crouch = crouching ? 1 : 0;
   const distance = Math.hypot(dx, dz);
   state.amount += (Math.min(4 * distance, 1) - state.amount) * 0.4;
   state.phase += state.amount;
@@ -18,7 +19,7 @@ export function tickPlayerAnimation(state, { dx = 0, dz = 0, aimYaw = state.aimY
   state.aimPitch = aimPitch;
   state.swingStartedThisTick = false;
   if (state.swingAge >= 0 && ++state.swingAge >= SWING_TICKS) state.swingAge = -1;
-  if ((swing || mining) && state.swingAge < 0) {
+  if ((swing || mining) && (state.swingAge < 0 || state.swingAge >= 3)) {
     state.swingAge = 0;
     state.swingSerial++;
     state.swingStartedThisTick = true;
@@ -45,11 +46,12 @@ export function interpolatePlayerAnimation(previous, current, alpha) {
     aimPitch: previous.aimPitch + (current.aimPitch - previous.aimPitch) * alpha,
     swingActive: previous.swingAge >= 0 || current.swingAge >= 0,
     swingProgress: 0,
+    crouch: previous.crouch + (current.crouch - previous.crouch) * alpha,
   };
   if (previous.swingAge >= 0) {
     // Finish the old cycle toward 1, including when a held click starts a new one.
-    const nextAge = current.swingSerial !== previous.swingSerial || current.swingAge < 0
-      ? SWING_TICKS : current.swingAge;
+    const nextAge = current.swingSerial !== previous.swingSerial ? previous.swingAge + 1
+      : current.swingAge < 0 ? SWING_TICKS : current.swingAge;
     pose.swingProgress = (previous.swingAge + (nextAge - previous.swingAge) * alpha) / SWING_TICKS;
   } else if (current.swingAge >= 0) {
     pose.swingProgress = current.swingAge * alpha / SWING_TICKS;

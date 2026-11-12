@@ -104,7 +104,7 @@ test('Escape menu name form validates beside the field and typing never reaches 
 
 test('T opens focused empty chat, clears held movement/mining, and typing cannot move or change view', t => {
   const f = fixture(t);
-  f.play(); f.key('w', 'KeyW'); f.key('Shift', 'ShiftLeft'); f.controller.setMining(true); f.frames();
+  f.play(); f.key('w', 'KeyW'); f.key('Shift', 'KeyR'); f.controller.setMining(true); f.frames();
   const before = { ...f.controller.player };
   assert.ok(before.speed > 0);
   const event = f.key('t', 'KeyT');
@@ -143,7 +143,8 @@ test('slash opens with exactly one slash, and Enter submits a private command in
   assert.equal(reply.senderId, SERVER_ID);
   assert.equal(reply.senderName, 'server');
   assert.equal(reply.recipientId, f.ui.profile.player.id);
-  assert.match(reply.text, /\/speed.*default/);
+  assert.match(reply.text, /\/speed <value>/);
+  assert.match(reply.text, /Use default/);
   assert.equal(f.calls.broadcast.length, 0);
   assert.equal(f.ui.elements['chat-log'].querySelector('.chat-server').textContent, 'server');
 });
@@ -203,7 +204,7 @@ test('blank Enter closes without delivering anything, and repeat Enter cannot do
 
 function measuredWalk(controller, { sprint = false } = {}) {
   controller.pause(); controller.keyDown('KeyW');
-  if (sprint) controller.keyDown('ShiftLeft');
+  if (sprint) controller.keyDown('KeyR');
   for (let i = 0; i < 100; i++) controller.update(0.05);
   const start = controller.player.z;
   for (let i = 0; i < 100; i++) controller.update(0.05);

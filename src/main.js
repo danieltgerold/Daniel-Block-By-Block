@@ -1,7 +1,8 @@
-import * as THREE from 'three';
-import { MovementController, MOVEMENT } from './movement.js';
+﻿import * as THREE from 'three';
+import { MovementController } from './movement.js';
 import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
+import { EntityHitboxes } from './entity-hitboxes.js';
 import { ChatUI, isTextEntry } from './chat-ui.js';
 import { createPlayerModel, animatePlayerModel, nextCameraMode, updatePlayerCamera,
   createEmptyHand, updateEmptyHand, renderPlayerScene } from './player-visuals.js';
@@ -13,8 +14,6 @@ const startButton = document.querySelector('#start');
 const startNote = document.querySelector('#start-note');
 const crosshair = document.querySelector('#crosshair');
 const playingHint = document.querySelector('#playing-hint');
-const status = document.querySelector('#status');
-const readouts = Object.fromEntries(['speed', 'height', 'apex', 'airtime'].map(id => [id, document.getElementById(id)]));
 const world = new VoxelWorld();
 const controller = new MovementController(world);
 controller.respawn(world.findSpawn());
@@ -23,6 +22,7 @@ let pitch = -0.12;
 let active = false;
 let previousTime = null;
 let cameraMode = 0;
+let hitboxesVisible = false;
 let primaryClickQueued = false;
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -35,6 +35,7 @@ scene.background = new THREE.Color('#c6dfe9');
 scene.fog = new THREE.Fog('#c6dfe9', 55, 140);
 const playerModel = createPlayerModel();
 scene.add(playerModel);
+const hitboxes = new EntityHitboxes(scene);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 500);
 const baseFov = camera.fov;
 camera.rotation.order = 'YXZ';
@@ -89,8 +90,8 @@ function editBlock(place, feet = controller.renderState()) {
 controller.onTick = player => {
   if (player.animation.swingStartedThisTick && (controller.miningHeld || primaryClickQueued)) {
     editBlock(false, player);
-    primaryClickQueued = false;
   }
+  primaryClickQueued = false;
 };
 canvas.addEventListener('mousedown', event => {
   // The click that captures the mouse does not also break a block.
@@ -114,7 +115,6 @@ function renderInputMode(mode) {
   playingHint.hidden = !active;
   document.body.classList.toggle('is-playing', active);
   previousTime = null;
-  status.textContent = active ? 'ON THE GROUND' : (mode === 'chat' ? 'CHATTING' : 'PAUSED');
 }
 
 let profileStorage = null;
@@ -122,7 +122,8 @@ try { profileStorage = window.localStorage; } catch { /* Session identity still 
 const chatUI = new ChatUI({ document, window, controller, clearInput, requestCapture: captureMouse,
   requestUnlock: () => { if (document.pointerLockElement === canvas) document.exitPointerLock(); },
   onModeChange: renderInputMode,
-  onCameraCycle: () => { cameraMode = nextCameraMode(cameraMode); }, storage: profileStorage });
+  onCameraCycle: () => { cameraMode = nextCameraMode(cameraMode); },
+  onHitboxToggle: () => { hitboxesVisible = !hitboxesVisible; }, storage: profileStorage });
 
 async function captureMouse() {
   if (chatUI.mode === 'chat') return false;
@@ -170,9 +171,8 @@ function animate(time) {
     controller.update(dt, { yaw, pitch });
     if (controller.player.y < -32) controller.respawn(world.findSpawn(controller.size));
   }
-  const p = controller.player;
   const position = controller.renderState();
-  animatePlayerModel(playerModel, position, position.animation, cameraMode);
+  animatePlayerModel(playerModel, position, position.animation, cameraMode, chatUI.showFirstPersonBody);
   updateEmptyHand(emptyHand, position.animation);
   updatePlayerCamera(camera, cameraMode, position, yaw, pitch, world);
   const fov = baseFov * position.fovMultiplier;
@@ -184,18 +184,8 @@ function animate(time) {
   const target = active ? targetBlock() : null;
   selection.visible = Boolean(target);
   if (target) selection.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
-  readouts.speed.textContent = p.speed.toFixed(3);
-  document.getElementById('speed-target').textContent = `Walk ${controller.effective.speed.toFixed(3)} / sprint ${(controller.effective.speed * 1.3).toFixed(3)}`;
-  document.getElementById('player-dimensions').textContent = `Height ${(MOVEMENT.playerHeight * controller.size).toFixed(2)} m / size ${controller.size}`;
-  document.getElementById('jump-target').textContent = `Target ${controller.effective.jump.toFixed(3)} m`;
-  readouts.height.textContent = p.y.toFixed(3);
-  if (p.lastJump) {
-    readouts.apex.textContent = p.lastJump.height.toFixed(3);
-    readouts.airtime.textContent = p.lastJump.airtime.toFixed(3);
-  }
-  if (active) status.textContent = p.grounded
-    ? (p.sprinting ? 'SPRINTING' : (p.speed > 0.01 ? 'WALKING' : 'ON THE GROUND'))
-    : (p.sprinting ? 'SPRINTING / AIRBORNE' : 'AIRBORNE');
+  chatUI.updateVisibility();
+  hitboxes.update([{ id: chatUI.profile.player.id, ...position, local: true }], cameraMode, hitboxesVisible);
   renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);
 }
 renderer.setAnimationLoop(animate);

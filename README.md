@@ -23,20 +23,27 @@ ignored; source files and the package lock are tracked.
 
 - Click **Click to play** to capture the mouse. Move the mouse to look around.
 - WASD moves relative to horizontal camera direction.
-- W + **Left Shift**, or two actual W presses within **7 physics ticks (0.35 s)**,
+- W + **R**, or two actual W presses within **7 physics ticks (0.35 s)**,
   starts sprinting. Keyboard auto-repeat does not count.
-- Release Shift while holding W to keep sprinting, including in the air and after
+- Release R while holding W to keep sprinting, including in the air and after
   landing. Releasing forward input, or canceling it with S, stops sprinting.
 - Hold Space to jump repeatedly whenever grounded and the cooldown permits.
+- Hold **Left Shift** to crouch and avoid walking off ledges. Release to stand
+  when there is enough headroom. An existing sprint can carry into crouching;
+  starting a new sprint requires standing.
 - F5 cycles first-person, third-person rear, and third-person front views.
   Held-key repeats do not cycle again; F5's normal page reload is suppressed.
 - Default reach is **4.5 blocks** at size 1; `/reach` changes it. The outline marks the target.
 - **Left click / hold** mines the targeted block and swings the bare hand.
-  Holding repeats the swing and mining once every six ticks (0.30 s).
+  A swing lasts six ticks (0.30 s); continued mining may restart it at tick three.
 - **Right click** places a block against the targeted face. Placement inside the
   player's physical or interpolated body is rejected. The context menu is suppressed.
 - Esc releases the mouse. Unlocking, switching windows, or hiding the tab clears
   held inputs, sprint, and double-tap history. Click again to resume.
+- **F3 + B** toggles depth-tested collision outlines, including the local player
+  in either third-person view. Keyboard repeats are ignored.
+- The Escape menu's **Show body in first person** checkbox is off by default
+  and saved locally. It shows the body without the head or duplicate right arm.
 
 ## Chat, names, and player settings
 
@@ -46,7 +53,9 @@ draft without opening the pause menu. Movement and game shortcuts are blocked
 while typing. Closing chat requests mouse capture again; if the browser denies
 that request, use **Click to resume mouse look** or click the world.
 
-Recent messages remain visible above the input after chat closes. Player text
+Recent messages stay visible for ten seconds after the latest message, then
+fade over one second. Opening chat or receiving a message brings them back.
+Player text
 and names are inserted as literal text. The sender name has its own color.
 Command replies use the reserved `server` sender and are private to the caller.
 
@@ -62,6 +71,8 @@ such as `/s`. Enter submits the completed command.
 | `/size <number>` | Player size multiplier | 0.1-4 | 1 |
 
 All accept decimals and `default`; each reset changes only its own setting.
+`/default` resets all four settings together, subject to the same resize checks.
+`/help` is one compact multiline server reply, with range details kept in errors.
 Values are stored independently. Effective speed, reach and jump height are
 their size-1 values times size. Thus speed 6 at size 2 is 12 blocks/s; sprint
 retains its 1.3 multiplier. Zero speed, reach and jump height are supported.
@@ -103,7 +114,11 @@ horizontally as you travel; only edits are stored. Edits remain while traveling
 away and back, but are currently session-only and reset on page reload.
 
 At size s, the axis-aligned hitbox extends 0.3*s blocks to each side in X/Z and
-1.8*s blocks above the feet. The eye is 1.6*s above the feet in every F5 mode.
+1.8*s blocks above the feet when standing, or 1.5*s when crouching. The eye
+targets 1.62*s standing or 1.27*s crouching in every F5 mode, easing halfway
+each tick with render interpolation. Crouching scales movement input by 0.30.
+While Shift is held, a 0.60*s downward footprint probe protects ledges by
+reducing horizontal motion in 0.05*s steps; upward jumps skip this check.
 The world model scales uniformly about the feet. Growth is rejected if the new
 box intersects a solid voxel. Placement checks use the same scaled body.
 Swept collision against the actual unit blocks handles walls, floors, ceilings,
@@ -111,8 +126,8 @@ placed blocks, and holes. Digging all three layers opens the void; there is no
 invisible floor below them. Falling below y=-32 respawns you at a supported
 column near the original spawn, with movement inputs cleared.
 
-The feet readout shows world Y. Jump peak is measured relative to the takeoff
-surface, so jumping on a placed block still measures approximately 1.25 m.
+Jump peak is measured internally relative to the takeoff surface. The former
+Live Telemetry panel and block-unit label have been removed from the game UI.
 
 ## Rendering and distance detail
 
@@ -134,18 +149,23 @@ Actions steer toward aim; otherwise idle torso yaw holds. The head stays within
 50 degrees, shifting the torso only as needed. Yaw interpolation wraps across
 180 degrees. From rest, aim 35 leaves torso 0; aim 70 gives torso 20/head 50.
 
-First-person hides the head and world right arm, retaining the depth-tested body.
-A small backward visual-only offset keeps the chest from covering both feet.
+First-person hides the entire world avatar by default. The Escape-menu body
+toggle enables the depth-tested body, hiding its head and world right arm.
+The rig stays rooted at the feet without a first-person position offset.
 The one visible right arm renders in a separate camera-space scene after the
 world with a depth clear and its own 70-degree vertical FOV. Six-tick action
 swings use the requested square-root sine curves, independently of walking,
 for mining (repeated while held) and successful placement.
+There is no idle sway or walk bob in that separate hand pass. Third-person
+actions layer chest and shoulder rotation onto the walk/crouch pose without
+accumulating transforms. Four-pixel legs use hip centers at +/-2 model pixels
+and rotate only around local X, preserving their seam.
 
-Eye height is **1.6 times size**. Third-person rear/front start 4 blocks opposite/
+Third-person rear/front start **4 times size** blocks opposite/
 along the full aim vector. Front rendering adds 180 degrees yaw and negates
-pitch without changing aim or movement. A swept camera box with 0.1-block
+pitch without changing aim or movement. A swept camera box with 0.1*size-block
 half-extents pulls in immediately against solid voxels, including corners,
-floors and ceilings, and restores 4 blocks when clear. Editing always uses the
+floors and ceilings, and restores the full scaled distance when clear. Editing always uses the
 player's scaled eye and aim with the configured effective reach, independently of camera mode.
 
 - Terrain is divided into **16 x 16 block chunks**.
@@ -183,8 +203,8 @@ that started airborne. Vertical update is vy = (vy - 0.08) * 0.98. Held jump use
 a 10-tick cooldown, reset on jump release. Hidden/unfocused sessions pause;
 frames over 0.25 s are capped to prevent runaway catch-up.
 
-The live speed readout uses actual displacement before drag, converted to m/s.
-Sprint-jump speed varies during each jump; compare its average to the value below.
+Internal measurements use actual displacement before drag. Sprint-jump speed
+varies during each jump; the value below averages consecutive jumps.
 
 ## Verification
 
@@ -206,3 +226,11 @@ terrain, successive digging and face targeting, placement safety, walls,
 ceilings, falling and jumping on placed blocks, hidden-face removal, distance
 LOD polygon reduction, camera-frustum culling, boundary rebuilds, and geometry
 disposal. Browser-based visual QA depends on availability of the browser host.
+
+Focused automated checks also cover both scaled F5 cameras, size-two wall
+collision, leg separation, forward action swings, neutral hand rest, crouch
+speed (1.295154 blocks/s at size one), low-ceiling standing rejection, diagonal
+ledge overhang at sizes one and two, chat fading and revival, compact help,
+the four-setting reset, the body checkbox, and F3+B collision bounds. These
+checks run without taking control of the user's computer; visual playtesting
+remains with the user.
