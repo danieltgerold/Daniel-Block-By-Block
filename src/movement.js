@@ -1,5 +1,6 @@
 ﻿// Position is in blocks (1 block = 1 meter); velocity is blocks per physics tick.
 // y is always the player's feet. Constants follow the requested Java rules.
+import { createPlayerAnimation, tickPlayerAnimation, interpolatePlayerAnimation } from './player-animation.js';
 export const MOVEMENT = Object.freeze({
   ticksPerSecond: 20,
   fixedStep: 1 / 20,
@@ -28,12 +29,14 @@ export function createPlayer() {
     jumpCooldown: 0, jumpTicks: 0, jumpApex: 0, jumpStartY: 0, jumpInProgress: false,
     jumpCount: 0, sprintImpulseCount: 0, lastJump: null,
     fovMultiplier: 1,
+    animation: createPlayerAnimation(),
   };
 }
 
 // Exactly one 50 ms physics tick. This snapshot drives both acceleration and
 // drag, including takeoff and landing ticks.
 export function stepPlayer(player, input = {}, world = null) {
+  const previousX = player.x, previousZ = player.z;
   // A block edit can remove last tick's support before the next tick begins.
   if (world && player.grounded && !world.isSupported(player)) player.grounded = false;
   const startedGrounded = player.grounded;
@@ -112,11 +115,13 @@ export function stepPlayer(player, input = {}, world = null) {
   player.vz *= drag;
   player.vy = (player.vy - MOVEMENT.gravity) * MOVEMENT.verticalDrag;
   if (player.grounded && player.vy < 0) player.vy = 0;
+  tickPlayerAnimation(player.animation, { dx: player.x - previousX, dz: player.z - previousZ,
+    aimYaw: input.yaw, aimPitch: input.pitch, swing: input.swing, mining: input.mining });
   return player;
 }
 
 const supportedKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft']);
-const snapshot = p => ({ x: p.x, y: p.y, z: p.z, fovMultiplier: p.fovMultiplier });
+const snapshot = p => ({ x: p.x, y: p.y, z: p.z, fovMultiplier: p.fovMultiplier, animation: { ...p.animation } });
 
 export class MovementController {
   constructor(world = null) {
@@ -128,7 +133,13 @@ export class MovementController {
     this.heldKeys = new Set();
     this.lastForwardPressTick = -Infinity;
     this.sprintRequested = false;
+    this.miningHeld = false;
+    this.swingQueued = false;
+    this.onTick = null;
   }
+
+  setMining(held) { this.miningHeld = held; }
+  requestSwing() { this.swingQueued = true; }
 
   keyDown(code, repeat = false) {
     // Count actual transitions, not OS repeats or duplicate keydown events.
@@ -172,10 +183,12 @@ export class MovementController {
     while (this.accumulator + 1e-9 >= MOVEMENT.fixedStep) {
       this.previous = snapshot(this.player);
       // Overrides let deterministic measurements exercise this exact controller.
-      stepPlayer(this.player, { ...this.readInput(), ...input }, this.world);
+      stepPlayer(this.player, { ...this.readInput(), mining: this.miningHeld, swing: this.swingQueued, ...input }, this.world);
+      if (this.player.animation.swingStartedThisTick) this.swingQueued = false;
       this.sprintRequested = false;
       this.accumulator -= MOVEMENT.fixedStep;
       this.totalSteps++;
+      this.onTick?.(this.player);
     }
     this.accumulator = Math.max(0, this.accumulator);
   }
@@ -186,15 +199,22 @@ export class MovementController {
     for (const key of ['x', 'y', 'z', 'fovMultiplier']) {
       result[key] = this.previous[key] + (this.player[key] - this.previous[key]) * alpha;
     }
+    result.animation = interpolatePlayerAnimation(this.previous.animation, this.player.animation, alpha);
     return result;
   }
 
   respawn(position) {
+    const { aimYaw, aimPitch } = this.player.animation;
     this.player = { ...createPlayer(), ...position };
+    this.player.animation = createPlayerAnimation(aimYaw, aimPitch);
     this.pause();
   }
 
   pause() {
+    this.miningHeld = false;
+    this.swingQueued = false;
+    this.player.animation.swingAge = -1;
+    this.player.animation.amount = 0;
     this.heldKeys.clear();
     this.lastForwardPressTick = -Infinity;
     this.sprintRequested = false;

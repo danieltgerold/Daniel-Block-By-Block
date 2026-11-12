@@ -31,7 +31,8 @@ ignored; source files and the package lock are tracked.
 - F5 cycles first-person, third-person rear, and third-person front views.
   Held-key repeats do not cycle again; F5's normal page reload is suppressed.
 - Aim at a block within **4.5 blocks (4.5 m)**. The outline marks the targeted block.
-- **Left click** removes the targeted block immediately.
+- **Left click / hold** mines the targeted block and swings the bare hand.
+  Holding repeats the swing and mining once every six ticks (0.30 s).
 - **Right click** places a block against the targeted face. Placement inside the
   player's physical or interpolated body is rejected. The context menu is suppressed.
 - Esc releases the mouse. Unlocking, switching windows, or hiding the tab clears
@@ -55,18 +56,37 @@ surface, so jumping on a placed block still measures approximately 1.25 m.
 
 ## Rendering and distance detail
 
-The player model is a `THREE.Group` with six separate brightly colored meshes:
-green head, yellow chest, red left arm, magenta right arm, blue left leg, and cyan
-right leg. It follows the interpolated feet position and player yaw. Limbs pivot
-at shoulders and hips; opposite arm/leg pairs use the cosine swing formula
-`cos(limbSwingTime * 0.6662) * 1.4 * speedAmount`. Movement distance drives cadence,
-and movement speed drives amplitude, easing smoothly back to zero when stopped.
+The visual rig uses classic Steve model coordinates scaled by `0.9375 / 16`,
+with a feet-rooted Y-up group and independent neck, shoulder and hip joints.
+Its standing height is **1.875 blocks**, independent of the **2-block physics
+hitbox**. Original green/yellow/red/magenta/blue/cyan part colors are preserved;
+an original simple face marks the head's forward direction (-Z, with +X right).
 
-First-person hides the model and uses normal mouse-look at eye height 1.6 m.
-Third-person rear/front place the camera exactly 4 m behind/in front along the
-player's full look vector, looking at feet + 1.6 m. This fixed offset can clip
-through nearby blocks. Editing always traces from the player's eyes along the
-player's look direction with the same 4.5 m reach, independently of camera mode.
+Each 20 Hz tick measures actual horizontal displacement after collision. Amount
+eases 40% toward `min(4 * hypot(dx, dz), 1)` and phase advances by amount.
+Rendered phase and amount interpolate between ticks. With
+`s = cos(phase * 0.6662) * amount`, arm rotations are `s` and `-s`; opposite legs
+are `1.4*s` and `-1.4*s`. Pushing against a wall therefore eases the limbs to rest.
+
+Aim and torso yaw are separate. Travel beyond 0.05 blocks/tick steers torso yaw
+30% toward travel direction, flipped when more than 95 degrees from aim.
+Actions steer toward aim; otherwise idle torso yaw holds. The head stays within
+50 degrees, shifting the torso only as needed. Yaw interpolation wraps across
+180 degrees. From rest, aim 35 leaves torso 0; aim 70 gives torso 20/head 50.
+
+First-person hides the head and world right arm, retaining the depth-tested body.
+A small backward visual-only offset keeps the chest from covering both feet.
+The one visible right arm renders in a separate camera-space scene after the
+world with a depth clear and its own 70-degree vertical FOV. Six-tick action
+swings use the requested square-root sine curves, independently of walking,
+for mining (repeated while held) and successful placement.
+
+Eye height stays **1.6 blocks**. Third-person rear/front start 4 blocks opposite/
+along the full aim vector. Front rendering adds 180 degrees yaw and negates
+pitch without changing aim or movement. A swept camera box with 0.1-block
+half-extents pulls in immediately against solid voxels, including corners,
+floors and ceilings, and restores 4 blocks when clear. Editing always uses the
+player's eye and aim with **4.5-block reach**, independently of camera mode.
 
 - Terrain is divided into **16 x 16 block chunks**.
 - Only exposed block faces are meshed. Adjacent coplanar faces are greedily merged;

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { MovementController, MOVEMENT } from './movement.js';
 import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
-import { createPlayerModel, animatePlayerModel, nextCameraMode, playerLookDirection, updatePlayerCamera } from './player-visuals.js';
+import { createPlayerModel, animatePlayerModel, nextCameraMode, playerLookDirection, updatePlayerCamera,
+  createEmptyHand, updateEmptyHand, renderPlayerScene } from './player-visuals.js';
 import './style.css';
 
 const canvas = document.querySelector('#world');
@@ -21,6 +22,7 @@ let pitch = -0.12;
 let active = false;
 let previousTime = null;
 let cameraMode = 0;
+let primaryClickQueued = false;
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -35,6 +37,7 @@ scene.add(playerModel);
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 500);
 const baseFov = camera.fov;
 camera.rotation.order = 'YXZ';
+const emptyHand = createEmptyHand(camera.aspect);
 
 // One texture tile covers one block face; retain filtered lines without shimmer.
 const gridCanvas = document.createElement('canvas');
@@ -66,38 +69,54 @@ scene.add(selection);
 const lookDirection = new THREE.Vector3();
 const reachOrigin = new THREE.Vector3();
 
-function targetBlock() {
-  const feet = controller.renderState();
+function targetBlock(feet = controller.renderState()) {
   reachOrigin.set(feet.x, feet.y + MOVEMENT.eyeHeight, feet.z);
   playerLookDirection(yaw, pitch, lookDirection);
   return world.raycast(reachOrigin, lookDirection);
 }
 
 window.addEventListener('keydown', event => {
-  if (event.code !== 'F5') return;
+  if (event.code !== 'F5' || !active) return;
   event.preventDefault();
   event.stopPropagation();
   cameraMode = nextCameraMode(cameraMode, event.repeat);
 }, { capture: true });
 
 canvas.addEventListener('contextmenu', event => event.preventDefault());
+function editBlock(place, feet = controller.renderState()) {
+  const hit = targetBlock(feet);
+  if (!hit) return false;
+  let { x, y, z } = hit;
+  if (place) {
+    if (!Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return false;
+    x += hit.normal.x; y += hit.normal.y; z += hit.normal.z;
+    if (!world.canPlaceBlock(x, y, z, [controller.player, controller.renderState()])) return false;
+  }
+  const changed = world.setBlock(x, y, z, place);
+  if (changed) chunks.invalidateBlock(x, z);
+  return changed;
+}
+controller.onTick = player => {
+  if (player.animation.swingStartedThisTick && (controller.miningHeld || primaryClickQueued)) {
+    editBlock(false, player);
+    primaryClickQueued = false;
+  }
+};
 canvas.addEventListener('mousedown', event => {
   // The click that captures the mouse does not also break a block.
   if (!active || (event.button !== 0 && event.button !== 2)) return;
   event.preventDefault();
-  const hit = targetBlock();
-  if (!hit) return;
-  let { x, y, z } = hit;
-  if (event.button === 2) {
-    if (!Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return;
-    x += hit.normal.x; y += hit.normal.y; z += hit.normal.z;
-    // Include the interpolated body, so a placed cube cannot intersect the view.
-    if (!world.canPlaceBlock(x, y, z, [controller.player, controller.renderState()])) return;
+  if (event.button === 0) {
+    primaryClickQueued = true;
+    controller.setMining(true);
+    controller.requestSwing();
+  } else if (editBlock(true)) {
+    controller.requestSwing();
   }
-  if (world.setBlock(x, y, z, event.button === 2)) chunks.invalidateBlock(x, z);
 });
+document.addEventListener('mouseup', event => { if (event.button === 0) controller.setMining(false); });
 
-function clearInput() { controller.pause(); }
+function clearInput() { primaryClickQueued = false; controller.pause(); }
 function setActive(value) {
   active = value;
   intro.hidden = value;
@@ -143,6 +162,8 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) relea
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+  emptyHand.camera.aspect = camera.aspect;
+  emptyHand.camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
@@ -151,17 +172,14 @@ function animate(time) {
   const dt = previousTime === null ? 0 : (time - previousTime) / 1000;
   previousTime = time;
   if (active) {
-    controller.update(dt, { yaw });
+    controller.update(dt, { yaw, pitch });
     if (controller.player.y < -32) controller.respawn(world.findSpawn());
   }
   const p = controller.player;
   const position = controller.renderState();
-  playerModel.position.set(position.x, position.y, position.z);
-  playerModel.rotation.y = yaw;
-  playerModel.userData.parts.Head.rotation.x = pitch;
-  playerModel.visible = cameraMode !== 0;
-  animatePlayerModel(playerModel, active ? p.speed : 0, dt);
-  updatePlayerCamera(camera, cameraMode, position, yaw, pitch);
+  animatePlayerModel(playerModel, position, position.animation, cameraMode);
+  updateEmptyHand(emptyHand, position.animation);
+  updatePlayerCamera(camera, cameraMode, position, yaw, pitch, world);
   const fov = baseFov * position.fovMultiplier;
   if (Math.abs(camera.fov - fov) > 1e-8) {
     camera.fov = fov;
@@ -180,6 +198,6 @@ function animate(time) {
   if (active) status.textContent = p.grounded
     ? (p.sprinting ? 'SPRINTING' : (p.speed > 0.01 ? 'WALKING' : 'ON THE GROUND'))
     : (p.sprinting ? 'SPRINTING / AIRBORNE' : 'AIRBORNE');
-  renderer.render(scene, camera);
+  renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);
 }
 renderer.setAnimationLoop(animate);

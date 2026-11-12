@@ -83,6 +83,36 @@ export class VoxelWorld {
     return null;
   }
 
+  // Continuous swept AABB: expand each solid voxel by the camera half-extents,
+  // then intersect the full path with slabs. All axes are tested simultaneously.
+  sweepBox(origin, delta, half = 0.1) {
+    const axes = ['x', 'y', 'z'];
+    const low = {}, high = {};
+    for (const axis of axes) {
+      low[axis] = Math.floor(Math.min(origin[axis], origin[axis] + delta[axis]) - half);
+      high[axis] = Math.floor(Math.max(origin[axis], origin[axis] + delta[axis]) + half);
+    }
+    let fraction = 1;
+    for (let x = low.x; x <= high.x; x++) for (let y = low.y; y <= high.y; y++) for (let z = low.z; z <= high.z; z++) {
+      if (!this.hasBlock(x, y, z)) continue;
+      const voxel = { x, y, z };
+      let enter = -Infinity, exit = Infinity;
+      for (const axis of axes) {
+        const min = voxel[axis] - half, max = voxel[axis] + 1 + half;
+        if (Math.abs(delta[axis]) < 1e-12) {
+          if (origin[axis] <= min + EPSILON || origin[axis] >= max - EPSILON) { exit = -Infinity; break; }
+        } else {
+          const a = (min - origin[axis]) / delta[axis];
+          const b = (max - origin[axis]) / delta[axis];
+          enter = Math.max(enter, Math.min(a, b));
+          exit = Math.min(exit, Math.max(a, b));
+        }
+      }
+      if (exit > 0 && enter < exit && enter <= fraction) fraction = Math.max(0, enter - 1e-6);
+    }
+    return fraction;
+  }
+
   isSupported(player, halfWidth = PLAYER_HALF_WIDTH) {
     const y = Math.floor(player.y - EPSILON);
     if (Math.abs(player.y - (y + 1)) > EPSILON * 2) return false;
