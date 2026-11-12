@@ -17,7 +17,8 @@ package blockbyblock.core.math;
 
 /**
  * Sine and cosine computed with arithmetic only, so the JVM, TeaVM-compiled JavaScript and every
- * browser engine produce identical bits (ADR 0001 §5.2 rule 1). Results equal {@link StrictMath}.
+ * browser engine produce identical bits (ADR 0001 §5.2 rule 1). Results equal the JDK's
+ * fdlibm-based strict math functions bit for bit.
  */
 public final class Trig {
     private Trig() {}

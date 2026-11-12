@@ -13,6 +13,8 @@ class TrigTest {
         Double.MAX_VALUE, -Double.MAX_VALUE, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY,
         Math.PI / 4, Math.nextUp(Math.PI / 4), Math.nextDown(Math.PI / 4), Math.PI / 2, Math.PI,
         0x1.921fb54442d18p20, Math.nextUp(0x1.921fb54442d18p20), Math.nextDown(0x1.921fb54442d18p20),
+        // First input above the medium-size branch (high word 0x413921FC): the true large-argument boundary.
+        Double.longBitsToDouble(0x413921FC00000000L), Math.nextDown(Double.longBitsToDouble(0x413921FC00000000L)),
         38295.9, 1e6, 1e22, 1e300, -1234.5678};
 
     static void assertSameBits(double x) {
