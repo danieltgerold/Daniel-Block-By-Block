@@ -61,6 +61,8 @@ export function createPlayerModel() {
 }
 
 export function animatePlayerModel(model, feet, pose, cameraMode = 0) {
+  const size = feet.size ?? 1;
+  model.scale.setScalar(size);
   model.position.set(feet.x, feet.y, feet.z);
   model.rotation.y = pose.torsoYaw;
   const joints = model.userData.joints;
@@ -72,8 +74,8 @@ export function animatePlayerModel(model, feet, pose, cameraMode = 0) {
     const relative = angleDifference(pose.aimYaw, pose.torsoYaw);
     const back = Math.abs(Math.cos(relative)) * 2 * MODEL_SCALE
       + Math.abs(Math.sin(relative)) * 4 * MODEL_SCALE + 0.2;
-    model.position.x += Math.sin(pose.aimYaw) * back;
-    model.position.z += Math.cos(pose.aimYaw) * back;
+    model.position.x += Math.sin(pose.aimYaw) * back * size;
+    model.position.z += Math.cos(pose.aimYaw) * back * size;
   }
   joints.Head.rotation.set(pose.aimPitch, pose.headYaw, 0);
   const s = Math.cos(pose.phase * 0.6662) * pose.amount;
@@ -98,7 +100,7 @@ const headTarget = new THREE.Vector3();
 const forward = new THREE.Vector3();
 const path = new THREE.Vector3();
 export function updatePlayerCamera(camera, mode, feet, yaw, pitch, world = null) {
-  headTarget.set(feet.x, feet.y + MOVEMENT.eyeHeight, feet.z);
+  headTarget.set(feet.x, feet.y + MOVEMENT.eyeHeight * (feet.size ?? 1), feet.z);
   camera.position.copy(headTarget);
   camera.rotation.order = 'YXZ';
   if (mode === 0) {

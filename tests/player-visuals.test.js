@@ -49,7 +49,7 @@ test('classic rig has the exact six dimensions, centers, pivots, colors and 1.87
   const bounds = new THREE.Box3().setFromObject(model);
   near(bounds.min.y, 0);
   near(bounds.max.y, 1.875);
-  near(MOVEMENT.playerHeight, 2, 1e-10);
+  near(MOVEMENT.playerHeight, 1.8, 1e-10);
   assert.equal(model.userData.parts.Head.children.length, 5, 'Original face has eyes and mouth');
 });
 

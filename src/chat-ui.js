@@ -1,5 +1,6 @@
 ﻿import { ChatService, LocalPlayerProfile, SERVER_ID } from './chat.js';
 
+import { DeveloperSequence } from './developer-sequence.js';
 export const isTextEntry = target => Boolean(target?.closest?.('input, textarea, select, [contenteditable="true"]'));
 
 // All game/chat/menu keyboard routing lives here, so text fields cannot leak
@@ -7,7 +8,7 @@ export const isTextEntry = target => Boolean(target?.closest?.('input, textarea,
 // production; tests inject only the browser capture/unlock boundaries.
 export class ChatUI {
   constructor({ document, window, controller, clearInput, requestCapture, requestUnlock,
-    onModeChange = () => {}, onCameraCycle = () => {}, storage, createId, broadcast }) {
+    onModeChange = () => {}, onCameraCycle = () => {}, storage, createId, broadcast, now }) {
     this.document = document;
     this.window = window;
     this.controller = controller;
@@ -18,8 +19,10 @@ export class ChatUI {
     this.onCameraCycle = onCameraCycle;
     this.pointerLocked = false;
     this.mode = null;
+    this.developerSequence = new DeveloperSequence({ now });
+    this.completion = null;
     this.elements = Object.fromEntries(['chat-panel', 'chat-log', 'chat-form', 'chat-input',
-      'name-form', 'player-name', 'name-error', 'resume-note'].map(id => [id, document.getElementById(id)]));
+      'name-form', 'player-name', 'name-error', 'resume-note', 'chat-completions'].map(id => [id, document.getElementById(id)]));
     this.profile = new LocalPlayerProfile(storage, createId);
     this.service = new ChatService({ profile: this.profile, controller, broadcast });
     this.elements['player-name'].value = this.profile.player.displayName;
@@ -41,6 +44,10 @@ export class ChatUI {
       if (this.mode === 'chat') this.closeChat(true);
     });
     this.elements['resume-note'].addEventListener('click', () => this.resume());
+    this.elements['chat-input'].addEventListener('input', () => {
+      this.completion = null;
+      this.renderCompletions(this.service.completions(this.elements['chat-input'].value));
+    });
     this.unsubscribe = this.service.subscribe(() => this.renderHistory());
     this.setMode('menu');
   }
@@ -48,6 +55,7 @@ export class ChatUI {
   setMode(mode) {
     if (this.mode === mode) return;
     this.mode = mode;
+    if (mode !== 'chat') { this.completion = null; this.renderCompletions([]); }
     this.clearInput();
     this.document.body.classList.toggle('chat-open', mode === 'chat');
     this.elements['resume-note'].hidden = mode !== 'ready';
@@ -64,6 +72,8 @@ export class ChatUI {
     field.value = prefix === '/' ? '/' : '';
     field.focus({ preventScroll: true });
     field.setSelectionRange(field.value.length, field.value.length);
+    this.completion = null;
+    this.renderCompletions(this.service.completions(field.value));
   }
 
   closeChat(submit = false) {
@@ -104,7 +114,15 @@ export class ChatUI {
   }
 
   handleKeyDown(event) {
+    if (this.developerSequence.feed(event)) {
+      event.preventDefault(); event.stopPropagation();
+      if (this.controller.enableDeveloperMode()) this.service.reply('You have entered developer mode.');
+      return;
+    }
     if (this.mode === 'chat') {
+      if (event.key === 'Tab') {
+        event.preventDefault(); event.stopPropagation(); this.complete(event.shiftKey); return;
+      }
       if (event.code === 'F5') { event.preventDefault(); event.stopPropagation(); return; }
       if (!event.isComposing && (event.key === 'Enter' || event.key === 'Escape')) {
         event.preventDefault(); event.stopPropagation();
@@ -137,7 +155,45 @@ export class ChatUI {
     this.controller.keyDown(event.code, event.repeat);
   }
 
+  complete(reverse = false) {
+    const field = this.elements['chat-input'];
+    if (field.selectionStart !== field.value.length || field.selectionEnd !== field.value.length) return;
+    if (!this.completion || this.completion.lastValue !== field.value) {
+      const matches = this.service.completions(field.value);
+      if (!matches.length) { this.renderCompletions([]); return; }
+      this.completion = { matches, index: reverse ? matches.length - 1 : 0 };
+    } else {
+      const state = this.completion;
+      state.index = (state.index + (reverse ? -1 : 1) + state.matches.length) % state.matches.length;
+    }
+    const state = this.completion;
+    field.value = state.matches[state.index];
+    state.lastValue = field.value;
+    field.setSelectionRange(field.value.length, field.value.length);
+    if (state.matches.length === 1 && field.value.endsWith(' ')) {
+      this.completion = null;
+      this.renderCompletions(this.service.completions(field.value));
+    } else this.renderCompletions(state.matches, state.index);
+  }
+
+  renderCompletions(matches, selected = -1) {
+    const list = this.elements['chat-completions'];
+    list.hidden = matches.length === 0;
+    const nodes = matches.flatMap((value, index) => {
+      const option = this.document.createElement('span');
+      option.textContent = value.trimEnd();
+      option.className = index === selected ? 'completion-selected' : '';
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', String(index === selected));
+      return [option, this.document.createTextNode('  ')];
+    });
+    list.replaceChildren(...nodes);
+  }
+
   renderHistory() {
+    if (this.mode === 'menu' && this.controller.developerMode) {
+      this.document.getElementById('start-note').textContent = '<server>: You have entered developer mode.';
+    }
     const open = this.mode === 'chat';
     const panel = this.elements['chat-panel'];
     panel.hidden = this.mode === 'menu' || (!open && this.service.messages.length === 0);

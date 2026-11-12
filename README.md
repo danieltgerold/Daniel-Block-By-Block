@@ -30,7 +30,7 @@ ignored; source files and the package lock are tracked.
 - Hold Space to jump repeatedly whenever grounded and the cooldown permits.
 - F5 cycles first-person, third-person rear, and third-person front views.
   Held-key repeats do not cycle again; F5's normal page reload is suppressed.
-- Aim at a block within **4.5 blocks (4.5 m)**. The outline marks the targeted block.
+- Default reach is **4.5 blocks** at size 1; `/reach` changes it. The outline marks the target.
 - **Left click / hold** mines the targeted block and swings the bare hand.
   Holding repeats the swing and mining once every six ticks (0.30 s).
 - **Right click** places a block against the targeted face. Placement inside the
@@ -38,7 +38,7 @@ ignored; source files and the package lock are tracked.
 - Esc releases the mouse. Unlocking, switching windows, or hiding the tab clears
   held inputs, sprint, and double-tap history. Click again to resume.
 
-## Chat, name, and speed commands
+## Chat, names, and player settings
 
 Press **T** while playing for an empty chat field or **/** for a command field
 prefilled with one slash. **Enter** sends and closes; **Escape** discards the
@@ -50,14 +50,36 @@ Recent messages remain visible above the input after chat closes. Player text
 and names are inserted as literal text. The sender name has its own color.
 Command replies use the reserved `server` sender and are private to the caller.
 
-- `/help` lists commands and usage.
-- `/speed <positive number>` changes current walking speed in blocks/s, including
-  decimal values. Sprint retains its 1.3 multiplier (walking 6 means sprint 7.8).
-- `/speed default` restores the normal 4.3171806 blocks/s walking speed.
+`/help` and Tab completion use the same command registry. Tab completes prefixes
+such as `/rea`, suggests `default` for arguments, and cycles ambiguous matches
+such as `/s`. Enter submits the completed command.
+
+| Command | Size-1 meaning | Normal range | Default |
+| --- | --- | --- | --- |
+| `/speed <number>` | Walking blocks/s | 0-255 | 4.3171806167 |
+| `/reach <number>` | Eye-to-hit blocks | 0-255 | 4.5 |
+| `/jump <number>` | Apex above takeoff, blocks | 0-255 | 1.252203352512 |
+| `/size <number>` | Player size multiplier | 0.1-4 | 1 |
+
+All accept decimals and `default`; each reset changes only its own setting.
+Values are stored independently. Effective speed, reach and jump height are
+their size-1 values times size. Thus speed 6 at size 2 is 12 blocks/s; sprint
+retains its 1.3 multiplier. Zero speed, reach and jump height are supported.
+Jump launch is tuned against the discrete tick apex; launch velocity and
+gravity scale together with size, preserving proportional flight time.
+
+Enter `Up Up Down Down Left Right Left Right B A Enter` within 60 seconds to
+enable developer mode for this load. Auto-repeat is ignored; a wrong key or
+timeout resets the sequence. The final Enter is consumed, even in text fields.
+The server chat announces entry. Developer mode removes all four normal range
+limits, while requiring finite nonnegative speed/reach/jump and finite positive
+size. Effective overflow and resizing into terrain are still rejected. This
+mode is not saved and starts disabled on a fresh load.
 
 The existing Escape screen has a **Player name** field and **Save name** button.
 The default is `player 1`. Accepted names are trimmed and saved in local storage;
 blank names and all capitalizations of `server` are rejected beside the field.
+Names allow at most 16 ASCII letters, numbers and spaces, after trimming.
 Invalid changes retain the last valid name. Player identity is a separate stable
 local ID, independent of display name. The reusable player directory checks join
 and rename uniqueness without case sensitivity and allocates the first free
@@ -80,7 +102,10 @@ voxel y=-1, -2, and -3, with the initial walking surface at y=0. The world exten
 horizontally as you travel; only edits are stored. Edits remain while traveling
 away and back, but are currently session-only and reset on page reload.
 
-The player is 0.6 m wide and **2 m tall**, with eyes 1.6 m above the feet.
+At size s, the axis-aligned hitbox extends 0.3*s blocks to each side in X/Z and
+1.8*s blocks above the feet. The eye is 1.6*s above the feet in every F5 mode.
+The world model scales uniformly about the feet. Growth is rejected if the new
+box intersects a solid voxel. Placement checks use the same scaled body.
 Swept collision against the actual unit blocks handles walls, floors, ceilings,
 placed blocks, and holes. Digging all three layers opens the void; there is no
 invisible floor below them. Falling below y=-32 respawns you at a supported
@@ -93,8 +118,8 @@ surface, so jumping on a placed block still measures approximately 1.25 m.
 
 The visual rig uses classic Steve model coordinates scaled by `0.9375 / 16`,
 with a feet-rooted Y-up group and independent neck, shoulder and hip joints.
-Its standing height is **1.875 blocks**, independent of the **2-block physics
-hitbox**. Original green/yellow/red/magenta/blue/cyan part colors are preserved;
+Its standing height is **1.875 blocks**, independent of the **1.8-block physics
+hitbox at size 1**. Original green/yellow/red/magenta/blue/cyan part colors are preserved;
 an original simple face marks the head's forward direction (-Z, with +X right).
 
 Each 20 Hz tick measures actual horizontal displacement after collision. Amount
@@ -116,12 +141,12 @@ world with a depth clear and its own 70-degree vertical FOV. Six-tick action
 swings use the requested square-root sine curves, independently of walking,
 for mining (repeated while held) and successful placement.
 
-Eye height stays **1.6 blocks**. Third-person rear/front start 4 blocks opposite/
+Eye height is **1.6 times size**. Third-person rear/front start 4 blocks opposite/
 along the full aim vector. Front rendering adds 180 degrees yaw and negates
 pitch without changing aim or movement. A swept camera box with 0.1-block
 half-extents pulls in immediately against solid voxels, including corners,
 floors and ceilings, and restores 4 blocks when clear. Editing always uses the
-player's eye and aim with **4.5-block reach**, independently of camera mode.
+player's scaled eye and aim with the configured effective reach, independently of camera mode.
 
 - Terrain is divided into **16 x 16 block chunks**.
 - Only exposed block faces are meshed. Adjacent coplanar faces are greedily merged;

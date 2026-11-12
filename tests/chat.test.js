@@ -228,7 +228,7 @@ test('speed accepts positive decimals; invalid arguments and unknown commands ex
   for (const [text, value] of [['/speed 6.25', 6.25], ['/speed .5', 0.5], ['/speed +1.5', 1.5]]) {
     f.command(text); near(f.controller.walkSpeed, value);
   }
-  for (const text of ['/speed', '/speed 0', '/speed -1', '/speed Infinity', '/speed NaN', '/speed 1e999', '/speed nope', '/speed 1 2', '/speed 0x10', '/unknown']) {
+  for (const text of ['/speed', '/speed 256', '/speed -1', '/speed Infinity', '/speed NaN', '/speed 1e999', '/speed nope', '/speed 1 2', '/speed 0x10', '/unknown']) {
     f.command(text);
     near(f.controller.walkSpeed, 1.5);
     assert.match(f.ui.service.messages.at(-1).text, /\/help/);

@@ -3,7 +3,7 @@ import { MovementController, MOVEMENT } from './movement.js';
 import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
 import { ChatUI, isTextEntry } from './chat-ui.js';
-import { createPlayerModel, animatePlayerModel, nextCameraMode, playerLookDirection, updatePlayerCamera,
+import { createPlayerModel, animatePlayerModel, nextCameraMode, updatePlayerCamera,
   createEmptyHand, updateEmptyHand, renderPlayerScene } from './player-visuals.js';
 import './style.css';
 
@@ -67,13 +67,9 @@ const selection = new THREE.LineSegments(
 );
 selection.visible = false;
 scene.add(selection);
-const lookDirection = new THREE.Vector3();
-const reachOrigin = new THREE.Vector3();
 
 function targetBlock(feet = controller.renderState()) {
-  reachOrigin.set(feet.x, feet.y + MOVEMENT.eyeHeight, feet.z);
-  playerLookDirection(yaw, pitch, lookDirection);
-  return world.raycast(reachOrigin, lookDirection);
+  return controller.targetBlock(feet, yaw, pitch);
 }
 
 canvas.addEventListener('contextmenu', event => event.preventDefault());
@@ -172,7 +168,7 @@ function animate(time) {
   previousTime = time;
   if (active) {
     controller.update(dt, { yaw, pitch });
-    if (controller.player.y < -32) controller.respawn(world.findSpawn());
+    if (controller.player.y < -32) controller.respawn(world.findSpawn(controller.size));
   }
   const p = controller.player;
   const position = controller.renderState();
@@ -189,7 +185,9 @@ function animate(time) {
   selection.visible = Boolean(target);
   if (target) selection.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
   readouts.speed.textContent = p.speed.toFixed(3);
-  document.getElementById('speed-target').textContent = `Walk ${controller.walkSpeed.toFixed(3)} / sprint ${(controller.walkSpeed * 1.3).toFixed(3)}`;
+  document.getElementById('speed-target').textContent = `Walk ${controller.effective.speed.toFixed(3)} / sprint ${(controller.effective.speed * 1.3).toFixed(3)}`;
+  document.getElementById('player-dimensions').textContent = `Height ${(MOVEMENT.playerHeight * controller.size).toFixed(2)} m / size ${controller.size}`;
+  document.getElementById('jump-target').textContent = `Target ${controller.effective.jump.toFixed(3)} m`;
   readouts.height.textContent = p.y.toFixed(3);
   if (p.lastJump) {
     readouts.apex.textContent = p.lastJump.height.toFixed(3);
