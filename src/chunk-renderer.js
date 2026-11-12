@@ -50,6 +50,12 @@ export class ChunkRenderer {
     this.frustum.setFromProjectionMatrix(this.projectionView);
     const cx = Math.floor(camera.position.x / CHUNK_SIZE), cz = Math.floor(camera.position.z / CHUNK_SIZE);
     const radius = Math.ceil(this.viewDistance / CHUNK_SIZE);
+    // Beyond integer-grid precision, do not run non-advancing coordinate loops.
+    if (![cx - radius, cx + radius, cz - radius, cz + radius].every(Number.isSafeInteger)) {
+      for (const chunk of this.chunks.values()) chunk.mesh.visible = false;
+      this.stats.visibleChunks = this.stats.visibleQuads = 0;
+      return;
+    }
     const visible = [];
     for (const chunk of this.chunks.values()) chunk.mesh.visible = false;
     for (let z = cz - radius; z <= cz + radius; z++) {

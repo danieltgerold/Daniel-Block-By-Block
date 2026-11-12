@@ -1,10 +1,13 @@
-﻿export const PROFILE_STORAGE_KEY = 'block-by-block.profile.v1';
+﻿import { applyCommand, commandCompletions } from './chat-commands.js';
+export const PROFILE_STORAGE_KEY = 'block-by-block.profile.v1';
 export const SERVER_ID = 'system:server';
 export const canonicalName = value => value.trim().toLowerCase();
 
 export function validateName(value) {
   const name = typeof value === 'string' ? value.trim() : '';
   if (!name) return { ok: false, error: 'Enter a name; it cannot be blank.' };
+  if (name.length > 16) return { ok: false, error: 'Names must be 16 characters or fewer.' };
+  if (!/^[A-Za-z0-9 ]+$/.test(name)) return { ok: false, error: 'Use only letters, numbers, and spaces.' };
   if (canonicalName(name) === 'server') return { ok: false, error: 'The name server is reserved for system messages.' };
   return { ok: true, name };
 }
@@ -65,7 +68,7 @@ export class LocalPlayerProfile {
   }
 }
 
-const numberText = value => String(Number(value.toPrecision(8)));
+
 export class ChatService {
   constructor({ profile, controller, broadcast = null }) {
     this.profile = profile;
@@ -99,30 +102,6 @@ export class ChatService {
       text, kind: 'chat', recipientId: null }, { broadcast: true });
     return true;
   }
-  command(text) {
-    const [name, ...args] = text.split(/\s+/);
-    switch (name.toLowerCase()) {
-      case '/help':
-        if (args.length) { this.reply('Usage: /help. See /help for commands.'); break; }
-        this.reply('/help — show commands. /speed <positive number> — walking blocks/s; sprint keeps its normal multiplier. /speed default — restore normal speed.');
-        break;
-      case '/speed': {
-        if (args.length === 1 && args[0].toLowerCase() === 'default') {
-          this.controller.resetWalkSpeed();
-          this.reply(`Walking speed restored to default (${numberText(this.controller.walkSpeed)} blocks/s).`);
-          break;
-        }
-        const value = Number(args[0]);
-        const decimal = /^[+]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
-        if (args.length !== 1 || !decimal.test(args[0]) || !Number.isFinite(value) || value <= 0) {
-          this.reply('Usage: /speed <finite positive number> or /speed default. See /help.');
-          break;
-        }
-        this.controller.setWalkSpeed(value);
-        this.reply(`Walking speed set to ${numberText(value)} blocks/s.`);
-        break;
-      }
-      default: this.reply('Unknown command. Type /help for available commands.');
-    }
-  }
+  completions(text) { return commandCompletions(text); }
+  command(text) { applyCommand(this, text); }
 }

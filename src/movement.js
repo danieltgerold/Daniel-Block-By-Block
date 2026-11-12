@@ -1,7 +1,8 @@
 ﻿// Position is in blocks (1 block = 1 meter); velocity is blocks per physics tick.
 // y is always the player's feet. Constants follow the requested Java rules.
 import { createPlayerAnimation, tickPlayerAnimation, interpolatePlayerAnimation } from './player-animation.js';
-export const DEFAULT_WALK_SPEED = 0.098 / (1 - 0.546) * 20;
+import { DEFAULT_SETTINGS, DEFAULT_WALK_SPEED, effectiveSettings, jumpVelocityForHeight } from './player-settings.js';
+export { DEFAULT_WALK_SPEED };
 export const MOVEMENT = Object.freeze({
   ticksPerSecond: 20,
   fixedStep: 1 / 20,
@@ -19,14 +20,14 @@ export const MOVEMENT = Object.freeze({
   gravity: 0.08,
   verticalDrag: 0.98,
   sprintFovMultiplier: 1.15,
-  playerHeight: 2,
+  playerHeight: 1.8,
   eyeHeight: 1.6,
 });
 
 export function createPlayer() {
   return {
     x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
-    grounded: true, sprinting: false, speed: 0,
+    grounded: true, sprinting: false, speed: 0, size: 1,
     jumpCooldown: 0, jumpTicks: 0, jumpApex: 0, jumpStartY: 0, jumpInProgress: false,
     jumpCount: 0, sprintImpulseCount: 0, lastJump: null,
     fovMultiplier: 1,
@@ -49,14 +50,16 @@ export function stepPlayer(player, input = {}, world = null) {
   if (player.jumpCooldown > 0) player.jumpCooldown--;
   // Java resets the repeat delay when jump is released.
   if (!input.jump) player.jumpCooldown = 0;
-  const takeoff = Boolean(input.jump) && startedGrounded && player.jumpCooldown === 0;
+  const size = player.size ?? 1;
+  const launchVelocity = input.jumpVelocity ?? MOVEMENT.jumpVelocity * size;
+  const takeoff = Boolean(input.jump) && launchVelocity > 0 && startedGrounded && player.jumpCooldown === 0;
   const yaw = input.yaw || 0;
   const sinYaw = Math.sin(yaw);
   const cosYaw = Math.cos(yaw);
 
   // 1. Jump and the once-per-takeoff sprint impulse, using carried velocity.
   if (takeoff) {
-    player.vy = MOVEMENT.jumpVelocity;
+    player.vy = launchVelocity;
     player.jumpCooldown = MOVEMENT.jumpCooldownTicks;
     player.jumpTicks = 0;
     player.jumpApex = 0;
@@ -64,8 +67,8 @@ export function stepPlayer(player, input = {}, world = null) {
     player.jumpInProgress = true;
     player.jumpCount++;
     if (player.sprinting) {
-      player.vx -= sinYaw * MOVEMENT.sprintJumpImpulse;
-      player.vz -= cosYaw * MOVEMENT.sprintJumpImpulse;
+      player.vx -= sinYaw * MOVEMENT.sprintJumpImpulse * size;
+      player.vz -= cosYaw * MOVEMENT.sprintJumpImpulse * size;
       player.sprintImpulseCount++;
     }
   }
@@ -85,7 +88,7 @@ export function stepPlayer(player, input = {}, world = null) {
 
   // 3. Move, resolve the floor, then apply drag using the PREVIOUS grounded state.
   if (world) {
-    const motion = world.movePlayer(player, { x: player.vx, y: player.vy, z: player.vz }, undefined, MOVEMENT.playerHeight);
+    const motion = world.movePlayer(player, { x: player.vx, y: player.vy, z: player.vz }, 0.3 * size, MOVEMENT.playerHeight * size);
     player.x = motion.x; player.y = motion.y; player.z = motion.z;
     if (motion.blocked.x) player.vx = 0;
     if (motion.blocked.y) player.vy = 0;
@@ -115,7 +118,7 @@ export function stepPlayer(player, input = {}, world = null) {
   const drag = startedGrounded ? MOVEMENT.groundDrag : MOVEMENT.airDrag;
   player.vx *= drag;
   player.vz *= drag;
-  player.vy = (player.vy - MOVEMENT.gravity) * MOVEMENT.verticalDrag;
+  player.vy = (player.vy - MOVEMENT.gravity * size) * MOVEMENT.verticalDrag;
   if (player.grounded && player.vy < 0) player.vy = 0;
   tickPlayerAnimation(player.animation, { dx: player.x - previousX, dz: player.z - previousZ,
     aimYaw: input.yaw, aimPitch: input.pitch, swing: input.swing, mining: input.mining });
@@ -138,14 +141,50 @@ export class MovementController {
     this.miningHeld = false;
     this.swingQueued = false;
     this.onTick = null;
-    this.walkSpeed = DEFAULT_WALK_SPEED;
+    this.settings = { ...DEFAULT_SETTINGS };
+    this.jumpLaunchVelocity = MOVEMENT.jumpVelocity;
+    this.developerMode = false;
   }
 
-  setWalkSpeed(value) {
-    if (!Number.isFinite(value) || value <= 0) throw new RangeError('Walking speed must be finite and positive.');
-    this.walkSpeed = value;
+  get walkSpeed() { return this.settings.speed; }
+  get size() { return this.settings.size; }
+  get effective() { return effectiveSettings(this.settings); }
+  get eyeHeight() { return MOVEMENT.eyeHeight * this.size; }
+  enableDeveloperMode() { const changed = !this.developerMode; this.developerMode = true; return changed; }
+  configure(key, value) {
+    if (!(key in DEFAULT_SETTINGS) || !Number.isFinite(value) || (key === 'size' ? value <= 0 : value < 0)) {
+      return { ok: false, error: 'Use a finite nonnegative number, or a positive size.' };
+    }
+    const next = { ...this.settings, [key]: value };
+    const effective = effectiveSettings(next);
+    const launch = key === 'jump' ? jumpVelocityForHeight(value) : this.jumpLaunchVelocity;
+    const derived = [...Object.values(effective), effective.speed * 1.3, launch * next.size,
+      3.92 * next.size, 1.875 * next.size, this.player.x + 0.3 * next.size,
+      this.player.x - 0.3 * next.size, this.player.z + 0.3 * next.size,
+      this.player.z - 0.3 * next.size, this.player.y + 1.8 * next.size + effective.jump];
+    if (!derived.every(Number.isFinite)) return { ok: false, error: 'Effective values would overflow; the setting was not changed.' };
+    if (key === 'size' && this.world?.intersectsPlayer(this.player, next.size)) {
+      return { ok: false, error: 'Cannot resize here: the new collision box would intersect solid blocks.' };
+    }
+    this.settings = next;
+    this.jumpLaunchVelocity = launch;
+    this.player.size = next.size;
+    if (key === 'size') this.previous = snapshot(this.player);
+    return { ok: true, value, effective };
   }
-  resetWalkSpeed() { this.walkSpeed = DEFAULT_WALK_SPEED; }
+  setWalkSpeed(value) {
+    const result = this.configure('speed', value);
+    if (!result.ok) throw new RangeError(result.error);
+  }
+  resetWalkSpeed() { this.setWalkSpeed(DEFAULT_WALK_SPEED); }
+  interactionRay(feet = this.player, yaw = this.player.animation.aimYaw, pitch = this.player.animation.aimPitch) {
+    return { origin: { x: feet.x, y: feet.y + this.eyeHeight, z: feet.z },
+      direction: { x: -Math.sin(yaw) * Math.cos(pitch), y: Math.sin(pitch), z: -Math.cos(yaw) * Math.cos(pitch) }, reach: this.effective.reach };
+  }
+  targetBlock(feet, yaw, pitch) {
+    const ray = this.interactionRay(feet, yaw, pitch);
+    return this.world?.raycast(ray.origin, ray.direction, ray.reach) ?? null;
+  }
 
   setMining(held) { this.miningHeld = held; }
   requestSwing() { this.swingQueued = true; }
@@ -193,7 +232,8 @@ export class MovementController {
       this.previous = snapshot(this.player);
       // Overrides let deterministic measurements exercise this exact controller.
       stepPlayer(this.player, { ...this.readInput(), mining: this.miningHeld, swing: this.swingQueued, ...input,
-        walkSpeedScale: this.walkSpeed / DEFAULT_WALK_SPEED }, this.world);
+        walkSpeedScale: this.effective.speed / DEFAULT_WALK_SPEED,
+        jumpVelocity: this.jumpLaunchVelocity * this.size }, this.world);
       if (this.player.animation.swingStartedThisTick) this.swingQueued = false;
       this.sprintRequested = false;
       this.accumulator -= MOVEMENT.fixedStep;
@@ -210,12 +250,13 @@ export class MovementController {
       result[key] = this.previous[key] + (this.player[key] - this.previous[key]) * alpha;
     }
     result.animation = interpolatePlayerAnimation(this.previous.animation, this.player.animation, alpha);
+    result.size = this.size;
     return result;
   }
 
   respawn(position) {
     const { aimYaw, aimPitch } = this.player.animation;
-    this.player = { ...createPlayer(), ...position };
+    this.player = { ...createPlayer(), ...position, size: this.size };
     this.player.animation = createPlayerAnimation(aimYaw, aimPitch);
     this.pause();
   }

@@ -87,3 +87,5 @@ button span { font-size: 19px; }
 .chat-open .telemetry { visibility: hidden; }
 .resume-note { position: fixed; z-index: 4; top: 90px; left: 50%; transform: translateX(-50%); width: auto; padding: 8px 14px; font-size: 12px; }
 @media (max-width: 600px) { .chat-panel { bottom: 235px; } .chat-panel.is-open { bottom: 16px; } }
+#chat-completions { padding: 5px 8px; background: #111e; color: #cdd7ca; white-space: pre-wrap; }
+#chat-completions .completion-selected { color: #ffe381; text-decoration: underline; }

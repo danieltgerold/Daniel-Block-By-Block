@@ -121,7 +121,7 @@ test('swept player collision stops at walls and floors without tunneling', () =>
   assert.equal(fall.grounded, true);
 });
 
-test('standing on placed blocks and head collisions respect the full 2m player', () => {
+test('standing on placed blocks and head collisions respect the 1.8m player', () => {
   const world = new VoxelWorld();
   world.setBlock(0, 0, 0, true);
   const landing = world.movePlayer({ x: 0.5, y: 2, z: 0.5 }, { x: 0, y: -2, z: 0 });
@@ -131,9 +131,9 @@ test('standing on placed blocks and head collisions respect the full 2m player',
   world.setBlock(0, 2, 0, true);
   const player = { ...createPlayer(), x: 0.5, z: 0.5 };
   stepPlayer(player, { jump: true }, world);
-  near(player.y, 0);
-  near(player.vy, 0);
-  assert.equal(player.grounded, true);
+  near(player.y, 0.2);
+  near(player.vy, -0.0784);
+  assert.equal(player.grounded, false);
 });
 
 test('breaking support makes the player fall into the hole and through all three layers', () => {
