@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createBlockItem } from './player-visuals.js';
 import { mergeEase } from './dropped-items.js';
 import { EntityVisibility } from './entity-visibility.js';
+import { VISUAL_QUALITY } from './visual-quality.js';
 export const DROPPED_ITEM_RENDER_SETTINGS = Object.freeze({
   // The five rotating .25 cubes plus fixed offsets and the full .2 bob range
   // fit inside this sphere. Merge bob blending stays in the same envelope.
@@ -13,7 +14,7 @@ export class DroppedItemRenderer {
     Object.assign(this, { scene, visibility, settings });
     this.prototype = createBlockItem(.25); this.meshes = new Map(); this.states = new Map();
   }
-  update(drops, alpha = 0, camera = null) {
+  update(drops, alpha = 0, camera = null, quality = null) {
     this.visibility.beginFrame(camera);
     const live = new Set();
     const now = drops.time + alpha * .05;
@@ -22,10 +23,14 @@ export class DroppedItemRenderer {
       y: (p.previous?.y ?? p.y) + (p.y - (p.previous?.y ?? p.y)) * alpha,
       z: (p.previous?.z ?? p.z) + (p.z - (p.previous?.z ?? p.z)) * alpha });
     const visible = drops.piles.map(p => ({ pile: p, at: interpolated(p) }));
-    for (const effect of drops.transitions ?? []) {
+    const performance = quality?.settings ?? VISUAL_QUALITY[0];
+    const effects = performance.mergeVisuals ? (drops.transitions ?? []).slice(-performance.mergeVisuals) : [];
+    for (const effect of effects) {
       const target = targets.get(effect.targetId);
       if (!target || effect.count <= 0n || now >= effect.ends) continue;
-      const t = mergeEase((now - effect.started) / (effect.ends - effect.started)), destination = interpolated(target);
+      const elapsed = performance.mergeStep ? Math.floor(Math.max(0, now - effect.started) / performance.mergeStep) * performance.mergeStep : now - effect.started;
+      const t = performance.mergeStep ? Math.min(1, elapsed / (effect.ends - effect.started)) : mergeEase(elapsed / (effect.ends - effect.started));
+      const destination = interpolated(target);
       // Converge on the destination's rendered bob as well as its live physics
       // position, so the source does not disappear above/below the cluster.
       const bobDelta = (Math.sin((now - target.born) * 2 + target.phase) - Math.sin((now - effect.born) * 2 + effect.phase)) * .1 * t;

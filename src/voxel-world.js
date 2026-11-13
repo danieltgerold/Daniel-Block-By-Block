@@ -1,5 +1,6 @@
 ﻿export const CHUNK_SIZE = 16;
 export const PLAYER_HALF_WIDTH = 0.3;
+import { BLOCK_TYPES } from './block-types.js';
 export const BLOCK_REACH = 4.5;
 const EPSILON = 1e-7;
 const AXES = ['x', 'y', 'z'];
@@ -57,6 +58,31 @@ export class VoxelWorld {
       edits.set(blockKey(x, y, z), { x, y, z, solid });
     }
     return true;
+  }
+  blockAt(x, y, z) {
+    return this.hasBlock(x, y, z) ? { x, y, z, definition: BLOCK_TYPES.get('test.block') } : null;
+  }
+  supportingBlock(player, depth = .2) {
+    const { min, max } = playerBounds(player);
+    const low = Math.ceil(player.y - depth - EPSILON) - 1, high = Math.floor(player.y + EPSILON) - 1;
+    let best = null, distance = Infinity;
+    const consider = (x, y, z) => {
+      if (y < low || y > high || min.x >= x + 1 - EPSILON || max.x <= x + EPSILON || min.z >= z + 1 - EPSILON || max.z <= z + EPSILON || !this.hasBlock(x, y, z)) return;
+      const d = Math.max(x - player.x, 0, player.x - x - 1) ** 2 + Math.max(z - player.z, 0, player.z - z - 1) ** 2;
+      if (d < distance) { best = this.blockAt(x, y, z); distance = d; }
+    };
+    for (let y = Math.max(low, -this.depth); y <= Math.min(high, -1); y++) consider(Math.floor(player.x), y, Math.floor(player.z));
+    if (distance === 0) return best;
+    for (const edit of this.edits()) if (edit.solid) consider(edit.x, edit.y, edit.z);
+    // Bound the scan by stored removals, even at very large /size values.
+    const x0 = Math.floor(min.x + EPSILON), x1 = Math.floor(max.x - EPSILON), z0 = Math.floor(min.z + EPSILON), z1 = Math.floor(max.z - EPSILON);
+    if ([x0, x1, z0, z1].every(Number.isSafeInteger)) {
+      for (let y = Math.max(low, -this.depth); y <= Math.min(high, -1); y++) {
+        let left = this.removedCount + 1;
+        for (let z = z0; z <= z1 && left > 0; z++) for (let x = x0; x <= x1 && left-- > 0; x++) consider(x, y, z);
+      }
+    }
+    return best;
   }
   chunkBounds(cx, cz) {
     let minY = -this.depth, maxY = 0;

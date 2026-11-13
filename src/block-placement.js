@@ -3,7 +3,9 @@
 import { ITEMS } from './inventory.js';
 export function breakTargetBlock({ controller, world, yaw, pitch, feet = controller.player, onBreak = () => {} }) {
   const hit = controller.targetBlock(feet, yaw, pitch);
-  if (!hit || !world.setBlock(hit.x, hit.y, hit.z, false)) return false;
+  const block = hit ? world.blockAt(hit.x, hit.y, hit.z) : null;
+  if (!block || !world.setBlock(hit.x, hit.y, hit.z, false)) return false;
+  controller.particles?.breakBlock(block);
   if (controller.gameMode !== 'creative') controller.drops.spawn('test.block', 1, { x: hit.x + .5, y: hit.y + .25, z: hit.z + .5 });
   onBreak(hit.x, hit.y, hit.z); return true;
 }

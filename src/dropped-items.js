@@ -2,6 +2,10 @@
 import { quantity } from './inventory.js';
 const position = p => ({ x: p.x, y: p.y, z: p.z });
 const lotCount = (lots, time) => lots.reduce((sum, lot) => sum + (lot.expires > time + 1e-8 ? lot.count : 0n), 0n);
+export function pickupBounds(player) {
+  const { min, max } = playerBounds(player);
+  return { min: { x: min.x - 1, y: min.y - .5, z: min.z - 1 }, max: { x: max.x + 1, y: max.y + .5, z: max.z + 1 } };
+}
 export const mergeEase = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
 
 export class DroppedItems {
@@ -43,7 +47,7 @@ export class DroppedItems {
   }
   step(player) {
     this.time += .05;
-    const bounds = playerBounds(player);
+    const bounds = pickupBounds(player);
     for (const pile of this.piles) {
       pile.lots = pile.lots.filter(l => l.expires > this.time + 1e-8);
       pile.count = lotCount(pile.lots, this.time);

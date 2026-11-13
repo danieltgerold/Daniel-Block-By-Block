@@ -8,6 +8,9 @@ import { InventoryUI } from './inventory-ui.js';
 import { InventoryPreview } from './inventory-preview.js';
 import { DroppedItemRenderer } from './dropped-item-renderer.js';
 import { getBlockAssets } from './block-assets.js';
+import { BlockParticles } from './block-particles.js';
+import { BlockParticleRenderer } from './block-particle-renderer.js';
+import { AdaptiveVisualQuality } from './visual-quality.js';
 import { BlockPlacement, bindPlacementInput, breakTargetBlock } from './block-placement.js';
 import { ChatUI, isTextEntry } from './chat-ui.js';
 import { createPlayerModel, animatePlayerModel, nextCameraMode, updatePlayerCamera,
@@ -52,6 +55,9 @@ const gridTexture = getBlockAssets(renderer.capabilities.getMaxAnisotropy()).tex
 const material = new THREE.MeshBasicMaterial({ map: gridTexture, vertexColors: true, fog: true });
 const chunks = new ChunkRenderer(world, scene, material);
 const droppedRenderer = new DroppedItemRenderer(scene);
+const visualQuality = new AdaptiveVisualQuality();
+controller.particles = new BlockParticles(world, { quality: visualQuality });
+const particleRenderer = new BlockParticleRenderer(scene);
 const selection = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
   new THREE.LineBasicMaterial({ color: '#fff4ad' }),
@@ -166,6 +172,7 @@ window.addEventListener('resize', () => {
 });
 
 function animate(time) {
+  visualQuality.recordFrame(time, { active: gameSimulationRunning(chatUI.mode) && !document.hidden && document.hasFocus() });
   const dt = previousTime === null ? 0 : (time - previousTime) / 1000;
   previousTime = time;
   if (gameSimulationRunning(chatUI.mode)) {
@@ -195,7 +202,8 @@ function refreshWorldView() {
     camera.updateProjectionMatrix();
   }
   // Camera pose/FOV must be current before entity culling, including F5 changes.
-  droppedRenderer.update(controller.drops, controller.accumulator / .05, camera);
+  droppedRenderer.update(controller.drops, controller.accumulator / .05, camera, visualQuality);
+  particleRenderer.update(controller.particles, controller.accumulator / .05, camera);
   chunks.update(camera);
   const target = active ? targetBlock() : null;
   selection.visible = Boolean(target);

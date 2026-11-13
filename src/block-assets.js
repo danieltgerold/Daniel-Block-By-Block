@@ -33,3 +33,16 @@ export function createSharedBlock(size = .375) {
   }
   return new THREE.Mesh(geometries.get(size), material);
 }
+const particleSources = new Map(), particleTextures = new WeakMap();
+export function registerParticleTexture(id, texture) { particleSources.set(id, texture); }
+export function getParticleTexture(id = 'test.block') {
+  const source = id === 'test.block' ? getBlockAssets().texture : particleSources.get(id);
+  if (!source) return null;
+  if (!particleTextures.has(source)) {
+    const texture = source.clone(); // Reuse source pixels; only the sampler differs.
+    texture.minFilter = texture.magFilter = THREE.NearestFilter; texture.generateMipmaps = false;
+    texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping; texture.needsUpdate = true;
+    particleTextures.set(source, texture);
+  }
+  return particleTextures.get(source);
+}

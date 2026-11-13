@@ -41,6 +41,7 @@ export function createPlayer() {
     jumpCooldown: 0, jumpTicks: 0, jumpApex: 0, jumpStartY: 0, jumpInProgress: false,
     jumpCount: 0, sprintImpulseCount: 0, lastJump: null,
     fovMultiplier: 1,
+    fallDistance: 0, landingFallDistance: 0,
     animation: createPlayerAnimation(),
   };
 }
@@ -48,11 +49,12 @@ export function createPlayer() {
 // Exactly one 50 ms physics tick. This snapshot drives both acceleration and
 // drag, including takeoff and landing ticks.
 export function stepPlayer(player, input = {}, world = null) {
-  const previousX = player.x, previousZ = player.z;
+  const previousX = player.x, previousY = player.y, previousZ = player.z;
+  player.landingFallDistance = 0;
   if (!input.canFly) player.flying = false;
   else if (input.toggleFlight) player.flying = !player.flying;
   const flying = player.flying;
-  if (flying) { player.jumpInProgress = false; player.jumpCooldown = 0; }
+  if (flying) { player.jumpInProgress = false; player.jumpCooldown = 0; player.fallDistance = 0; }
   if (input.crouch && !flying) player.crouching = true;
   else if (player.crouching && (!world || !world.intersectsPlayer({ ...player, crouching: false }))) player.crouching = false;
   player.eyeOffset += (((player.crouching ? MOVEMENT.crouchEyeHeight : MOVEMENT.eyeHeight) * player.size) - player.eyeOffset) * 0.5;
@@ -144,6 +146,14 @@ export function stepPlayer(player, input = {}, world = null) {
       };
       player.jumpInProgress = false;
     }
+  }
+  // Landing uses distance accumulated BEFORE the final collision-adjusted tick,
+  // then resets. Airborne descent alone contributes; teleports reset via createPlayer.
+  if (!flying) {
+    if (player.grounded) {
+      if (!startedGrounded) player.landingFallDistance = player.fallDistance;
+      player.fallDistance = 0;
+    } else player.fallDistance += Math.max(0, previousY - player.y);
   }
   if (flying && player.grounded) player.flying = false;
   const drag = !flying && startedGrounded ? MOVEMENT.groundDrag : MOVEMENT.airDrag;
@@ -328,6 +338,8 @@ export class MovementController {
       this.sprintRequested = false;
       this.accumulator -= MOVEMENT.fixedStep;
       this.totalSteps++;
+      this.particles?.step();
+      this.particles?.playerEffects(this.player);
       this.onTick?.(this.player);
       this.drops.step(this.player);
     }

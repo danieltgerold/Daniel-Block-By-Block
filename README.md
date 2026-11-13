@@ -339,6 +339,31 @@ frames over 0.25 s are capped to prevent runaway catch-up.
 Internal measurements use actual displacement before drag. Sprint-jump speed
 varies during each jump; the value below averages consecutive jumps.
 
+## Pickup and block particles
+
+Dropped-item pickup tests the current scaled, crouch-aware collision box expanded
+by a fixed one block on each X/Z side and half a block above and below. Item-box
+overlap is sufficient, including through walls; delays, partial pickup, capacity,
+and each quantity's expiry remain unchanged.
+
+Block definitions designate a shared particle texture and optional tint. Sprint,
+landing, and instant-break effects use the actual supporting or broken block.
+Normal break bursts sample all 64 cell centers; landing bursts use accumulated
+downward travel before the final landing tick. A separate small mining-hit API
+is reserved for future progressive mining, without adding a delay today.
+
+Particles run at 20 Hz with interpolated, camera-facing quarter-texture crops,
+nearest filtering, collision and Java-style motion/lifetimes. A reusable pool
+caps active particles at 1,024; shared instanced batches render each texture.
+Frustum/distance culling and nearby-visible prioritization limit cosmetic work.
+
+Smoothed frame timing, independent of the FPS HUD, selects normal, half-density,
+or quarter-density effects with sustained thresholds and gradual recovery.
+Inactive-tab time is excluded, and the quality policy accepts a known frame cap.
+Reduced quality simplifies bounded merge visuals; low quality skips them.
+These settings never affect authoritative items, movement or inventory. Inventory
+continues simulation, while the Escape menu retains its existing pause behavior.
+
 ## Verification
 
 The browser and tests use the same voxel world, mesher, renderer, and controller.
