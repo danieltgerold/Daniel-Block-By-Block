@@ -149,9 +149,20 @@ export class PlayerInventory {
     }
     this.changed();
   }
-  pick(id) {
+  pick(id, { creative = false } = {}) {
+    if (!ITEMS.has(id)) return false;
     let index = HOTBAR.find(i => this.slots[i]?.id === id);
-    if (index !== undefined) this.select(index);
-    else { index = MAIN.find(i => this.slots[i]?.id === id); if (index !== undefined) this.swap(index, this.selected); }
+    if (index !== undefined) { this.select(index); return true; }
+    if (creative) {
+      index = HOTBAR.find(i => !this.slots[i]) ?? this.selected;
+      const displaced = this.slots[index]; this.slots[index] = null;
+      if (displaced) {
+        const remaining = this.insert(displaced.id, displaced.count, MAIN);
+        if (remaining) this.onDrop({ id: displaced.id, count: remaining });
+      }
+      this.slots[index] = { id, count: 1 }; this.select(index); return true;
+    }
+    index = MAIN.find(i => this.slots[i]?.id === id);
+    return index !== undefined ? this.swap(index, this.selected) : false;
   }
 }

@@ -1,6 +1,10 @@
 // Round halves away from zero consistently, without ever displaying "-0".
 export const roundCoordinate = value => Math.sign(value) * Math.round(Math.abs(value)) || 0;
 export const coordinateText = feet => ['x', 'y', 'z'].map(axis => `${axis.toUpperCase()}: ${roundCoordinate(feet[axis])}`).join('  ');
+export const gameSimulationRunning = mode => mode === 'playing' || mode === 'inventory';
+export function updateCrosshair(element, mode, cameraMode) {
+  element.hidden = mode !== 'playing' || cameraMode !== 0;
+}
 
 export class GameplayHUD {
   constructor(document, storage = null) {

@@ -245,11 +245,22 @@ export class MovementController {
     const remaining = this.inventory.insert(id, count);
     if (remaining) this.drops.spawn(id, remaining, { x: this.player.x, y: this.player.y + .2, z: this.player.z });
   }
-  throwItem(stack) {
+  throwItem(stack, random = Math.random) {
     const { yaw, pitch } = this.getAim?.() ?? { yaw: this.player.animation.aimYaw, pitch: this.player.animation.aimPitch };
     const ray = this.interactionRay(this.player, yaw, pitch);
-    this.drops.spawn(stack.id, stack.count, { x: ray.origin.x, y: ray.origin.y - .2 * this.size, z: ray.origin.z },
-      { thrown: true, velocity: { x: ray.direction.x * .18, y: ray.direction.y * .18 + .1, z: ray.direction.z * .18 } });
+    const angle = random() * Math.PI * 2, spread = random() * .02;
+    this.drops.spawn(stack.id, stack.count, { x: this.player.x, y: ray.origin.y - .3, z: this.player.z },
+      { thrown: true, velocity: { x: ray.direction.x * .3 + Math.cos(angle) * spread,
+        y: ray.direction.y * .3 + .1, z: ray.direction.z * .3 + Math.sin(angle) * spread } });
+  }
+  pickBlock(yaw, pitch) {
+    if (!this.targetBlock(this.player, yaw, pitch)) return false;
+    return this.inventory.pick('test.block', { creative: this.gameMode === 'creative' });
+  }
+  clearHeldInputs() {
+    this.heldKeys.clear(); this.lastForwardPressTick = this.lastSpacePressTick = -Infinity;
+    this.flightToggles = 0; this.sprintRequested = false; this.miningHeld = false;
+    this.placementHeld = false; this.placementPresses = this.placementRepeat = 0; this.swingQueued = false;
   }
 
   keyDown(code, repeat = false) {
@@ -294,6 +305,8 @@ export class MovementController {
   }
 
   update(frameSeconds, input = {}) {
+    const gameplay = input.gameplayEnabled !== false;
+    if (!gameplay) this.clearHeldInputs();
     // Simulate normal frames fully; cap long browser stalls. Focus loss pauses
     // separately so returning to the tab never simulates unattended input.
     this.accumulator += Math.max(0, Math.min(frameSeconds, 0.25));
@@ -302,7 +315,8 @@ export class MovementController {
       this.previous = snapshot(this.player);
       const wasFlying = this.player.flying;
       // Overrides let deterministic measurements exercise this exact controller.
-      stepPlayer(this.player, { ...this.readInput(), mining: this.miningHeld, swing: this.swingQueued, ...input,
+      const controls = gameplay ? { ...this.readInput(), mining: this.miningHeld, swing: this.swingQueued, ...input } : { yaw: input.yaw, pitch: input.pitch };
+      stepPlayer(this.player, { ...controls,
         walkSpeedScale: this.effective.speed / DEFAULT_WALK_SPEED,
         canFly: this.gameMode === 'creative', toggleFlight: this.flightToggles % 2 === 1,
         jumpVelocity: this.jumpLaunchVelocity * this.size }, this.world);

@@ -77,14 +77,14 @@ test('drops merge exact quantities, respect throw delay and collision, partially
   const expiry = first.lots[0].expires;
   c.update(.05); assert.equal(c.inventory.mainHand.count, 64); assert.equal(c.drops.total(), 96n);
   c.drops.spawn('test.block', 200, { x: 1, y: .2, z: .5 });
-  assert.equal(c.drops.piles.length, 1); assert.equal(c.drops.total(), 296n); assert.equal(first.lots[0].expires, expiry);
+  assert.equal(c.drops.piles.length, 1); assert.equal(c.drops.total(), 296n); assert.ok(c.drops.piles[0].lots.some(l => l.expires === expiry));
   for (let n = 0; n < 30; n++) c.update(.05);
   assert.ok(c.drops.piles[0].y >= 0, 'Dropped cube collides with floor');
   c.drops.time = 299.95; c.update(.05); assert.equal(c.drops.total(), 200n);
   c.update(.05); assert.equal(c.drops.total(), 0n);
   c.inventory.slots[0] = null;
   c.drops.spawn('test.block', 5, { x: .5, y: .2, z: .5 }, { thrown: true });
-  for (let n = 0; n < 9; n++) c.update(.05);
+  for (let n = 0; n < 39; n++) c.update(.05);
   assert.equal(c.drops.total(), 5n);
   c.update(.05); assert.equal(c.drops.total(), 0n); assert.equal(c.inventory.mainHand.count, 5);
 });

@@ -3,7 +3,7 @@ import { MovementController } from './movement.js';
 import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
 import { EntityHitboxes } from './entity-hitboxes.js';
-import { GameplayHUD } from './gameplay-hud.js';
+import { GameplayHUD, gameSimulationRunning, updateCrosshair } from './gameplay-hud.js';
 import { InventoryUI } from './inventory-ui.js';
 import { InventoryPreview } from './inventory-preview.js';
 import { DroppedItemRenderer } from './dropped-item-renderer.js';
@@ -73,6 +73,7 @@ const placement = new BlockPlacement({ controller, world, getAim: () => ({ yaw, 
 bindPlacementInput(placement, canvas, document, window);
 controller.onTick = player => {
   emptyHand.equipHeight = Math.min(1, emptyHand.equipHeight + .4);
+  if (!active) return;
   if (player.animation.swingStartedThisTick && (controller.miningHeld || primaryClickQueued)) {
     breakBlock(player);
   }
@@ -81,7 +82,7 @@ controller.onTick = player => {
 };
 canvas.addEventListener('mousedown', event => {
   if (active && event.button === 1) {
-    event.preventDefault(); if (targetBlock(controller.player)) controller.inventory.pick('test.block'); return;
+    event.preventDefault(); controller.pickBlock(yaw, pitch); return;
   }
   // The click that captures the mouse does not also break a block.
   if (!active || event.button !== 0) return;
@@ -98,7 +99,7 @@ function clearInput() { primaryClickQueued = false; controller.pause(); }
 function renderInputMode(mode) {
   active = mode === 'playing';
   intro.hidden = mode !== 'menu';
-  crosshair.hidden = !active;
+  updateCrosshair(crosshair, mode, cameraMode);
   playingHint.hidden = !active;
   document.body.classList.toggle('is-playing', active);
   document.body.classList.toggle('world-view', mode !== 'menu');
@@ -169,9 +170,9 @@ window.addEventListener('resize', () => {
 function animate(time) {
   const dt = previousTime === null ? 0 : (time - previousTime) / 1000;
   previousTime = time;
-  if (active) {
+  if (gameSimulationRunning(chatUI.mode)) {
     const previousY = controller.player.y;
-    controller.update(dt, { yaw, pitch });
+    controller.update(dt, { yaw, pitch, gameplayEnabled: active });
     // Keep explicit teleports below the void boundary; respawn ordinary falls
     // when they cross that boundary from above.
     if (previousY >= -32 && controller.player.y < -32) controller.respawn(world.findSpawn(controller.size));
@@ -185,6 +186,7 @@ function animate(time) {
 
 function refreshWorldView() {
   const position = controller.renderState();
+  updateCrosshair(crosshair, chatUI.mode, cameraMode);
   const controlMode = position.flying ? 'flight' : controller.gameMode;
   if (playingHint.dataset.controlMode !== controlMode) {
     playingHint.dataset.controlMode = controlMode;

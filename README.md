@@ -57,8 +57,14 @@ ignored; source files and the package lock are tracked.
   suppressed while playing.
 - **E** opens/closes inventory; Escape closes it. **1-9** or the mouse wheel
   selects a hotbar slot, **F** swaps the selected stack and offhand, and **Q**
-  drops one item (**Ctrl+Q** drops the selected stack). Middle click picks an
-  existing matching hotbar stack, or swaps a matching main-inventory stack in.
+  drops one item (**Ctrl+Q** drops the selected stack). Middle click picks a
+  matching hotbar stack. Survival can swap a matching main-inventory stack in;
+  Creative creates one targeted block in an empty hotbar slot, or replaces the
+  selected slot while saving the displaced stack to inventory/dropping overflow.
+  No target within reach means no change, in any F5 view.
+- The first-person crosshair is a crisp translucent 15x15 GUI-pixel plus with
+  difference blending. It hides in third person and while chat, inventory or
+  menus have focus; eye-based targeting continues in all camera views.
 - Esc releases the mouse. Unlocking, switching windows, or hiding the tab clears
   held inputs, sprint, and double-tap history. Click again to resume.
 - **F3 + B** toggles depth-tested collision outlines, including the local player
@@ -155,7 +161,9 @@ transfers matching source-area stacks. Hover plus 1-9 or F swaps with that hotba
 slot or offhand. Hover plus Q/Ctrl+Q drops one/all. Left/right clicking outside
 the panel drops all/one cursor items. Closing returns cursor items to storage
 and drops any remainder. Inventory blocks all gameplay input and releases the
-mouse; closing uses the same capture/resume flow as chat.
+mouse, but the 20 Hz world simulation keeps running, including gravity, drops,
+pickup, merging and despawn. Closing uses the same capture/resume flow as chat.
+The Escape pause menu and lost-focus state still pause simulation.
 
 Breaking blocks in Survival makes collectible cube items with gravity and voxel
 collision. Piles show 1 cube for one item, 2 for 2–16, 3 for 17–32, 4 for 33–48,
@@ -163,9 +171,15 @@ and 5 for 49 or more. Extra cubes have stable offsets and shared geometry/materi
 Only the visual group bobs by `sin(ageTicks/10 + phase)*0.1 + 0.1` above a fixed
 height offset and rotates by `ageTicks/20 + phase`; physics bounds never bob.
 Touching picks up as much as storage can hold. Nearby
-compatible drops merge within two blocks; a visible pile may exceed 64, while
+compatible drops merge within two blocks; smaller sources visually travel into
+the live larger pile over 0.25 seconds. Quantities transfer once immediately;
+the effect is visual-only, follows subsequent merges and ends on pickup/expiry.
+A visible pile may exceed 64, while
 inventory stacks stay capped. Each merged lot retains its original five-minute
-active-game-time expiry. Thrown items have a half-second pickup delay. Drops,
+active-game-time expiry. Thrown items start at the player's X/Z and 0.3 blocks
+below the eye, with 0.3 blocks/tick along the full aim, +0.1 upward velocity and
+up to 0.02 horizontal spread. They use 0.04 gravity, 0.98 air drag, a small
+landing bounce and a 40-tick (two-second) pickup delay. Drops,
 inventory and block edits currently reset together on page reload.
 Values are stored independently. Effective speed, reach and jump height are
 their size-1 values times size. Thus speed 6 at size 2 is 12 blocks/s; sprint
