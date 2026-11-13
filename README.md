@@ -36,8 +36,14 @@ ignored; source files and the package lock are tracked.
 - Default reach is **4.5 blocks** at size 1; `/reach` changes it. The outline marks the target.
 - **Left click / hold** mines the targeted block and swings the bare hand.
   A swing lasts six ticks (0.30 s); continued mining may restart it at tick three.
-- **Right click** places a block against the targeted face. Placement inside the
-  player's physical or interpolated body is rejected. The context menu is suppressed.
+- **Right click** attempts placement immediately. Hold it to attempt again on
+  every 20 Hz physics tick, with a fresh eye raycast and the current reach.
+  Each attempt can target faces created earlier in the same hold. Only empty
+  destinations outside the current collision box are accepted; only successful
+  placements request a swing. The game currently uses one unlimited block type.
+  Releasing the button, opening chat or menus, losing focus or releasing mouse
+  capture cancels the hold and requires a new press. Browser context menus are
+  suppressed while playing.
 - Esc releases the mouse. Unlocking, switching windows, or hiding the tab clears
   held inputs, sprint, and double-tap history. Click again to resume.
 - **F3 + B** toggles depth-tested collision outlines, including the local player

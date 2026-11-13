@@ -152,6 +152,7 @@ export class MovementController {
     this.lastForwardPressTick = -Infinity;
     this.sprintRequested = false;
     this.miningHeld = false;
+    this.placementHeld = false;
     this.swingQueued = false;
     this.onTick = null;
     this.settings = { ...DEFAULT_SETTINGS };
@@ -295,6 +296,7 @@ export class MovementController {
 
   pause() {
     this.miningHeld = false;
+    this.placementHeld = false;
     this.swingQueued = false;
     this.player.animation.swingAge = -1;
     this.player.animation.amount = 0;

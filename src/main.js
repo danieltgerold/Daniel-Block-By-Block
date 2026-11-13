@@ -4,6 +4,7 @@ import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
 import { EntityHitboxes } from './entity-hitboxes.js';
 import { GameplayHUD } from './gameplay-hud.js';
+import { BlockPlacement, bindPlacementInput } from './block-placement.js';
 import { ChatUI, isTextEntry } from './chat-ui.js';
 import { createPlayerModel, animatePlayerModel, nextCameraMode, updatePlayerCamera,
   createEmptyHand, updateEmptyHand, renderPlayerScene } from './player-visuals.js';
@@ -74,35 +75,32 @@ function targetBlock(feet = controller.renderState()) {
   return controller.targetBlock(feet, yaw, pitch);
 }
 
-canvas.addEventListener('contextmenu', event => event.preventDefault());
-function editBlock(place, feet = controller.renderState()) {
+function breakBlock(feet = controller.renderState()) {
   const hit = targetBlock(feet);
   if (!hit) return false;
-  let { x, y, z } = hit;
-  if (place) {
-    if (!Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return false;
-    x += hit.normal.x; y += hit.normal.y; z += hit.normal.z;
-    if (!world.canPlaceBlock(x, y, z, [controller.player, controller.renderState()])) return false;
-  }
-  const changed = world.setBlock(x, y, z, place);
+  const { x, y, z } = hit;
+  const changed = world.setBlock(x, y, z, false);
   if (changed) chunks.invalidateBlock(x, z);
   return changed;
 }
+const placement = new BlockPlacement({ controller, world, getAim: () => ({ yaw, pitch }),
+  canInteract: () => active && document.pointerLockElement === canvas && document.hasFocus() && !document.hidden,
+  onPlace: (x, y, z) => chunks.invalidateBlock(x, z) });
+bindPlacementInput(placement, canvas, document, window);
 controller.onTick = player => {
   if (player.animation.swingStartedThisTick && (controller.miningHeld || primaryClickQueued)) {
-    editBlock(false, player);
+    breakBlock(player);
   }
   primaryClickQueued = false;
+  placement.tick();
 };
 canvas.addEventListener('mousedown', event => {
   // The click that captures the mouse does not also break a block.
-  if (!active || (event.button !== 0 && event.button !== 2)) return;
+  if (!active || event.button !== 0) return;
   event.preventDefault();
   if (event.button === 0) {
     primaryClickQueued = true;
     controller.setMining(true);
-    controller.requestSwing();
-  } else if (editBlock(true)) {
     controller.requestSwing();
   }
 });

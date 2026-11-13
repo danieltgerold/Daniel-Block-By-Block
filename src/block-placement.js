@@ -1,0 +1,55 @@
+// The world currently has one unlimited block type. All placement paths share
+// this transaction so invalid attempts never edit terrain or request a swing.
+export class BlockPlacement {
+  constructor({ controller, world, getAim, canInteract, onPlace = () => {} }) {
+    Object.assign(this, { controller, world, getAim, canInteract, onPlace });
+  }
+
+  press() {
+    if (!this.canInteract() || this.controller.placementHeld) return false;
+    this.controller.placementHeld = true;
+    return this.attempt();
+  }
+
+  release() { this.controller.placementHeld = false; }
+
+  tick() { return this.controller.placementHeld ? this.attempt() : false; }
+
+  attempt() {
+    if (!this.canInteract()) { this.release(); return false; }
+    const { yaw, pitch } = this.getAim();
+    // Never cache a hit or use the third-person camera as the ray origin.
+    // Tick callbacks use the actual post-collision feet, even in catch-up frames.
+    const hit = this.controller.targetBlock(this.controller.player, yaw, pitch);
+    if (!hit || !Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return false;
+    const x = hit.x + hit.normal.x, y = hit.y + hit.normal.y, z = hit.z + hit.normal.z;
+    if (!this.world.canPlaceBlock(x, y, z, [this.controller.player])) return false;
+    if (!this.world.setBlock(x, y, z, true)) return false;
+    this.controller.requestSwing();
+    this.onPlace(x, y, z);
+    return true;
+  }
+}
+
+export function bindPlacementInput(placement, canvas, document, window) {
+  const listeners = [];
+  const listen = (target, name, callback) => {
+    target.addEventListener(name, callback);
+    listeners.push(() => target.removeEventListener(name, callback));
+  };
+  listen(canvas, 'mousedown', event => {
+    // Capturing the mouse, interacting with a menu, or returning with an old
+    // physical hold must not count as a fresh placement press.
+    if (event.button !== 2 || !placement.canInteract()) return;
+    event.preventDefault();
+    placement.press();
+  });
+  listen(document, 'mouseup', event => { if (event.button === 2) placement.release(); });
+  listen(window, 'blur', () => placement.release());
+  listen(document, 'visibilitychange', () => { if (document.hidden) placement.release(); });
+  listen(document, 'pointerlockchange', () => {
+    if (document.pointerLockElement !== canvas) placement.release();
+  });
+  listen(canvas, 'contextmenu', event => { if (placement.canInteract()) event.preventDefault(); });
+  return () => { placement.release(); for (const remove of listeners) remove(); };
+}
