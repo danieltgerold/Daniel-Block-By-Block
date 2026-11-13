@@ -192,7 +192,7 @@ function refreshWorldView() {
       ? 'WASD fly · R / double W faster · SPACE up · L SHIFT down · Double SPACE stop flight · F5 camera · Left click break / right click place · ESC pause'
       : `WASD move · R / double W sprint · L SHIFT crouch · Hold SPACE jump${controller.gameMode === 'creative' ? ' / double SPACE fly' : ''} · F5 camera · Left click break / right click place · ESC pause`;
   }
-  animatePlayerModel(playerModel, position, position.animation, cameraMode);
+  animatePlayerModel(playerModel, position, position.animation, cameraMode, controller.inventory);
   syncEquipment(playerModel, controller.inventory);
   updateEmptyHand(emptyHand, position.animation, controller.inventory);
   droppedRenderer.update(controller.drops, controller.accumulator / .05);

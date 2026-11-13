@@ -5,6 +5,7 @@ import { ITEMS, ARMOR } from './inventory.js';
 import { createSharedBlock } from './block-assets.js';
 
 export const MODEL_SCALE = 0.9375 / 16;
+export const PLAYER_RENDER_SCALE = 0.9375;
 export const THIRD_PERSON_DISTANCE = 4;
 export const PLAYER_COLORS = Object.freeze({ Head: '#32f45d', Chest: '#ffe529',
   'Left Arm': '#ff3434', 'Right Arm': '#ff35da', 'Left Leg': '#285cff', 'Right Leg': '#16deff' });
@@ -19,6 +20,25 @@ function coloredBox(size, color) {
   }
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   return new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color, vertexColors: true, depthTest: true, depthWrite: true }));
+}
+
+function thirdPersonHeldBlock(handSign) {
+  const item = createSharedBlock(1); // Centered unit cube; scale lives in the attachment matrix.
+  const basis = new THREE.Matrix4().makeScale(-1, -1, 1);
+  const mc = new THREE.Matrix4().makeRotationX(-Math.PI / 2)
+    .multiply(new THREE.Matrix4().makeRotationY(Math.PI))
+    .multiply(new THREE.Matrix4().makeTranslation(handSign / 16, 2 / 16, -10 / 16))
+    .multiply(new THREE.Matrix4().makeTranslation(0, 2.5 / 16, 0))
+    .multiply(new THREE.Matrix4().makeRotationX(75 * Math.PI / 180))
+    .multiply(new THREE.Matrix4().makeRotationY(handSign * Math.PI / 4))
+    .multiply(new THREE.Matrix4().makeScale(.375, .375, .375));
+  // Convert the complete ordered transform with C * M * C^-1 (C^-1 = C),
+  // then apply the rig render scale once to translations AND cube dimensions.
+  item.matrixAutoUpdate = false;
+  item.matrix.makeScale(PLAYER_RENDER_SCALE, PLAYER_RENDER_SCALE, PLAYER_RENDER_SCALE)
+    .multiply(basis).multiply(mc).multiply(basis);
+  item.matrixWorldNeedsUpdate = true;
+  return item;
 }
 
 export function createPlayerModel() {
@@ -59,16 +79,14 @@ export function createPlayerModel() {
   faceRect(2.6, 0.4, 0, -1.5, '#264b38');
   model.userData.parts = parts;
   model.userData.joints = joints;
-  const rightItem = createBlockItem(), leftItem = createBlockItem();
-  rightItem.position.set(MODEL_SCALE, -10 * MODEL_SCALE - .15, -.15);
-  leftItem.position.set(-MODEL_SCALE, -10 * MODEL_SCALE - .15, -.15);
+  const rightItem = thirdPersonHeldBlock(1), leftItem = thirdPersonHeldBlock(-1);
   rightItem.visible = leftItem.visible = false;
   joints['Right Arm'].add(rightItem); joints['Left Arm'].add(leftItem);
   model.userData.equipment = { rightItem, leftItem, armor: new Map() };
   return model;
 }
 
-export function animatePlayerModel(model, feet, pose, cameraMode = 0) {
+export function animatePlayerModel(model, feet, pose, cameraMode = 0, inventory = null) {
   model.scale.setScalar(feet.size ?? 1);
   model.position.set(feet.x, feet.y, feet.z);
   model.rotation.set(0, pose.torsoYaw, 0);
@@ -77,6 +95,10 @@ export function animatePlayerModel(model, feet, pose, cameraMode = 0) {
   j.Head.visible = cameraMode !== 0;
   j['Right Arm'].visible = cameraMode !== 0;
   const s = Math.cos(pose.phase * 0.6662) * pose.amount;
+  // Held-item base pose in MC coordinates, before crouch and attack offsets.
+  // The base yaw is zero; the action yaw below is layered on afterward.
+  const rightWalkMC = inventory?.mainHand ? s * .5 - Math.PI / 10 : s;
+  const leftWalkMC = inventory?.offhand ? -s * .5 - Math.PI / 10 : -s;
   const c = pose.crouch ?? 0;
   const p = pose.swingActive ? pose.swingProgress : 0;
   const t = pose.swingActive ? 0.20 * Math.sin(2 * Math.PI * Math.sqrt(p)) : 0;
@@ -91,8 +113,8 @@ export function animatePlayerModel(model, feet, pose, cameraMode = 0) {
   j.Head.rotation.set(pose.aimPitch, pose.headYaw, 0);
   j['Right Arm'].position.set(5 * Math.cos(t) * MODEL_SCALE, (22 - 3.2 * c) * MODEL_SCALE, 5 * Math.sin(t) * MODEL_SCALE);
   j['Left Arm'].position.set(-5 * Math.cos(t) * MODEL_SCALE, (22 - 3.2 * c) * MODEL_SCALE, -5 * Math.sin(t) * MODEL_SCALE);
-  j['Right Arm'].rotation.set(-(s + 0.4 * c - attack), -3 * t, -0.4 * Math.sin(Math.PI * p));
-  j['Left Arm'].rotation.set(-(-s + 0.4 * c + t), -t, 0);
+  j['Right Arm'].rotation.set(-(rightWalkMC + 0.4 * c - attack), -3 * t, -0.4 * Math.sin(Math.PI * p));
+  j['Left Arm'].rotation.set(-(leftWalkMC + 0.4 * c + t), -t, 0);
   j['Right Leg'].position.set(2 * MODEL_SCALE, 12 * MODEL_SCALE, 4 * c * MODEL_SCALE);
   j['Left Leg'].position.set(-2 * MODEL_SCALE, 12 * MODEL_SCALE, 4 * c * MODEL_SCALE);
   j['Right Leg'].rotation.set(1.4 * s, 0, 0);

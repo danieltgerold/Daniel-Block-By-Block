@@ -29,7 +29,7 @@ export class InventoryPreview {
     this.pose.aim((x - rect.left - rect.width / 2) / 180, (y - rect.top - rect.height / 2) / 180);
   }
   render() {
-    animatePlayerModel(this.model, { x: 0, y: 0, z: 0, size: 1 }, this.pose.step(), 1);
+    animatePlayerModel(this.model, { x: 0, y: 0, z: 0, size: 1 }, this.pose.step(), 1, this.inventory);
     syncEquipment(this.model, this.inventory); this.renderer.render(this.scene, this.camera);
   }
 }

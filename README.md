@@ -128,8 +128,12 @@ The camera smoothly combines the 1.1 flying multiplier with sprint FOV.
 The registered **Test Block** (`test.block`) stacks to 64. A cached static
 three-face isometric icon is shared across inventory, hotbar and cursor slots.
 World, held and dropped blocks share the original palette, shaded faces and
-filtered grid texture. Held blocks use cached 0.375-block cube geometry at
-the animated wrists; the offhand attachment is mirrored. Inventory starts
+filtered grid texture. Third-person blocks use Java's ordered hand/block-model
+transforms, converted with the rig's X/Y-flipped basis and a single 0.9375
+render scale. Their side length is 0.3515625 blocks at size one; both attachments
+follow the animated shoulders. Held arms halve their base walk pitch and add
+the Java hold pose before crouch/action offsets. First-person item transforms
+remain on their separate path. Inventory starts
 empty for the session; `/give test.block [quantity]` defaults to one, fills
 partial storage stacks before empty slots, and drops all overflow near the
 player. Quantities use exact integers, including totals larger than JavaScript's
