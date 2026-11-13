@@ -10,7 +10,7 @@ import { ChatUI } from '../src/chat-ui.js';
 function fixture() {
   const world = new VoxelWorld(), controller = new MovementController(world);
   world.setBlock(0, 1, 0, true);
-  controller.respawn({ x: 4.5, y: 0, z: .5 });
+  controller.respawn({ x: 5.5, y: 0, z: .5 });
   let playing = true, aim = { yaw: Math.PI / 2, pitch: 0 }, swings = 0, attempts = 0;
   const placed = [];
   const requestSwing = controller.requestSwing.bind(controller);
@@ -24,30 +24,30 @@ function fixture() {
     aim: value => { aim = value; }, playing: value => { playing = value; } };
 }
 
-test('press places immediately; each tick recasts against newly placed faces and current aim', () => {
+test('press places immediately but the near side stays three blocks away; holding uses fresh aim', () => {
   const f = fixture();
   assert.equal(f.placement.press(), true);
   assert.deepEqual(f.placed, [[1, 1, 0]]);
   assert.equal(f.controller.totalSteps, 0);
   assert.equal(f.placement.press(), false, 'Duplicate down does not place twice');
   f.controller.update(.1);
-  assert.deepEqual(f.placed, [[1, 1, 0], [2, 1, 0], [3, 1, 0]]);
+  assert.deepEqual(f.placed, [[1, 1, 0]]);
   assert.equal(f.attempts(), 3);
-  assert.equal(f.swings(), 3);
+  assert.equal(f.swings(), 1);
   f.controller.update(.05);
-  assert.equal(f.placed.length, 3, 'Next block would intersect the live player');
-  f.aim({ yaw: 0, pitch: -Math.PI / 4 });
+  assert.equal(f.placed.length, 1, 'Next block would be less than three blocks from the eye');
+  f.aim({ yaw: 0, pitch: -Math.atan2(1.62, 4) });
   f.controller.update(.05);
-  assert.deepEqual(f.placed.at(-1), [4, 0, -2], 'Aim changes during the same hold');
-  assert.equal(f.swings(), 4);
+  assert.deepEqual(f.placed.at(-1), [5, 0, -4], 'Aim changes during the same hold');
+  assert.equal(f.swings(), 2);
 });
 
 test('each attempt obeys live reach and the scaled crouching hitbox; failures make no edits or swings', () => {
   const f = fixture();
-  f.controller.configure('reach', 3.49);
+  f.controller.configure('reach', 4.49);
   assert.equal(f.placement.press(), false);
   assert.equal(f.placed.length, 0); assert.equal(f.swings(), 0);
-  f.controller.configure('reach', 3.5);
+  f.controller.configure('reach', 4.5);
   f.controller.update(.05);
   assert.equal(f.placed.length, 1, 'A failed press keeps trying with the updated reach');
   f.controller.configure('size', 2);
@@ -66,26 +66,39 @@ test('each attempt obeys live reach and the scaled crouching hitbox; failures ma
   assert.equal(f.swings(), 1);
 });
 
-test('walking and sprinting build continuous rows with identical tick attempts across render frame rates', () => {
-  function run(fps, sprint) {
+test('retreating faster ramps up placement, catches up in one tick and preserves the three-block gap', () => {
+  function run(fps, speed) {
     const f = fixture();
-    for (let z = -50; z < 1; z++) f.world.setBlock(0, 1, z, true);
+    f.controller.configure('reach', 10);
+    f.controller.configure('speed', speed);
+    let maximumPerTick = 0;
+    f.controller.onTick = () => {
+      const before = f.placed.length;
+      f.placement.tick();
+      maximumPerTick = Math.max(maximumPerTick, f.placed.length - before);
+      for (const [x] of f.placed) assert.ok(f.controller.player.x - x - 1 >= 3 - 1e-7);
+    };
     f.placement.press();
-    for (let frame = 0; frame < 3 * fps; frame++) {
-      f.controller.update(1 / fps, { right: 1, yaw: Math.PI / 2, pitch: 0,
-        // Sprint diagonally into the wall while sliding along it. Aim and
-        // movement share the same yaw, as they do during normal gameplay.
-        ...(sprint ? { forward: 1, sprint: true } : {}) });
+    for (let frame = 0; frame < fps; frame++) {
+      f.controller.update(1 / fps, { forward: -1, yaw: Math.PI / 2, pitch: 0 });
     }
-    assert.equal(f.attempts(), 61, 'Immediate press plus one attempt per physics tick');
-    assert.ok(f.placed.length > 20);
     assert.equal(f.swings(), f.placed.length);
-    assert.ok(f.placed.some(([x, , z]) => x === 1 && z < -8));
-    return f.placed;
+    const nearest = f.controller.player.x - f.placed.at(-1)[0] - 1;
+    assert.ok(nearest >= 3 && nearest < 4);
+    return { placed: f.placed, maximumPerTick };
   }
-  for (const sprint of [false, true]) {
-    const reference = run(20, sprint);
-    for (const fps of [5, 60, 144]) assert.deepEqual(run(fps, sprint), reference);
+  const slow = run(20, 6), fast = run(20, 40);
+  assert.ok(fast.maximumPerTick > slow.maximumPerTick);
+  assert.ok(fast.placed.length > slow.placed.length);
+  assert.deepEqual(run(60, 40), fast);
+  const f = fixture();
+  f.controller.configure('reach', 10);
+  f.placement.press();
+  f.controller.player.x += 3;
+  f.placement.tick();
+  assert.deepEqual(f.placed, [[1, 1, 0], [2, 1, 0], [3, 1, 0], [4, 1, 0]]);
+  for (const [x] of f.placed) {
+    assert.ok(f.controller.player.x - x - 1 >= 3);
   }
 });
 

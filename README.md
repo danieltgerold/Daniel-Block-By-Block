@@ -41,6 +41,9 @@ ignored; source files and the package lock are tracked.
   Each attempt can target faces created earlier in the same hold. Only empty
   destinations outside the current collision box are accepted; only successful
   placements request a swing. The game currently uses one unlimited block type.
+  New blocks must stay at least three blocks from the eye, measured to the
+  nearest part of the cube. Retreating faster allows extra fresh attempts in
+  that tick to catch the build up to the gap, while still respecting reach.
   Releasing the button, opening chat or menus, losing focus or releasing mouse
   capture cancels the hold and requires a new press. Browser context menus are
   suppressed while playing.
