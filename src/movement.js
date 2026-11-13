@@ -1,6 +1,6 @@
 ﻿// Position is in blocks (1 block = 1 meter); velocity is blocks per physics tick.
 // y is always the player's feet. Constants follow the requested Java rules.
-import { createPlayerAnimation, tickPlayerAnimation, interpolatePlayerAnimation } from './player-animation.js';
+import { createPlayerAnimation, tickPlayerAnimation, tickHeldItemAnimation, interpolatePlayerAnimation } from './player-animation.js';
 import { DEFAULT_SETTINGS, DEFAULT_WALK_SPEED, effectiveSettings, jumpVelocityForHeight } from './player-settings.js';
 import { protectSneakingEdge } from './player-posture.js';
 import { PlayerInventory } from './inventory.js';
@@ -253,6 +253,7 @@ export class MovementController {
 
   setMining(held) { this.miningHeld = held; }
   requestSwing() { this.swingQueued = true; }
+  lowerMainHand() { this.player.animation.equipHeight = 0; }
   giveItem(id, count) {
     const remaining = this.inventory.insert(id, count);
     if (remaining) this.drops.spawn(id, remaining, { x: this.player.x, y: this.player.y + .2, z: this.player.z });
@@ -338,6 +339,7 @@ export class MovementController {
       this.sprintRequested = false;
       this.accumulator -= MOVEMENT.fixedStep;
       this.totalSteps++;
+      tickHeldItemAnimation(this.player.animation, this.inventory.mainHand);
       this.particles?.step();
       this.particles?.playerEffects(this.player);
       this.onTick?.(this.player);
@@ -378,7 +380,14 @@ export class MovementController {
     return true;
   }
 
-  pause() {
+  pause({ preserveMomentum = false } = {}) {
+    if (preserveMomentum) {
+      // Inventory releases controls; it does not cancel carried velocity or
+      // reset interpolation. Air drag, gravity and collisions keep running.
+      this.clearHeldInputs();
+      this.player.sprinting = false;
+      return;
+    }
     this.miningHeld = false;
     this.placementHeld = false;
     this.placementPresses = 0;

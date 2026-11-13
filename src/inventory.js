@@ -132,6 +132,7 @@ export class PlayerInventory {
     this.onDrop({ id: stack.id, count }); stack.count -= count;
     if (!stack.count) this.slots[index] = null;
     this.changed();
+    return true;
   }
   dropCursor(whole = false) {
     if (!this.cursor) return;

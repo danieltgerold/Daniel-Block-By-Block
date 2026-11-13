@@ -178,18 +178,19 @@ export function updateEmptyHand(hand, pose, inventory = null) {
   const p = pose.swingActive ? pose.swingProgress : 0;
   const { inward: q, vertical: r, reach: a } = swingCurves(p, pose.swingActive);
   const b = Math.sin(Math.PI * p * p);
+  const equipHeight = pose.equipHeight ?? hand.equipHeight;
   hand.rig.matrixAutoUpdate = false;
   // Written matrix order: T · Ry · Rz · fixed arm alignment. No walk/idle bob.
-  hand.rig.matrix.makeTranslation(0.64 - 0.30 * q, -0.60 + 0.40 * r, -0.72 - 0.40 * a)
+  hand.rig.matrix.makeTranslation(0.64 - 0.30 * q, -0.60 + 0.40 * r - .6 * (1 - equipHeight), -0.72 - 0.40 * a)
     .multiply(handRotation.makeRotationY((45 + 70 * q) * Math.PI / 180))
     .multiply(handRotation.makeRotationZ(-20 * b * Math.PI / 180))
     .multiply(fixedArmAlignment);
   hand.rig.matrixWorldNeedsUpdate = true;
-  const main = inventory?.mainHand, offhand = inventory?.offhand;
+  const main = pose.equipInitialized ? pose.equippedItem : inventory?.mainHand, offhand = inventory?.offhand;
   hand.rig.visible = !main;
   hand.mainItem.visible = Boolean(main); hand.offhandItem.visible = Boolean(offhand);
   if (main) {
-    hand.mainItem.position.set(.56 - .4 * q, -.52 + .2 * r - .6 * (1 - hand.equipHeight), -.72 - .2 * a);
+    hand.mainItem.position.set(.56 - .4 * q, -.52 + .2 * r - .6 * (1 - equipHeight), -.72 - .2 * a);
     hand.mainItem.matrixAutoUpdate = false;
     hand.mainItem.matrix.makeTranslation(...hand.mainItem.position.toArray())
       .multiply(handRotation.makeRotationY((45 - 20 * b) * Math.PI / 180))

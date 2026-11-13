@@ -28,6 +28,12 @@ export class DroppedItemRenderer {
     for (const effect of effects) {
       const target = targets.get(effect.targetId);
       if (!target || effect.count <= 0n || now >= effect.ends) continue;
+      if (effect.flight && now < effect.flight.ends) {
+        const f = effect.flight, t = Math.max(0, Math.min(1, (now - f.started) / (f.ends - f.started)));
+        visible.push({ pile: effect, at: { x: f.from.x + (effect.from.x - f.from.x) * t,
+          y: f.from.y + (effect.from.y - f.from.y) * t, z: f.from.z + (effect.from.z - f.from.z) * t } });
+        continue;
+      }
       const elapsed = performance.mergeStep ? Math.floor(Math.max(0, now - effect.started) / performance.mergeStep) * performance.mergeStep : now - effect.started;
       const t = performance.mergeStep ? Math.min(1, elapsed / (effect.ends - effect.started)) : mergeEase(elapsed / (effect.ends - effect.started));
       const destination = interpolated(target);

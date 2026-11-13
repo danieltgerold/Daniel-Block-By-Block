@@ -6,7 +6,20 @@ export const lerpAngle = (from, to, alpha) => wrapAngle(from + angleDifference(f
 
 export function createPlayerAnimation(aimYaw = 0, aimPitch = 0) {
   return { amount: 0, phase: 0, aimYaw, aimPitch, torsoYaw: aimYaw,
-    swingAge: -1, swingSerial: 0, swingStartedThisTick: false, crouch: 0 };
+    swingAge: -1, swingSerial: 0, swingStartedThisTick: false, crouch: 0,
+    equipInitialized: false, equippedItem: null, equipHeight: 1 };
+}
+
+// Identity excludes stack count: dropping one from a stack only swings it.
+export function tickHeldItemAnimation(state, mainHand) {
+  const target = mainHand?.id ?? null;
+  if (!state.equipInitialized) {
+    state.equippedItem = target; state.equipInitialized = true;
+  }
+  if (state.equippedItem !== target) {
+    state.equipHeight = Math.max(0, state.equipHeight - .4);
+    if (state.equipHeight < .1) state.equippedItem = target;
+  } else state.equipHeight = Math.min(1, state.equipHeight + .4);
 }
 
 export function tickPlayerAnimation(state, { dx = 0, dz = 0, aimYaw = state.aimYaw,
@@ -47,6 +60,9 @@ export function interpolatePlayerAnimation(previous, current, alpha) {
     swingActive: previous.swingAge >= 0 || current.swingAge >= 0,
     swingProgress: 0,
     crouch: previous.crouch + (current.crouch - previous.crouch) * alpha,
+    equipHeight: previous.equipHeight + (current.equipHeight - previous.equipHeight) * alpha,
+    equippedItem: current.equippedItem,
+    equipInitialized: current.equipInitialized,
   };
   if (previous.swingAge >= 0) {
     // Finish the old cycle toward 1, including when a held click starts a new one.

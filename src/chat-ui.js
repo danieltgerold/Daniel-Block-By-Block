@@ -65,10 +65,12 @@ export class ChatUI {
 
   setMode(mode) {
     if (this.mode === mode) return;
+    const previousMode = this.mode;
     this.mode = mode;
     if (mode !== 'playing') this.f3Held = this.bHeld = false;
     if (mode !== 'chat') { this.completion = null; this.renderCompletions([]); }
-    this.clearInput();
+    this.clearInput({ preserveMomentum: ['playing', 'ready', 'inventory'].includes(mode)
+      && ['playing', 'ready', 'inventory'].includes(previousMode) });
     this.document.body.classList.toggle('chat-open', mode === 'chat');
     this.document.body.classList.toggle('inventory-open', mode === 'inventory');
     this.elements['resume-note'].hidden = mode !== 'ready';

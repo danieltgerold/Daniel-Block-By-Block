@@ -74,10 +74,9 @@ function breakBlock(feet = controller.renderState()) {
 }
 const placement = new BlockPlacement({ controller, world, getAim: () => ({ yaw, pitch }),
   canInteract: () => active && document.pointerLockElement === canvas && document.hasFocus() && !document.hidden,
-  onPlace: (x, y, z) => { chunks.invalidateBlock(x, z, true); emptyHand.equipHeight = 0; } });
+  onPlace: (x, y, z) => { chunks.invalidateBlock(x, z, true); controller.lowerMainHand(); } });
 bindPlacementInput(placement, canvas, document, window);
 controller.onTick = player => {
-  emptyHand.equipHeight = Math.min(1, emptyHand.equipHeight + .4);
   if (!active) return;
   if (player.animation.swingStartedThisTick && (controller.miningHeld || primaryClickQueued)) {
     breakBlock(player);
@@ -100,7 +99,7 @@ canvas.addEventListener('mousedown', event => {
 });
 document.addEventListener('mouseup', event => { if (event.button === 0) controller.setMining(false); });
 
-function clearInput() { primaryClickQueued = false; controller.pause(); }
+function clearInput(options) { primaryClickQueued = false; controller.pause(options); }
 function renderInputMode(mode) {
   active = mode === 'playing';
   intro.hidden = mode !== 'menu';
@@ -115,7 +114,8 @@ function renderInputMode(mode) {
 let profileStorage = null;
 try { profileStorage = window.localStorage; } catch { /* Session identity still works without browser storage. */ }
 const hud = new GameplayHUD(document, profileStorage);
-const inventoryUI = new InventoryUI({ inventory: controller.inventory, document, window, onClose: () => chatUI.closeInventory() });
+const inventoryUI = new InventoryUI({ inventory: controller.inventory, document, window,
+  onClose: () => chatUI.closeInventory(), onGameplayDrop: () => controller.requestSwing() });
 inventoryUI.preview = new InventoryPreview(document.getElementById('inventory-preview'), controller.inventory);
 const chatUI = new ChatUI({ document, window, controller, clearInput, requestCapture: captureMouse,
   requestUnlock: () => { if (document.pointerLockElement === canvas) document.exitPointerLock(); },

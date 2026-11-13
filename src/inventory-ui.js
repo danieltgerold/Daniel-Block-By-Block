@@ -15,8 +15,8 @@ export function drawStack(document, element, stack, extra = 0) {
 }
 
 export class InventoryUI {
-  constructor({ inventory, document, window, onClose = () => {} }) {
-    Object.assign(this, { inventory, document, window, onClose });
+  constructor({ inventory, document, window, onClose = () => {}, onGameplayDrop = () => {} }) {
+    Object.assign(this, { inventory, document, window, onClose, onGameplayDrop });
     this.root = document.getElementById('inventory-screen');
     this.panel = document.getElementById('inventory-panel');
     this.cursorView = document.getElementById('cursor-stack');
@@ -131,7 +131,7 @@ export class InventoryUI {
     if (!event.repeat) {
       if (digit) this.inventory.select(Number(digit[1]) - 1);
       else if (event.code === 'KeyF') this.inventory.swap(this.inventory.selected, OFFHAND);
-      else this.inventory.drop(this.inventory.selected, event.ctrlKey);
+      else if (this.inventory.drop(this.inventory.selected, event.ctrlKey)) this.onGameplayDrop();
     }
     return true;
   }

@@ -16,7 +16,7 @@ export class DroppedItems {
     count = quantity(count);
     if (count <= 0n) return;
     const pile = { id: ++this.serial, item: id, ...location, previous: position(location), born: this.time,
-      phase: (this.serial * 2.3999632297) % (2 * Math.PI), count,
+      phase: (this.serial * 2.3999632297) % (2 * Math.PI), count, thrown,
       vx: velocity.x ?? 0, vy: velocity.y ?? .08, vz: velocity.z ?? 0,
       lots: [{ count, expires: this.time + 300, pickup: this.time + (thrown ? 2 : 0) }] };
     // Thrown items get their launch physics before joining a nearby pile.
@@ -35,10 +35,26 @@ export class DroppedItems {
       const at = source.previous ?? source;
       effect.from = { x: effect.from.x + (at.x - effect.from.x) * t,
         y: effect.from.y + (at.y - effect.from.y) * t, z: effect.from.z + (at.z - effect.from.z) * t };
-      effect.started = this.time; effect.targetId = target.id;
+      effect.started = Math.max(this.time, effect.flight?.ends ?? 0); effect.targetId = target.id;
     }
-    this.transitions.push({ id: source.id, targetId: target.id, from: position(source.previous ?? source),
-      started: this.time, ends: this.time + .25, born: source.born, phase: source.phase, count: source.count, lots: [...source.lots] });
+    let from = position(source.previous ?? source), flight = null;
+    if (source.thrown && this.time - source.born < .15) {
+      // A first-tick merge transfers ownership now, but its bounded cosmetic
+      // ghost briefly continues the launch before converging. No second item.
+      const ghost = { ...source };
+      for (let i = 0; i < 2; i++) {
+        const motion = this.world?.movePlayer({ ...ghost, size: 1 }, { x: ghost.vx, y: ghost.vy, z: ghost.vz }, .125, .25)
+          ?? { x: ghost.x + ghost.vx, y: ghost.y + ghost.vy, z: ghost.z + ghost.vz, blocked: {}, grounded: false };
+        Object.assign(ghost, { x: motion.x, y: motion.y, z: motion.z,
+          vx: motion.blocked.x ? 0 : ghost.vx * .98, vz: motion.blocked.z ? 0 : ghost.vz * .98,
+          vy: motion.blocked.y ? 0 : (ghost.vy - .04) * .98 });
+      }
+      flight = { from, started: this.time, ends: this.time + .15 };
+      from = position(ghost);
+    }
+    const started = flight?.ends ?? this.time;
+    this.transitions.push({ id: source.id, targetId: target.id, from, flight,
+      started, ends: started + .25, born: source.born, phase: source.phase, count: source.count, lots: [...source.lots] });
     if (this.transitions.length > 64) this.transitions.shift();
     target.lots.push(...source.lots); target.count += source.count;
     source.lots = []; source.count = 0n;

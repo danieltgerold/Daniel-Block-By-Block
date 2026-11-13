@@ -341,6 +341,20 @@ varies during each jump; the value below averages consecutive jumps.
 
 ## Pickup and block particles
 
+Opening and closing inventory releases gameplay inputs while preserving carried
+velocity and interpolation. Air drag, gravity and collision keep running, just
+as when movement keys are released. The Escape pause menu retains its existing
+motion reset.
+
+Successful gameplay Q/Ctrl+Q drops request the same six-tick main-hand swing as
+block actions. Empty slots, key repeats and inventory-interface drops do not.
+The first-person block follows that swing; a stack-count change keeps it equipped.
+Changing to an empty hand lowers the old item, switches below 0.1 equip height,
+then raises the hand, at up to 0.4 equip height per physics tick with interpolation.
+Third-person drops use the existing animated shoulder attachment. A newly thrown
+item merged immediately into another pile retains a short cosmetic launch before
+converging; ownership, pickup delay and lifetime remain authoritative and unchanged.
+
 Dropped-item pickup tests the current scaled, crouch-aware collision box expanded
 by a fixed one block on each X/Z side and half a block above and below. Item-box
 overlap is sufficient, including through walls; delays, partial pickup, capacity,
