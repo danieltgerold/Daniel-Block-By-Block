@@ -185,6 +185,13 @@ function animate(time) {
 
 function refreshWorldView() {
   const position = controller.renderState();
+  const controlMode = position.flying ? 'flight' : controller.gameMode;
+  if (playingHint.dataset.controlMode !== controlMode) {
+    playingHint.dataset.controlMode = controlMode;
+    playingHint.textContent = position.flying
+      ? 'WASD fly · R / double W faster · SPACE up · L SHIFT down · Double SPACE stop flight · F5 camera · Left click break / right click place · ESC pause'
+      : `WASD move · R / double W sprint · L SHIFT crouch · Hold SPACE jump${controller.gameMode === 'creative' ? ' / double SPACE fly' : ''} · F5 camera · Left click break / right click place · ESC pause`;
+  }
   animatePlayerModel(playerModel, position, position.animation, cameraMode);
   syncEquipment(playerModel, controller.inventory);
   updateEmptyHand(emptyHand, position.animation, controller.inventory);

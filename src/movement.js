@@ -23,6 +23,11 @@ export const MOVEMENT = Object.freeze({
   gravity: 0.08,
   verticalDrag: 0.98,
   sprintFovMultiplier: 1.15,
+  flyingSpeed: 0.05,
+  flyingSprintSpeed: 0.10,
+  flyingVerticalAcceleration: 0.15,
+  flyingVerticalDrag: 0.60,
+  flyingFovMultiplier: 1.1,
   playerHeight: 1.8,
   eyeHeight: 1.62,
   crouchHeight: 1.5,
@@ -32,7 +37,7 @@ export const MOVEMENT = Object.freeze({
 export function createPlayer() {
   return {
     x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0,
-    grounded: true, sprinting: false, speed: 0, size: 1, crouching: false, eyeOffset: 1.62,
+    grounded: true, sprinting: false, flying: false, speed: 0, size: 1, crouching: false, eyeOffset: 1.62,
     jumpCooldown: 0, jumpTicks: 0, jumpApex: 0, jumpStartY: 0, jumpInProgress: false,
     jumpCount: 0, sprintImpulseCount: 0, lastJump: null,
     fovMultiplier: 1,
@@ -44,7 +49,11 @@ export function createPlayer() {
 // drag, including takeoff and landing ticks.
 export function stepPlayer(player, input = {}, world = null) {
   const previousX = player.x, previousZ = player.z;
-  if (input.crouch) player.crouching = true;
+  if (!input.canFly) player.flying = false;
+  else if (input.toggleFlight) player.flying = !player.flying;
+  const flying = player.flying;
+  if (flying) { player.jumpInProgress = false; player.jumpCooldown = 0; }
+  if (input.crouch && !flying) player.crouching = true;
   else if (player.crouching && (!world || !world.intersectsPlayer({ ...player, crouching: false }))) player.crouching = false;
   player.eyeOffset += (((player.crouching ? MOVEMENT.crouchEyeHeight : MOVEMENT.eyeHeight) * player.size) - player.eyeOffset) * 0.5;
   // A block edit can remove last tick's support before the next tick begins.
@@ -52,15 +61,14 @@ export function stepPlayer(player, input = {}, world = null) {
   const startedGrounded = player.grounded;
   let forward = input.forward || 0;
   let right = input.right || 0;
-  player.sprinting = forward > 0 && (player.sprinting || (!player.crouching && Boolean(input.sprint)));
-  player.fovMultiplier += ((player.sprinting ? MOVEMENT.sprintFovMultiplier : 1) - player.fovMultiplier) * 0.5;
+  player.sprinting = forward > 0 && (player.sprinting || ((flying || !player.crouching) && Boolean(input.sprint)));
 
   if (player.jumpCooldown > 0) player.jumpCooldown--;
   // Java resets the repeat delay when jump is released.
   if (!input.jump) player.jumpCooldown = 0;
   const size = player.size ?? 1;
   const launchVelocity = input.jumpVelocity ?? MOVEMENT.jumpVelocity * size;
-  const takeoff = Boolean(input.jump) && launchVelocity > 0 && startedGrounded && player.jumpCooldown === 0;
+  const takeoff = !flying && Boolean(input.jump) && launchVelocity > 0 && startedGrounded && player.jumpCooldown === 0;
   const yaw = input.yaw || 0;
   const sinYaw = Math.sin(yaw);
   const cosYaw = Math.cos(yaw);
@@ -80,9 +88,10 @@ export function stepPlayer(player, input = {}, world = null) {
       player.sprintImpulseCount++;
     }
   }
+  if (flying) player.vy += (Number(Boolean(input.jump)) - Number(Boolean(input.crouch))) * MOVEMENT.flyingVerticalAcceleration * size;
 
   // 2. Normalize diagonals, preserving Java's small diagonal speed adjustment.
-  const sneak = player.crouching ? 0.30 : 1;
+  const sneak = player.crouching && !flying ? 0.30 : 1;
   forward *= sneak * MOVEMENT.diagonalAdjustment;
   right *= sneak * MOVEMENT.diagonalAdjustment;
   const length = Math.hypot(forward, right);
@@ -90,8 +99,14 @@ export function stepPlayer(player, input = {}, world = null) {
   let acceleration = startedGrounded
     ? (player.sprinting ? MOVEMENT.groundSprintAcceleration : MOVEMENT.groundWalkAcceleration)
     : (player.sprinting ? MOVEMENT.airSprintAcceleration : MOVEMENT.airWalkAcceleration);
-  acceleration /= MOVEMENT.diagonalAdjustment;
-  acceleration *= input.walkSpeedScale ?? 1;
+  if (flying) {
+    // Flight is a separate ability speed, scaled by size. /speed continues to
+    // control walking; the 0.98 input shaping gives 10.8889 blocks/s in flight.
+    acceleration = (player.sprinting ? MOVEMENT.flyingSprintSpeed : MOVEMENT.flyingSpeed) * size;
+  } else {
+    acceleration /= MOVEMENT.diagonalAdjustment;
+    acceleration *= input.walkSpeedScale ?? 1;
+  }
   // Only new acceleration is rotated by yaw; momentum stays in world space.
   player.vx += (right * cosYaw - forward * sinYaw) * acceleration;
   player.vz += (-right * sinYaw - forward * cosYaw) * acceleration;
@@ -99,7 +114,7 @@ export function stepPlayer(player, input = {}, world = null) {
   // 3. Move, resolve the floor, then apply drag using the PREVIOUS grounded state.
   if (world) {
     let requested = { x: player.vx, z: player.vz };
-    if (input.crouch && !takeoff && player.vy <= 0 && (startedGrounded || world.supportProbe(player))) {
+    if (input.crouch && !flying && !takeoff && player.vy <= 0 && (startedGrounded || world.supportProbe(player))) {
       requested = protectSneakingEdge(world, player, requested.x, requested.z);
     }
     const motion = world.movePlayer(player, { ...requested, y: player.vy }, 0.3 * size,
@@ -130,11 +145,14 @@ export function stepPlayer(player, input = {}, world = null) {
       player.jumpInProgress = false;
     }
   }
-  const drag = startedGrounded ? MOVEMENT.groundDrag : MOVEMENT.airDrag;
+  if (flying && player.grounded) player.flying = false;
+  const drag = !flying && startedGrounded ? MOVEMENT.groundDrag : MOVEMENT.airDrag;
   player.vx *= drag;
   player.vz *= drag;
-  player.vy = (player.vy - MOVEMENT.gravity * size) * MOVEMENT.verticalDrag;
+  player.vy = flying ? player.vy * MOVEMENT.flyingVerticalDrag : (player.vy - MOVEMENT.gravity * size) * MOVEMENT.verticalDrag;
   if (player.grounded && player.vy < 0) player.vy = 0;
+  const fovTarget = (player.sprinting ? MOVEMENT.sprintFovMultiplier : 1) * (player.flying ? MOVEMENT.flyingFovMultiplier : 1);
+  player.fovMultiplier += (fovTarget - player.fovMultiplier) * 0.5;
   tickPlayerAnimation(player.animation, { dx: player.x - previousX, dz: player.z - previousZ,
     aimYaw: input.yaw, aimPitch: input.pitch, swing: input.swing, mining: input.mining, crouching: player.crouching });
   return player;
@@ -152,6 +170,8 @@ export class MovementController {
     this.totalSteps = 0;
     this.heldKeys = new Set();
     this.lastForwardPressTick = -Infinity;
+    this.lastSpacePressTick = -Infinity;
+    this.flightToggles = 0;
     this.sprintRequested = false;
     this.miningHeld = false;
     this.placementHeld = false;
@@ -174,7 +194,10 @@ export class MovementController {
   enableDeveloperMode() { const changed = !this.developerMode; this.developerMode = true; return changed; }
   setGameMode(mode) {
     if (!['survival', 'creative'].includes(mode)) return false;
-    this.gameMode = mode; return true;
+    this.gameMode = mode;
+    this.lastSpacePressTick = -Infinity; this.flightToggles = 0;
+    if (mode !== 'creative') this.player.flying = false;
+    return true;
   }
   configure(key, value) {
     return this.configureSettings({ [key]: value });
@@ -239,6 +262,12 @@ export class MovementController {
       }
       this.lastForwardPressTick = this.totalSteps;
     }
+    if (code === 'Space' && this.gameMode === 'creative') {
+      if (this.totalSteps - this.lastSpacePressTick <= MOVEMENT.doubleTapTicks) {
+        this.flightToggles++;
+        this.lastSpacePressTick = -Infinity;
+      } else this.lastSpacePressTick = this.totalSteps;
+    }
     this.cancelSprintWithoutForward();
   }
 
@@ -271,10 +300,14 @@ export class MovementController {
     // Sub-nanosecond rounding must not postpone a tick at a clock boundary.
     while (this.accumulator + 1e-9 >= MOVEMENT.fixedStep) {
       this.previous = snapshot(this.player);
+      const wasFlying = this.player.flying;
       // Overrides let deterministic measurements exercise this exact controller.
       stepPlayer(this.player, { ...this.readInput(), mining: this.miningHeld, swing: this.swingQueued, ...input,
         walkSpeedScale: this.effective.speed / DEFAULT_WALK_SPEED,
+        canFly: this.gameMode === 'creative', toggleFlight: this.flightToggles % 2 === 1,
         jumpVelocity: this.jumpLaunchVelocity * this.size }, this.world);
+      this.flightToggles = 0;
+      if (wasFlying && !this.player.flying) this.lastSpacePressTick = -Infinity;
       this.swingQueued = false;
       this.sprintRequested = false;
       this.accumulator -= MOVEMENT.fixedStep;
@@ -294,6 +327,7 @@ export class MovementController {
     result.animation = interpolatePlayerAnimation(this.previous.animation, this.player.animation, alpha);
     result.size = this.size;
     result.crouching = this.player.crouching;
+    result.flying = this.player.flying;
     result.eyeHeight = this.previous.eyeOffset + (this.player.eyeOffset - this.previous.eyeOffset) * alpha;
     return result;
   }
@@ -326,10 +360,12 @@ export class MovementController {
     this.player.animation.amount = 0;
     this.heldKeys.clear();
     this.lastForwardPressTick = -Infinity;
+    this.lastSpacePressTick = -Infinity; this.flightToggles = 0;
     this.sprintRequested = false;
     this.accumulator = 0;
     this.player.sprinting = false;
-    this.player.fovMultiplier = 1;
+    this.player.fovMultiplier = this.player.flying ? MOVEMENT.flyingFovMultiplier : 1;
+    if (this.player.flying) this.player.vy = 0;
     this.player.jumpCooldown = 0;
     this.player.vx = this.player.vz = this.player.speed = 0;
     this.previous = snapshot(this.player);

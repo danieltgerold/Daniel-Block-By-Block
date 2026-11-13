@@ -28,6 +28,12 @@ ignored; source files and the package lock are tracked.
 - Release R while holding W to keep sprinting, including in the air and after
   landing. Releasing forward input, or canceling it with S, stops sprinting.
 - Hold Space to jump repeatedly whenever grounded and the cooldown permits.
+- In Creative, two distinct **Space** presses within seven game ticks toggle
+  flight. Space rises, Left Shift descends, and releasing both eases to hover.
+  WASD follows yaw only; R or double-W sprints faster. Landing or switching to
+  Survival ends flight and restores normal gravity. Shift crouches again after
+  flight ends. Chat, inventory, menus and focus loss clear held inputs and tap
+  history; pausing a flight keeps it active but clears its movement momentum.
 - Hold **Left Shift** to crouch and avoid walking off ledges. Release to stand
   when there is enough headroom. An existing sprint can carry into crouching;
   starting a new sprint requires standing.
@@ -107,7 +113,15 @@ in Survival. Survival consumes one selected Test Block per successful placement
 and breaking creates a collectible drop. Creative preserves the selected stack
 and breaking creates no drop, but an empty main hand still cannot place. Mode
 changes preserve inventory and terrain, movement and breaking timing. They do
-not add flight, health or hunger.
+not add health or hunger. Creative flight uses the controls described above.
+
+Flight uses the same interpolated 20 Hz controller and swept scaled hitbox.
+At size one its separate ability acceleration is 0.05 (0.10 while sprinting),
+with the existing 0.98 input shaping and 0.91 horizontal retention. Settled
+straight speeds are 10.888889 and 21.777778 blocks/s. Vertical input adds
+0.15 blocks/tick per tick, followed by 0.60 retention without gravity. Both
+accelerations scale with size; `/speed` retains its walking-speed meaning.
+The camera smoothly combines the 1.1 flying multiplier with sprint FOV.
 
 ## Inventory and collectible items
 
