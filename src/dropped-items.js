@@ -53,7 +53,7 @@ export class DroppedItems {
       from = position(ghost);
     }
     const started = flight?.ends ?? this.time;
-    this.transitions.push({ id: source.id, targetId: target.id, from, flight,
+    this.transitions.push({ id: source.id, item: source.item, targetId: target.id, from, flight,
       started, ends: started + .25, born: source.born, phase: source.phase, count: source.count, lots: [...source.lots] });
     if (this.transitions.length > 64) this.transitions.shift();
     target.lots.push(...source.lots); target.count += source.count;

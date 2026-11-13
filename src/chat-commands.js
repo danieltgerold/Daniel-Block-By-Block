@@ -50,9 +50,9 @@ export function applyCommand(service, text) {
     service.reply(`Game mode set to ${service.controller.gameMode === 'creative' ? 'Creative' : 'Survival'}.`); return;
   }
   if (command.action === 'give') {
-    if (!ITEMS.has(args[0])) { service.reply('Unknown item. Use /give test.block [quantity].'); return; }
+    if (!ITEMS.has(args[0])) { service.reply('Unknown item ID. Use /give <item> [quantity]; Tab lists matching IDs.'); return; }
     if (args.length > 2 || (args[1] !== undefined && !/^\+?\d+$/.test(args[1])) || BigInt(args[1] ?? '1') <= 0n) {
-      service.reply('Quantity must be a positive whole number. Use /give test.block [quantity].'); return;
+      service.reply('Quantity must be a positive whole number. Use /give <item> [quantity].'); return;
     }
     const amount = BigInt(args[1] ?? '1');
     service.controller.giveItem(args[0], amount);

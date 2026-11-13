@@ -1,7 +1,7 @@
 export const BLOCK_COLOR = '#d9dfcd';
 export const BLOCK_GRID_COLOR = '#bac4ae';
 export const blockShade = (axis, sign) => axis === 1 ? (sign > 0 ? 1 : .55) : axis === 0 ? .82 : .71;
-function shaded(color, amount) {
+export function shaded(color, amount) {
   const channels = color.slice(1).match(/../g).map(hex => {
     const c = parseInt(hex, 16) / 255;
     const linear = (c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4) * amount;

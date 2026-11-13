@@ -49,7 +49,7 @@ ignored; source files and the package lock are tracked.
   not, resets the four-tick repeat delay; a hold repeats every 0.20 seconds.
   Every attempt uses fresh eye targeting, current reach and the selected
   main-hand stack. Only empty destinations outside the collision box succeed.
-  Success consumes one Test Block and requests one swing; failure consumes none.
+  Success consumes one selected block and requests one swing; failure consumes none.
   Close-up placement is allowed with no minimum eye distance. All six entered
   faces work, and cubes may touch the scaled hitbox but must not overlap it.
   The offhand is display/storage only. Active mining prevents placement. Loaded
@@ -117,7 +117,7 @@ Aim and player settings are preserved. `/tp` also appears in help and autocomple
 
 `/gamemode survival` or `/gamemode creative` changes the mode for the current
 session, with argument autocomplete and a server confirmation. New loads start
-in Survival. Survival consumes one selected Test Block per successful placement
+in Survival. Survival consumes one selected block per successful placement
 and breaking creates a collectible drop. Creative preserves the selected stack
 and breaking creates no drop, but an empty main hand still cannot place. Mode
 changes preserve inventory and terrain, movement and breaking timing. They do
@@ -133,22 +133,22 @@ The camera smoothly combines the 1.1 flying multiplier with sprint FOV.
 
 ## Inventory and collectible items
 
-The registered **Test Block** (`test.block`) stacks to 64. A cached static
-three-face isometric icon is shared across inventory, hotbar and cursor slots.
-World, held and dropped blocks share the original palette, shaded faces and
-filtered grid texture. Third-person blocks use Java's ordered hand/block-model
+Registered blocks stack to 64 and have cached, static three-face isometric icons
+shared across inventory, hotbar and cursor slots. World, held and dropped blocks
+use the corresponding block's face textures. Test Block retains its original
+palette and filtered fine grid. Third-person blocks use Java's ordered hand/block-model
 transforms, converted with the rig's X/Y-flipped basis and a single 0.9375
 render scale. Their side length is 0.3515625 blocks at size one; both attachments
 follow the animated shoulders. Held arms halve their base walk pitch and add
 the Java hold pose before crouch/action offsets. First-person item transforms
 remain on their separate path. Inventory starts
-empty for the session; `/give test.block [quantity]` defaults to one, fills
+empty for the session; `/give <item> [quantity]` defaults to one, fills
 partial storage stacks before empty slots, and drops all overflow near the
 player. Quantities use exact integers, including totals larger than JavaScript's
 safe Number range. Tab completes the item ID and leaves a space for quantity.
 
 There are 27 main slots, nine shared HUD/inventory hotbar slots, four typed
-armor slots and one offhand slot. Test Blocks cannot enter armor slots. The
+armor slots and one offhand slot. These blocks cannot enter armor slots. The
 reserved 2x2 crafting grid/output is visibly inactive. Item definitions and
 armor slot rules support future items. The separate preview uses the actual
 colored rig and equipment at size one; its limited mouse-follow pose never
@@ -176,7 +176,7 @@ and 5 for 49 or more. Extra cubes have stable offsets and shared geometry/materi
 Only the visual group bobs by `sin(ageTicks/10 + phase)*0.1 + 0.1` above a fixed
 height offset and rotates by `ageTicks/20 + phase`; physics bounds never bob.
 Touching picks up as much as storage can hold. Nearby
-compatible drops merge within two blocks; smaller sources visually travel into
+compatible drops with exactly the same item ID merge within two blocks; smaller sources visually travel into
 the live larger pile over 0.25 seconds. Quantities transfer once immediately;
 the effect is visual-only, follows subsequent merges and ends on pickup/expiry.
 A visible pile may exceed 64, while
@@ -338,6 +338,44 @@ frames over 0.25 s are capped to prevent runaway catch-up.
 
 Internal measurements use actual displacement before drag. Sprint-jump speed
 varies during each jump; the value below averages consecutive jumps.
+
+## Block definitions and basic blocks
+
+Commands provide Test Block (`test.block`), Stone (`stone`), Cobblestone
+(`cobblestone`), Dirt (`dirt`), Grass Block (`grass.block`), Sand (`sand`),
+Gravel (`gravel`), Oak Log (`oak.log`), and Oak Planks (`oak.planks`).
+For example, `/give grass.block 64`; Tab completes all registered item IDs.
+There is no creative inventory, crafting, tool requirement, log rotation, or
+falling Sand/Gravel behavior yet.
+
+Definitions share cube collision/placement/breaking code and specify names, IDs,
+face textures, stack sizes, solidity, opacity, collision shape, breaking time,
+optional behavior hooks and recipe tags. All current breaking times remain zero.
+Wood tags allow future recipes to accept a group or an exact block ID.
+Sparse world edits retain the actual block ID; old boolean edits map to Test
+Block and untouched ground remains unchanged. `loadEdits` accepts both formats.
+Survival breaks drop the actual block item; Creative pick-block provides that
+actual type, while Survival still requires an existing matching stack.
+
+The eight new blocks use original, low-noise 16x16 pixel face artwork with
+nearest magnification and shared mipmaps. Test Block deliberately keeps its
+legacy 128-pixel fine-grid sampler to preserve its appearance. Cached SVG icons
+project the same pixel artwork onto three shaded cube faces; no slot needs a
+live renderer. Grass has distinct top/side/bottom faces and logs have bark/end
+faces. Held blocks, drop clusters, merge ghosts and particles use their own
+block's appearance. Different item IDs never merge.
+
+Greedy meshes merge only compatible face textures, hide contacting opaque faces,
+and repeat the tile once per world block, including at distant LODs. Side UVs
+keep grass edges at the top and bark vertical. Chunk material groups reuse face
+materials and rebuild on identity changes, including grass behavior changes.
+
+Covering Grass with a solid opaque block changes it to Dirt immediately. Area
+refresh also checks covered grass. Every second of active 20 Hz simulation,
+each uncovered Grass Block chooses a random neighbor within one block on each
+axis; uncovered Dirt there becomes Grass. Newly spread grass waits until the
+next round. Uncovering Dirt does not instantly restore Grass. Inventory keeps
+this timer running, while the Escape menu pauses it.
 
 ## Pickup and block particles
 

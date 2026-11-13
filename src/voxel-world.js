@@ -36,31 +36,79 @@ function rayBox(origin, direction, min, max, reach) {
 }
 
 export class VoxelWorld {
-  constructor({ depth = 3 } = {}) { this.depth = depth; this.chunkEdits = new Map(); this.removedCount = 0; }
-  *edits() { for (const edits of this.chunkEdits.values()) yield* edits.values(); }
-  hasBlock(x, y, z) {
-    const edit = this.chunkEdits.get(chunkKey(Math.floor(x / CHUNK_SIZE), Math.floor(z / CHUNK_SIZE)))?.get(blockKey(x, y, z));
-    return edit ? edit.solid : y >= -this.depth && y < 0;
+  constructor({ depth = 3, random = Math.random } = {}) {
+    this.depth = depth; this.chunkEdits = new Map(); this.removedCount = 0;
+    this.random = random; this.behaviorBlocks = new Map(); this.behaviorTime = 0; this.listeners = new Set();
   }
-  setBlock(x, y, z, solid) {
+  *edits() { for (const edits of this.chunkEdits.values()) yield* edits.values(); }
+  blockIdAt(x, y, z) {
+    const edit = this.chunkEdits.get(chunkKey(Math.floor(x / CHUNK_SIZE), Math.floor(z / CHUNK_SIZE)))?.get(blockKey(x, y, z));
+    // Old boolean occupancy entries are still Test Blocks, including old ground.
+    return edit ? (edit.id === undefined ? (edit.solid ? 'test.block' : null) : edit.id)
+      : y >= -this.depth && y < 0 ? 'test.block' : null;
+  }
+  hasBlock(x, y, z) { return this.blockIdAt(x, y, z) !== null; }
+  isOpaqueSolid(x, y, z) {
+    const definition = BLOCK_TYPES.get(this.blockIdAt(x, y, z));
+    return Boolean(definition?.solid && definition.opaque);
+  }
+  subscribe(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+  setBlock(x, y, z, value) {
     if (![x, y, z].every(Number.isSafeInteger)) return false;
-    solid = Boolean(solid);
-    if (this.hasBlock(x, y, z) === solid) return false;
+    const id = value === true ? 'test.block' : value === false || value === null ? null : value;
+    const definition = BLOCK_TYPES.get(id);
+    if (id !== null && !definition) return false;
+    const previousId = this.blockIdAt(x, y, z);
+    if (previousId === id) return false;
+    const solid = Boolean(definition?.solid && definition.collisionShape === 'cube');
+    const previous = BLOCK_TYPES.get(previousId);
+    const previousSolid = Boolean(previous?.solid && previous.collisionShape === 'cube');
     const key = chunkKey(Math.floor(x / CHUNK_SIZE), Math.floor(z / CHUNK_SIZE));
     let edits = this.chunkEdits.get(key);
     const isDefault = y >= -this.depth && y < 0;
-    if (isDefault) this.removedCount += solid ? -1 : 1;
-    if (solid === isDefault) {
+    if (isDefault) this.removedCount += Number(previousSolid) - Number(solid);
+    if (id === (isDefault ? 'test.block' : null)) {
       edits?.delete(blockKey(x, y, z));
       if (edits?.size === 0) this.chunkEdits.delete(key);
     } else {
       if (!edits) { edits = new Map(); this.chunkEdits.set(key, edits); }
-      edits.set(blockKey(x, y, z), { x, y, z, solid });
+      edits.set(blockKey(x, y, z), { x, y, z, id, solid });
+    }
+    const coordinateKey = blockKey(x, y, z);
+    this.behaviorBlocks.delete(coordinateKey);
+    if (definition?.behavior) this.behaviorBlocks.set(coordinateKey, { x, y, z });
+    for (const listener of this.listeners) listener({ x, y, z, id, previousId });
+    for (const [dx, dy, dz] of [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+      const block = this.blockAt(x + dx, y + dy, z + dz);
+      block?.definition.behavior?.neighborChanged?.(this, block);
     }
     return true;
   }
   blockAt(x, y, z) {
-    return this.hasBlock(x, y, z) ? { x, y, z, definition: BLOCK_TYPES.get('test.block') } : null;
+    const id = this.blockIdAt(x, y, z);
+    return id === null ? null : { x, y, z, id, definition: BLOCK_TYPES.get(id) };
+  }
+  // Migration entry point for old {solid:true/false} and current typed edits.
+  loadEdits(entries) {
+    for (const edit of entries) this.setBlock(edit.x, edit.y, edit.z, edit.id === undefined ? edit.solid : edit.id);
+    this.updateArea();
+  }
+  updateArea(min = { x: -Infinity, y: -Infinity, z: -Infinity }, max = { x: Infinity, y: Infinity, z: Infinity }) {
+    for (const at of [...this.behaviorBlocks.values()]) if (AXES.every(a => at[a] >= min[a] && at[a] <= max[a])) {
+      const block = this.blockAt(at.x, at.y, at.z);
+      block?.definition.behavior?.neighborChanged?.(this, block);
+    }
+  }
+  step(seconds) {
+    this.behaviorTime += seconds;
+    while (this.behaviorTime + 1e-9 >= 1) {
+      this.behaviorTime -= 1;
+      // Snapshot prevents newly spread grass spreading again in this same second.
+      for (const at of [...this.behaviorBlocks.values()]) {
+        const block = this.blockAt(at.x, at.y, at.z);
+        block?.definition.behavior?.tick?.(this, block, this.random);
+      }
+    }
   }
   supportingBlock(player, depth = .2) {
     const { min, max } = playerBounds(player);

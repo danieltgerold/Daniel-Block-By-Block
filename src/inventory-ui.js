@@ -1,13 +1,13 @@
 import { ITEMS, MAIN, HOTBAR, ARMOR, OFFHAND } from './inventory.js';
 
-import { TEST_BLOCK_ICON } from './block-appearance.js';
 export function drawStack(document, element, stack, extra = 0) {
   element.replaceChildren();
   element.title = ''; // Names use the immediate in-game tooltip, not the browser delay.
   if (!stack) return;
-  const icon = document.createElement(stack.id === 'test.block' ? 'img' : 'span');
+  const item = ITEMS.get(stack.id);
+  const icon = document.createElement(item.icon ? 'img' : 'span');
   icon.className = 'item-icon'; icon.setAttribute('aria-hidden', 'true');
-  if (stack.id === 'test.block') { icon.src = TEST_BLOCK_ICON; icon.alt = ''; icon.draggable = false; }
+  if (item.icon) { icon.src = item.icon; icon.alt = ''; icon.draggable = false; }
   icon.style.setProperty('--item-color', ITEMS.get(stack.id).color ?? '#d9dfcd');
   const count = document.createElement('span'); count.className = 'stack-count';
   count.textContent = stack.count + extra === 1 ? '' : String(stack.count + extra);

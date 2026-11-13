@@ -3,6 +3,7 @@ import { createBlockItem } from './player-visuals.js';
 import { mergeEase } from './dropped-items.js';
 import { EntityVisibility } from './entity-visibility.js';
 import { VISUAL_QUALITY } from './visual-quality.js';
+import { setBlockAppearance } from './block-assets.js';
 export const DROPPED_ITEM_RENDER_SETTINGS = Object.freeze({
   // The five rotating .25 cubes plus fixed offsets and the full .2 bob range
   // fit inside this sphere. Merge bob blending stays in the same envelope.
@@ -59,7 +60,7 @@ export class DroppedItemRenderer {
         const i = mesh.children.length, cube = this.prototype.clone();
         cube.position.fromArray(PILE_OFFSETS[i]); cube.rotation.y = i * .37; mesh.add(cube);
       }
-      mesh.children.forEach((cube, i) => { cube.visible = i < desired; });
+      mesh.children.forEach((cube, i) => { cube.visible = i < desired; setBlockAppearance(cube, pile.item ?? 'test.block'); });
       const ageTicks = (drops.time - pile.born) * 20 + alpha;
       const bob = Math.sin(ageTicks / 10 + pile.phase) * .1 + .1;
       mesh.position.set(at.x, at.y + .2 + bob + bobDelta, at.z);

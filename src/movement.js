@@ -267,8 +267,10 @@ export class MovementController {
         y: ray.direction.y * .3 + .1, z: ray.direction.z * .3 + Math.sin(angle) * spread } });
   }
   pickBlock(yaw, pitch) {
-    if (!this.targetBlock(this.player, yaw, pitch)) return false;
-    return this.inventory.pick('test.block', { creative: this.gameMode === 'creative' });
+    const hit = this.targetBlock(this.player, yaw, pitch);
+    if (!hit) return false;
+    const block = this.world.blockAt(hit.x, hit.y, hit.z);
+    return block ? this.inventory.pick(block.definition.id, { creative: this.gameMode === 'creative' }) : false;
   }
   clearHeldInputs() {
     this.heldKeys.clear(); this.lastForwardPressTick = this.lastSpacePressTick = -Infinity;
@@ -339,6 +341,7 @@ export class MovementController {
       this.sprintRequested = false;
       this.accumulator -= MOVEMENT.fixedStep;
       this.totalSteps++;
+      this.world?.step?.(MOVEMENT.fixedStep);
       tickHeldItemAnimation(this.player.animation, this.inventory.mainHand);
       this.particles?.step();
       this.particles?.playerEffects(this.player);

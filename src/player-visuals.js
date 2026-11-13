@@ -2,7 +2,7 @@
 import { MOVEMENT } from './movement.js';
 import { swingCurves } from './player-animation.js';
 import { ITEMS, ARMOR } from './inventory.js';
-import { createSharedBlock } from './block-assets.js';
+import { createSharedBlock, setBlockAppearance } from './block-assets.js';
 
 export const MODEL_SCALE = 0.9375 / 16;
 export const PLAYER_RENDER_SCALE = 0.9375;
@@ -189,6 +189,8 @@ export function updateEmptyHand(hand, pose, inventory = null) {
   const main = pose.equipInitialized ? pose.equippedItem : inventory?.mainHand, offhand = inventory?.offhand;
   hand.rig.visible = !main;
   hand.mainItem.visible = Boolean(main); hand.offhandItem.visible = Boolean(offhand);
+  if (main) setBlockAppearance(hand.mainItem, typeof main === 'string' ? main : main.id);
+  if (offhand) setBlockAppearance(hand.offhandItem, offhand.id);
   if (main) {
     hand.mainItem.position.set(.56 - .4 * q, -.52 + .2 * r - .6 * (1 - equipHeight), -.72 - .2 * a);
     hand.mainItem.matrixAutoUpdate = false;
@@ -202,12 +204,14 @@ export function updateEmptyHand(hand, pose, inventory = null) {
   if (offhand) { hand.offhandItem.position.set(-.56, -.52, -.72); hand.offhandItem.rotation.set(.12, -.35, 0); }
 }
 
-export const createBlockItem = (size = .375) => createSharedBlock(size);
+export const createBlockItem = (size = .375, id = 'test.block') => createSharedBlock(size, id);
 
 export function syncEquipment(model, inventory) {
   const equipment = model.userData.equipment;
   equipment.rightItem.visible = Boolean(inventory.mainHand);
   equipment.leftItem.visible = Boolean(inventory.offhand);
+  if (inventory.mainHand) setBlockAppearance(equipment.rightItem, inventory.mainHand.id);
+  if (inventory.offhand) setBlockAppearance(equipment.leftItem, inventory.offhand.id);
   const groups = [['Head'], ['Chest', 'Left Arm', 'Right Arm'], ['Left Leg', 'Right Leg'], ['Left Leg', 'Right Leg']];
   for (let n = 0; n < ARMOR.length; n++) {
     const stack = inventory.slots[36 + n], item = ITEMS.get(stack?.id);

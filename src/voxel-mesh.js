@@ -1,6 +1,7 @@
 ﻿import { CHUNK_SIZE } from './voxel-world.js';
 
 import { blockShade } from './block-appearance.js';
+import { BLOCK_TYPES, blockFaceTexture } from './block-types.js';
 // Coarsen horizontal samples at distance; keep vertical layers one meter thick.
 // Majority coverage intentionally drops sub-LOD details only in distant meshes.
 export function buildChunkMesh(world, cx, cz, level = 1) {
@@ -11,23 +12,30 @@ export function buildChunkMesh(world, cx, cz, level = 1) {
   const originX = cx * CHUNK_SIZE;
   const originZ = cz * CHUNK_SIZE;
   const padded = dimensions.map(n => n + 2);
-  const occupancy = new Uint8Array(padded[0] * padded[1] * padded[2]);
+  const occupancy = new Uint16Array(padded[0] * padded[1] * padded[2]);
+  const types = [null], typeIndices = new Map();
   const indexOf = (x, y, z) => (x + 1) + padded[0] * ((y + 1) + padded[1] * (z + 1));
   for (let z = -1; z <= dimensions[2]; z++) {
     for (let y = -1; y <= dimensions[1]; y++) {
       for (let x = -1; x <= dimensions[0]; x++) {
-        let count = 0;
+        let count = 0; const counts = new Map();
         for (let dz = 0; dz < level; dz++) {
           for (let dx = 0; dx < level; dx++) {
-            if (world.hasBlock(originX + x * level + dx, minY + y, originZ + z * level + dz)) count++;
+            const id = world.blockIdAt(originX + x * level + dx, minY + y, originZ + z * level + dz);
+            if (id) { count++; counts.set(id, (counts.get(id) ?? 0) + 1); }
           }
         }
-        occupancy[indexOf(x, y, z)] = count * 2 >= level * level ? 1 : 0;
+        if (count && count * 2 >= level * level) {
+          const id = [...counts].sort((a, b) => b[1] - a[1])[0][0];
+          if (!typeIndices.has(id)) { typeIndices.set(id, types.length); types.push(id); }
+          occupancy[indexOf(x, y, z)] = typeIndices.get(id);
+        }
       }
     }
   }
-  const solid = c => occupancy[indexOf(...c)] === 1;
+  const type = c => types[occupancy[indexOf(...c)]];
   const positions = [], normals = [], uvs = [], colors = [], indices = [];
+  const materialIndices = new Map(), groups = [];
   let quads = 0;
 
   for (let axis = 0; axis < 3; axis++) {
@@ -38,24 +46,26 @@ export function buildChunkMesh(world, cx, cz, level = 1) {
     for (const sign of [-1, 1]) {
       const shade = blockShade(axis, sign);
       for (let slice = 0; slice < dimensions[axis]; slice++) {
-        const mask = new Uint8Array(width * height);
+        const mask = Array(width * height).fill(null);
         for (let j = 0; j < height; j++) {
           for (let i = 0; i < width; i++) {
             const cell = [0, 0, 0];
             cell[axis] = slice; cell[u] = i; cell[v] = j;
             const neighbor = [...cell]; neighbor[axis] += sign;
-            if (solid(cell) && !solid(neighbor)) mask[i + j * width] = 1;
+            const id = type(cell), adjacent = type(neighbor);
+            if (id && !BLOCK_TYPES.get(adjacent)?.opaque) mask[i + j * width] = blockFaceTexture(id, axis, sign);
           }
         }
         // Greedily merge coplanar exposed faces; never create internal faces.
         for (let j = 0; j < height; j++) {
           for (let i = 0; i < width;) {
             if (!mask[i + j * width]) { i++; continue; }
+            const texture = mask[i + j * width];
             let w = 1;
-            while (i + w < width && mask[i + w + j * width]) w++;
+            while (i + w < width && mask[i + w + j * width] === texture) w++;
             let h = 1;
             outer: while (j + h < height) {
-              for (let k = 0; k < w; k++) if (!mask[i + k + (j + h) * width]) break outer;
+              for (let k = 0; k < w; k++) if (mask[i + k + (j + h) * width] !== texture) break outer;
               h++;
             }
             const p = [0, 0, 0];
@@ -69,11 +79,14 @@ export function buildChunkMesh(world, cx, cz, level = 1) {
             const first = positions.length / 3;
             const normal = [0, 0, 0]; normal[axis] = sign;
             for (const corner of corners) { positions.push(...corner); normals.push(...normal); colors.push(shade, shade, shade); }
-            const textureWidth = w * scale[u] / level;
-            const textureHeight = h * scale[v] / level;
-            uvs.push(0, 0, textureWidth, 0, textureWidth, textureHeight, 0, textureHeight);
+            const textureWidth = w * scale[u], textureHeight = h * scale[v];
+            // Repeat once per world block even after greedy merging/LOD.
+            // Side textures always keep their vertical axis along world Y.
+            if (axis === 0) uvs.push(0, 0, 0, textureWidth, textureHeight, textureWidth, textureHeight, 0);
+            else uvs.push(0, 0, textureWidth, 0, textureWidth, textureHeight, 0, textureHeight);
             const order = sign > 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2];
-            indices.push(...order.map(n => first + n));
+            if (!materialIndices.has(texture)) materialIndices.set(texture, []);
+            materialIndices.get(texture).push(...order.map(n => first + n));
             quads++;
             for (let row = 0; row < h; row++) {
               for (let col = 0; col < w; col++) mask[i + col + (j + row) * width] = 0;
@@ -84,7 +97,11 @@ export function buildChunkMesh(world, cx, cz, level = 1) {
       }
     }
   }
-  return { positions, normals, uvs, colors, indices, quads, minY, maxY, level };
+  for (const [texture, faces] of materialIndices) {
+    groups.push({ start: indices.length, count: faces.length, texture });
+    for (const index of faces) indices.push(index);
+  }
+  return { positions, normals, uvs, colors, indices, groups, quads, minY, maxY, level };
 }
 
 export function chooseLod(distance, current = null) {

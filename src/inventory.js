@@ -1,10 +1,14 @@
 export const ITEMS = new Map();
-import { BLOCK_COLOR } from './block-appearance.js';
+import { BLOCK_TYPES, onBlockTypeRegistered } from './block-types.js';
+import { blockIcon } from './block-icons.js';
 export function registerItem(definition) {
   if (!definition.id || !Number.isSafeInteger(definition.maxStack) || definition.maxStack < 1) throw new Error('Invalid item definition');
   ITEMS.set(definition.id, Object.freeze({ ...definition }));
 }
-registerItem({ id: 'test.block', name: 'Test Block', maxStack: 64, block: true, color: BLOCK_COLOR });
+const registerBlockItem = block => registerItem({ id: block.id, name: block.name,
+  maxStack: block.maxStack, block: true, color: block.color, tags: block.tags, icon: blockIcon(block.id) });
+for (const block of BLOCK_TYPES.values()) registerBlockItem(block);
+onBlockTypeRegistered(registerBlockItem);
 export const HOTBAR = Array.from({ length: 9 }, (_, i) => i);
 export const MAIN = Array.from({ length: 27 }, (_, i) => i + 9);
 export const STORAGE = [...HOTBAR, ...MAIN];

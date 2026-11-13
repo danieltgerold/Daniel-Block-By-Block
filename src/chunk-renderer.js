@@ -1,6 +1,7 @@
 ﻿import * as THREE from 'three';
 import { CHUNK_SIZE, chunkKey } from './voxel-world.js';
 import { buildChunkMesh, chooseLod } from './voxel-mesh.js';
+import { getFaceMaterial } from './block-assets.js';
 
 export class ChunkRenderer {
   constructor(world, scene, material, { viewDistance = 160, buildsPerFrame = 4 } = {}) {
@@ -14,6 +15,7 @@ export class ChunkRenderer {
     this.projectionView = new THREE.Matrix4();
     this.box = new THREE.Box3();
     this.stats = { visibleChunks: 0, visibleQuads: 0, loadedChunks: 0, lods: [0, 0, 0] };
+    this.unsubscribe = world.subscribe(({ x, z }) => this.invalidateBlock(x, z));
   }
 
   invalidateBlock(x, z, immediate = false) {
@@ -36,8 +38,12 @@ export class ChunkRenderer {
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(data.uvs, 2));
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(data.colors, 3));
     geometry.setIndex(data.indices);
+    const materials = data.groups.map((group, index) => {
+      geometry.addGroup(group.start, group.count, index);
+      return group.texture === 'test.block' ? this.material : getFaceMaterial(group.texture);
+    });
     geometry.computeBoundingSphere();
-    const mesh = new THREE.Mesh(geometry, this.material);
+    const mesh = new THREE.Mesh(geometry, materials.length === 1 ? materials[0] : materials);
     mesh.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
     mesh.frustumCulled = true;
     if (old) { this.scene.remove(old.mesh); old.mesh.geometry.dispose(); }
@@ -104,6 +110,7 @@ export class ChunkRenderer {
   }
 
   dispose() {
+    this.unsubscribe();
     for (const chunk of this.chunks.values()) { this.scene.remove(chunk.mesh); chunk.mesh.geometry.dispose(); }
     this.chunks.clear();
   }
