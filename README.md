@@ -178,6 +178,12 @@ targets 1.62*s standing or 1.27*s crouching in every F5 mode, easing halfway
 each tick with render interpolation. Crouching scales movement input by 0.30.
 While Shift is held, a 0.60*s downward footprint probe protects ledges by
 reducing horizontal motion in 0.05*s steps; upward jumps skip this check.
+Grounded contact uses that same full footprint with a contact-thin probe at
+the actual feet height. Overhanging players can stop and stand without a
+horizontal shift. The edge guard subdivides movement at edited voxel-face
+crossings to detect unsupported intervals along the path, including narrow
+gaps at fractional sizes. Blocked edge motion clears its horizontal momentum;
+vertical movement and gravity still determine actual floor contact.
 The world model scales uniformly about the feet. Growth is rejected if the new
 box intersects a solid voxel. Placement checks use the same scaled body.
 Swept collision against the actual unit blocks handles walls, floors, ceilings,

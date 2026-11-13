@@ -105,9 +105,9 @@ export function stepPlayer(player, input = {}, world = null) {
     const motion = world.movePlayer(player, { ...requested, y: player.vy }, 0.3 * size,
       (player.crouching ? MOVEMENT.crouchHeight : MOVEMENT.playerHeight) * size);
     player.x = motion.x; player.y = motion.y; player.z = motion.z;
-    if (motion.blocked.x) player.vx = 0;
+    if (motion.blocked.x || requested.x !== player.vx) player.vx = 0;
     if (motion.blocked.y) player.vy = 0;
-    if (motion.blocked.z) player.vz = 0;
+    if (motion.blocked.z || requested.z !== player.vz) player.vz = 0;
     player.speed = Math.hypot(motion.moved.x, motion.moved.z) * MOVEMENT.ticksPerSecond;
     player.grounded = motion.grounded;
   } else {

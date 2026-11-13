@@ -171,15 +171,44 @@ export class VoxelWorld {
     return fraction;
   }
   isSupported(player, halfWidth = 0.3 * (player.size ?? 1)) {
-    const y = Math.round(player.y);
-    if (Math.abs(player.y - y) > EPSILON) return false;
-    return this.hasSolidInBox({ x: player.x - halfWidth, y: y - 0.5, z: player.z - halfWidth },
-      { x: player.x + halfWidth, y, z: player.z + halfWidth });
+    // Resting contact uses the SAME full footprint as sneaking, but only a
+    // contact-thin slab. Nearby support must not turn an airborne player into
+    // a grounded one, nor may an embedded foot be mistaken for a block top.
+    const depth = Math.min(EPSILON, halfWidth * 1e-3);
+    return this.supportProbe(player, depth, halfWidth)
+      && !this.supportProbe({ ...player, y: player.y + depth }, depth, halfWidth);
   }
-  supportProbe(player, depth = 0.6 * (player.size ?? 1)) {
+  supportProbe(player, depth = 0.6 * (player.size ?? 1), halfWidth = 0.3 * (player.size ?? 1)) {
+    const { min, max } = playerBounds(player, halfWidth);
+    return this.hasSolidInBox({ ...min, y: player.y - depth }, { ...max, y: player.y });
+  }
+  supportedPath(player, dx, dz, depth = 0.6 * (player.size ?? 1)) {
+    const at = t => this.supportProbe({ ...player, x: player.x + dx * t, z: player.z + dz * t }, depth);
+    if (!at(0) || !at(1)) return false;
+    // Subdivide where the footprint crosses voxel faces. Between these times
+    // the covered solid cells cannot change. This also catches very narrow
+    // unsupported gaps at fractional sizes without arbitrary tiny substeps.
+    // Untouched base terrain is horizontally uniform: only stored edits can
+    // change support, so work stays bounded even at developer-mode speeds.
     const half = 0.3 * (player.size ?? 1);
-    return this.hasSolidInBox({ x: player.x - half, y: player.y - depth, z: player.z - half },
-      { x: player.x + half, y: player.y, z: player.z + half });
+    const { min, max } = playerBounds(player);
+    const times = new Set([0, 1]);
+    for (const block of this.edits()) {
+      if (block.y >= player.y || block.y + 1 <= player.y - depth) continue;
+      for (const [axis, delta] of [['x', dx], ['z', dz]]) {
+        if (!delta) continue;
+        const inset = half - tolerance(min[axis], max[axis]);
+        for (const face of [block[axis], block[axis] + 1]) for (const side of [-1, 1]) {
+          const t = (face + side * inset - player[axis]) / delta;
+          if (t > 0 && t < 1) times.add(t);
+        }
+      }
+    }
+    const ordered = [...times].sort((a, b) => a - b);
+    for (let i = 1; i < ordered.length; i++) {
+      if (!at(ordered[i]) || !at((ordered[i - 1] + ordered[i]) / 2)) return false;
+    }
+    return true;
   }
   movePlayer(player, velocity, halfWidth = 0.3 * (player.size ?? 1), height = (player.crouching ? 1.5 : 1.8) * (player.size ?? 1)) {
     const p = { x: player.x, y: player.y, z: player.z, size: player.size ?? 1, crouching: player.crouching };
