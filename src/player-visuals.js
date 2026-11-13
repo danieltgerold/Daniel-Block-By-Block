@@ -2,6 +2,7 @@
 import { MOVEMENT } from './movement.js';
 import { swingCurves } from './player-animation.js';
 import { ITEMS, ARMOR } from './inventory.js';
+import { createSharedBlock } from './block-assets.js';
 
 export const MODEL_SCALE = 0.9375 / 16;
 export const THIRD_PERSON_DISTANCE = 4;
@@ -59,8 +60,8 @@ export function createPlayerModel() {
   model.userData.parts = parts;
   model.userData.joints = joints;
   const rightItem = createBlockItem(), leftItem = createBlockItem();
-  rightItem.position.set(MODEL_SCALE, -10 * MODEL_SCALE, -.1);
-  leftItem.position.set(-MODEL_SCALE, -10 * MODEL_SCALE, -.1);
+  rightItem.position.set(MODEL_SCALE, -10 * MODEL_SCALE - .15, -.15);
+  leftItem.position.set(-MODEL_SCALE, -10 * MODEL_SCALE - .15, -.15);
   rightItem.visible = leftItem.visible = false;
   joints['Right Arm'].add(rightItem); joints['Left Arm'].add(leftItem);
   model.userData.equipment = { rightItem, leftItem, armor: new Map() };
@@ -178,12 +179,7 @@ export function updateEmptyHand(hand, pose, inventory = null) {
   if (offhand) { hand.offhandItem.position.set(-.56, -.52, -.72); hand.offhandItem.rotation.set(.12, -.35, 0); }
 }
 
-export function createBlockItem(size = .35, map = null) {
-  const mesh = coloredBox([size, size, size], '#d9dfcd');
-  mesh.material.map = map;
-  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: '#839479' }));
-  mesh.add(edges); return mesh;
-}
+export const createBlockItem = (size = .375) => createSharedBlock(size);
 
 export function syncEquipment(model, inventory) {
   const equipment = model.userData.equipment;

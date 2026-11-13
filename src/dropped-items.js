@@ -8,9 +8,11 @@ export class DroppedItems {
     if (count <= 0n) return;
     let pile = this.piles.find(p => p.item === id && Math.hypot(p.x - position.x, p.y - position.y, p.z - position.z) <= 2);
     if (!pile) {
-      pile = { id: ++this.serial, item: id, ...position, vx: velocity.x ?? 0, vy: velocity.y ?? .08, vz: velocity.z ?? 0, lots: [] };
+      pile = { id: ++this.serial, item: id, ...position, born: this.time, phase: (this.serial * 2.3999632297) % (2 * Math.PI),
+        count: 0n, vx: velocity.x ?? 0, vy: velocity.y ?? .08, vz: velocity.z ?? 0, lots: [] };
       this.piles.push(pile);
     }
+    pile.count += count;
     const expires = this.time + 300, pickup = this.time + (thrown ? .5 : 0);
     const lot = pile.lots.find(l => l.expires === expires && l.pickup === pickup);
     if (lot) lot.count += count;
@@ -22,6 +24,7 @@ export class DroppedItems {
     const bounds = playerBounds(player);
     for (const pile of this.piles) {
       pile.lots = pile.lots.filter(l => l.expires > this.time + 1e-8);
+      pile.count = pile.lots.reduce((sum, lot) => sum + lot.count, 0n);
       if (!pile.lots.length) continue;
       const motion = this.world?.movePlayer({ ...pile, size: 1 }, { x: pile.vx, y: pile.vy, z: pile.vz }, .125, .25)
         ?? { ...pile, blocked: {}, grounded: false };
@@ -35,6 +38,7 @@ export class DroppedItems {
       if (touches && this.inventory.capacity(pile.item)) {
         for (const lot of pile.lots) if (lot.pickup <= this.time + 1e-8 && lot.count) lot.count = this.inventory.insert(pile.item, lot.count);
         pile.lots = pile.lots.filter(l => l.count > 0n);
+        pile.count = pile.lots.reduce((sum, lot) => sum + lot.count, 0n);
       }
     }
     this.piles = this.piles.filter(p => p.lots.length);
@@ -47,7 +51,7 @@ export class DroppedItems {
       for (let x = cx - 1; x <= cx + 1 && !target; x++) for (let y = cy - 1; y <= cy + 1 && !target; y++) for (let z = cz - 1; z <= cz + 1 && !target; z++) {
         target = buckets.get(`${pile.item}:${x},${y},${z}`)?.find(p => Math.hypot(p.x - pile.x, p.y - pile.y, p.z - pile.z) <= 2);
       }
-      if (target) target.lots.push(...pile.lots);
+      if (target) { target.lots.push(...pile.lots); target.count += pile.count; }
       else {
         const key = `${pile.item}:${cx},${cy},${cz}`;
         if (!buckets.has(key)) buckets.set(key, []);

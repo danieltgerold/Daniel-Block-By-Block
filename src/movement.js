@@ -164,6 +164,7 @@ export class MovementController {
     this.settings = { ...DEFAULT_SETTINGS };
     this.jumpLaunchVelocity = MOVEMENT.jumpVelocity;
     this.developerMode = false;
+    this.gameMode = 'survival';
   }
 
   get walkSpeed() { return this.settings.speed; }
@@ -171,6 +172,10 @@ export class MovementController {
   get effective() { return effectiveSettings(this.settings); }
   get eyeHeight() { return (this.player.crouching ? MOVEMENT.crouchEyeHeight : MOVEMENT.eyeHeight) * this.size; }
   enableDeveloperMode() { const changed = !this.developerMode; this.developerMode = true; return changed; }
+  setGameMode(mode) {
+    if (!['survival', 'creative'].includes(mode)) return false;
+    this.gameMode = mode; return true;
+  }
   configure(key, value) {
     return this.configureSettings({ [key]: value });
   }

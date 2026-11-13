@@ -57,7 +57,7 @@ button span { font-size: 19px; }
 .name-error { display: block; margin-top: 5px; color: #a52d27; font-size: 11px; }
 .chat-panel { position: fixed; z-index: 4; left: 16px; bottom: 16px; width: min(580px, calc(100vw - 32px)); font: 14px/1.5 Consolas, monospace; color: #fff; }
 .chat-panel.is-open { bottom: 16px; }
-.chat-log { list-style: none; padding: 0; margin: 0 0 7px; max-height: 220px; overflow-y: auto; overflow-wrap: anywhere; text-shadow: 1px 1px #000; }
+.chat-log { list-style: none; padding: 0; margin: 0 0 7px; max-height: 240px; overflow-y: auto; overflow-wrap: anywhere; text-shadow: 1px 1px #000; }
 .chat-log li { padding: 2px 7px; background: #0009; white-space: pre-wrap; }
 .chat-sender { color: #72d8ff; }
 .chat-server { color: #ffe381; }
@@ -91,7 +91,8 @@ button.inventory-slot:hover { background: #d9e4cf; }
 .inventory-slot.selected-slot { border-color: #fff8bd; }
 .inventory-slot.drag-preview { background: #e1e9a3; }
 .inventory-slot[data-empty]::after { content: attr(data-empty); font-size: 9px; color: #465d48; }
-.item-icon { position: absolute; width: 24px; height: 24px; top: 6px; left: calc(50% - 12px); background: var(--item-color, #d9dfcd); border: 1px solid #839479; box-shadow: inset -6px -5px #0002, inset 4px 4px #fff5; transform: rotate(-8deg); }
+.item-icon { position: absolute; width: 30px; height: 31px; top: 3px; left: calc(50% - 15px); object-fit: contain; }
+span.item-icon { background: var(--item-color, #d9dfcd); }
 .stack-count { position: absolute; right: 3px; bottom: 0; color: #fff; font: bold 14px Consolas, monospace; text-shadow: 1px 1px #162319; }
 .hotbar .inventory-slot { width: 42px; height: 42px; }
 .cursor-stack { position: fixed; z-index: 10; width: 40px; height: 40px; pointer-events: none; }

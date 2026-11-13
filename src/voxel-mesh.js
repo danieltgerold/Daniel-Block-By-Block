@@ -1,5 +1,6 @@
 ﻿import { CHUNK_SIZE } from './voxel-world.js';
 
+import { blockShade } from './block-appearance.js';
 // Coarsen horizontal samples at distance; keep vertical layers one meter thick.
 // Majority coverage intentionally drops sub-LOD details only in distant meshes.
 export function buildChunkMesh(world, cx, cz, level = 1) {
@@ -35,7 +36,7 @@ export function buildChunkMesh(world, cx, cz, level = 1) {
     const width = dimensions[u];
     const height = dimensions[v];
     for (const sign of [-1, 1]) {
-      const shade = axis === 1 ? (sign > 0 ? 1 : 0.55) : axis === 0 ? 0.82 : 0.71;
+      const shade = blockShade(axis, sign);
       for (let slice = 0; slice < dimensions[axis]; slice++) {
         const mask = new Uint8Array(width * height);
         for (let j = 0; j < height; j++) {

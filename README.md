@@ -42,9 +42,10 @@ ignored; source files and the package lock are tracked.
   Every attempt uses fresh eye targeting, current reach and the selected
   main-hand stack. Only empty destinations outside the collision box succeed.
   Success consumes one Test Block and requests one swing; failure consumes none.
-  New blocks must stay at least three blocks from the eye, measured to the
-  nearest part of the cube. This retains the earlier placement distance buffer;
-  adaptive speed-based repeats have been replaced by the Java tick timer.
+  Close-up placement is allowed with no minimum eye distance. All six entered
+  faces work, and cubes may touch the scaled hitbox but must not overlap it.
+  The offhand is display/storage only. Active mining prevents placement. Loaded
+  edited chunks and their neighbors rebuild immediately, including boundaries.
   Releasing the button, opening chat or menus, losing focus or releasing mouse
   capture cancels the hold and requires a new press. Browser context menus are
   suppressed while playing.
@@ -100,9 +101,21 @@ Teleporting clears velocity, held inputs and
 interpolation, and immediately refreshes the camera, hitbox and nearby chunks.
 Aim and player settings are preserved. `/tp` also appears in help and autocomplete.
 
+`/gamemode survival` or `/gamemode creative` changes the mode for the current
+session, with argument autocomplete and a server confirmation. New loads start
+in Survival. Survival consumes one selected Test Block per successful placement
+and breaking creates a collectible drop. Creative preserves the selected stack
+and breaking creates no drop, but an empty main hand still cannot place. Mode
+changes preserve inventory and terrain, movement and breaking timing. They do
+not add flight, health or hunger.
+
 ## Inventory and collectible items
 
-The registered **Test Block** (`test.block`) stacks to 64. Inventory starts
+The registered **Test Block** (`test.block`) stacks to 64. A cached static
+three-face isometric icon is shared across inventory, hotbar and cursor slots.
+World, held and dropped blocks share the original palette, shaded faces and
+filtered grid texture. Held blocks use cached 0.375-block cube geometry at
+the animated wrists; the offhand attachment is mirrored. Inventory starts
 empty for the session; `/give test.block [quantity]` defaults to one, fills
 partial storage stacks before empty slots, and drops all overflow near the
 player. Quantities use exact integers, including totals larger than JavaScript's
@@ -126,8 +139,12 @@ the panel drops all/one cursor items. Closing returns cursor items to storage
 and drops any remainder. Inventory blocks all gameplay input and releases the
 mouse; closing uses the same capture/resume flow as chat.
 
-Breaking blocks makes collectible cube items with gravity, voxel collision,
-rotation and bobbing. Touching picks up as much as storage can hold. Nearby
+Breaking blocks in Survival makes collectible cube items with gravity and voxel
+collision. Piles show 1 cube for one item, 2 for 2–16, 3 for 17–32, 4 for 33–48,
+and 5 for 49 or more. Extra cubes have stable offsets and shared geometry/materials.
+Only the visual group bobs by `sin(ageTicks/10 + phase)*0.1 + 0.1` above a fixed
+height offset and rotates by `ageTicks/20 + phase`; physics bounds never bob.
+Touching picks up as much as storage can hold. Nearby
 compatible drops merge within two blocks; a visible pile may exceed 64, while
 inventory stacks stay capped. Each merged lot retains its original five-minute
 active-game-time expiry. Thrown items have a half-second pickup delay. Drops,

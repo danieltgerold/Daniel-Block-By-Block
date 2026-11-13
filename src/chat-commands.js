@@ -11,6 +11,7 @@ export const COMMANDS = Object.freeze([
   { name: '/default', action: 'defaults', description: 'Reset all player settings' },
   { name: '/tp', action: 'teleport', usage: '/tp <x> <y> <z>', description: 'Teleport feet (~ for relative)' },
   { name: '/give', action: 'give', usage: '/give <item> [quantity]', description: 'Give items' },
+  { name: '/gamemode', action: 'gamemode', usage: '/gamemode <mode>', description: 'Survival / Creative' },
 ].map(Object.freeze));
 export const numberText = value => String(Number(value.toPrecision(8)));
 export function commandHelp() {
@@ -26,6 +27,7 @@ export function commandCompletions(text) {
   const [, prefix, separator, argument] = match;
   if (!separator) return COMMANDS.filter(command => command.name.startsWith(`/${prefix.toLowerCase()}`)).map(command => `${command.name} `);
   const command = COMMANDS.find(item => item.name === `/${prefix.toLowerCase()}`);
+  if (command?.action === 'gamemode') return ['survival', 'creative'].filter(mode => mode.startsWith(argument.toLowerCase())).map(mode => `/gamemode ${mode}`);
   if (command?.action === 'teleport') return '~ ~ ~'.startsWith(argument) ? [`/tp ~ ~ ~`] : [];
   if (command?.action === 'give') return /\s/.test(argument) ? [] : [...ITEMS.keys()]
     .filter(id => id.startsWith(argument.toLowerCase())).map(id => `/give ${id} `);
@@ -36,6 +38,12 @@ export function applyCommand(service, text) {
   const [name, ...args] = text.split(/\s+/);
   const command = COMMANDS.find(item => item.name === name.toLowerCase());
   if (!command) { service.reply('Unknown command. Type /help for available commands.'); return; }
+  if (command.action === 'gamemode') {
+    if (args.length !== 1 || !service.controller.setGameMode(args[0].toLowerCase())) {
+      service.reply('Use /gamemode survival or /gamemode creative.'); return;
+    }
+    service.reply(`Game mode set to ${service.controller.gameMode === 'creative' ? 'Creative' : 'Survival'}.`); return;
+  }
   if (command.action === 'give') {
     if (!ITEMS.has(args[0])) { service.reply('Unknown item. Use /give test.block [quantity].'); return; }
     if (args.length > 2 || (args[1] !== undefined && !/^\+?\d+$/.test(args[1])) || BigInt(args[1] ?? '1') <= 0n) {

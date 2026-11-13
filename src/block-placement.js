@@ -4,7 +4,7 @@ import { ITEMS } from './inventory.js';
 export function breakTargetBlock({ controller, world, yaw, pitch, feet = controller.player, onBreak = () => {} }) {
   const hit = controller.targetBlock(feet, yaw, pitch);
   if (!hit || !world.setBlock(hit.x, hit.y, hit.z, false)) return false;
-  controller.drops.spawn('test.block', 1, { x: hit.x + .5, y: hit.y + .25, z: hit.z + .5 });
+  if (controller.gameMode !== 'creative') controller.drops.spawn('test.block', 1, { x: hit.x + .5, y: hit.y + .25, z: hit.z + .5 });
   onBreak(hit.x, hit.y, hit.z); return true;
 }
 export class BlockPlacement {
@@ -48,18 +48,12 @@ export class BlockPlacement {
     // Tick callbacks use the actual post-collision feet, even in catch-up frames.
     const hit = this.controller.targetBlock(this.controller.player, yaw, pitch);
     const stack = this.controller.inventory.mainHand;
-    if (!stack || !ITEMS.get(stack.id)?.block) return false;
+    if (this.controller.miningHeld || !stack || stack.id !== 'test.block' || !ITEMS.get(stack.id)?.block) return false;
     if (!hit || !Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return false;
     const x = hit.x + hit.normal.x, y = hit.y + hit.normal.y, z = hit.z + hit.normal.z;
     if (!this.world.canPlaceBlock(x, y, z, [this.controller.player])) return false;
-    const eye = this.controller.interactionRay(this.controller.player, yaw, pitch).origin;
-    // Measure to the nearest part of the NEW cube, not its center or the old
-    // hit face, so a block's near side never builds into the player's face.
-    const distance = Math.hypot(Math.max(x - eye.x, 0, eye.x - x - 1),
-      Math.max(y - eye.y, 0, eye.y - y - 1), Math.max(z - eye.z, 0, eye.z - z - 1));
-    if (distance < 3 - 1e-7) return false;
     if (!this.world.setBlock(x, y, z, true)) return false;
-    this.controller.inventory.consumeSelected();
+    if (this.controller.gameMode !== 'creative') this.controller.inventory.consumeSelected();
     this.controller.requestSwing();
     this.onPlace(x, y, z);
     return true;

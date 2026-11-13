@@ -23,7 +23,7 @@ test('queued presses run on ticks, bypass cooldown, and held attempts repeat eve
   assert.equal(f.controller.inventory.mainHand.count, 9); assert.equal(f.swings(), 1);
   f.controller.update(.15); assert.deepEqual(f.ticks, [1]);
   f.controller.update(.05); assert.deepEqual(f.ticks, [1, 5]);
-  assert.equal(f.controller.inventory.mainHand.count, 9, 'Close destination rejected without consuming');
+  assert.equal(f.controller.inventory.mainHand.count, 8, 'Close destination now succeeds without the old distance buffer');
   f.placement.release(); f.placement.press(); f.placement.release(); f.placement.press();
   f.controller.update(.05); assert.deepEqual(f.ticks, [1, 5, 6, 6]);
   assert.equal(f.controller.placementRepeat, 4);

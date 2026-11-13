@@ -16,12 +16,15 @@ export class ChunkRenderer {
     this.stats = { visibleChunks: 0, visibleQuads: 0, loadedChunks: 0, lods: [0, 0, 0] };
   }
 
-  invalidateBlock(x, z) {
+  invalidateBlock(x, z, immediate = false) {
     const cx = Math.floor(x / CHUNK_SIZE), cz = Math.floor(z / CHUNK_SIZE);
     // Neighbors must expose/hide shared boundary faces, too.
     for (const [dx, dz] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) {
       const chunk = this.chunks.get(chunkKey(cx + dx, cz + dz));
-      if (chunk) chunk.dirty = true;
+      if (chunk) {
+        chunk.dirty = true;
+        if (immediate) this.rebuild(cx + dx, cz + dz, chunk.level, chunk);
+      }
     }
   }
 

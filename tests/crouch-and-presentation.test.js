@@ -38,7 +38,7 @@ test('help is one compact multiline server reply, /default resets the four setti
   assert.equal((text.match(/<server>/g) || []).length, 1);
   assert.match(text, /^<server>: Commands\n\/help — Show commands\n\/speed <value> — Walking speed/);
   assert.match(text, /\/default — Reset all player settings/);
-  assert.equal(text.split('\n').length, 10);
+  assert.equal(text.split('\n').length, 11);
   for (const command of ['/speed 6', '/reach 10', '/jump 3', '/size 2', '/default']) f.ui.service.submit(command);
   assert.deepEqual(f.controller.settings, DEFAULT_SETTINGS);
   assert.equal(f.document.querySelector('.telemetry'), null);

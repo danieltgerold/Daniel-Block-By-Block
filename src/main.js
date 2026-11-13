@@ -7,6 +7,7 @@ import { GameplayHUD } from './gameplay-hud.js';
 import { InventoryUI } from './inventory-ui.js';
 import { InventoryPreview } from './inventory-preview.js';
 import { DroppedItemRenderer } from './dropped-item-renderer.js';
+import { getBlockAssets } from './block-assets.js';
 import { BlockPlacement, bindPlacementInput, breakTargetBlock } from './block-placement.js';
 import { ChatUI, isTextEntry } from './chat-ui.js';
 import { createPlayerModel, animatePlayerModel, nextCameraMode, updatePlayerCamera,
@@ -48,27 +49,10 @@ camera.rotation.order = 'YXZ';
 const emptyHand = createEmptyHand(camera.aspect);
 
 // One texture tile covers one block face; retain filtered lines without shimmer.
-const gridCanvas = document.createElement('canvas');
-gridCanvas.width = gridCanvas.height = 128;
-const gridContext = gridCanvas.getContext('2d');
-gridContext.fillStyle = '#d9dfcd';
-gridContext.fillRect(0, 0, 128, 128);
-gridContext.strokeStyle = '#bac4ae';
-gridContext.lineWidth = 2;
-gridContext.beginPath();
-// Draw both sides so filtering wraps seamlessly at the tile boundary.
-gridContext.rect(0, 0, 128, 128);
-gridContext.stroke();
-const gridTexture = new THREE.CanvasTexture(gridCanvas);
-gridTexture.colorSpace = THREE.SRGBColorSpace;
-gridTexture.wrapS = gridTexture.wrapT = THREE.RepeatWrapping;
-gridTexture.minFilter = THREE.LinearMipmapLinearFilter;
-gridTexture.magFilter = THREE.LinearFilter;
-gridTexture.generateMipmaps = true;
-gridTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+const gridTexture = getBlockAssets(renderer.capabilities.getMaxAnisotropy()).texture;
 const material = new THREE.MeshBasicMaterial({ map: gridTexture, vertexColors: true, fog: true });
 const chunks = new ChunkRenderer(world, scene, material);
-const droppedRenderer = new DroppedItemRenderer(scene, gridTexture);
+const droppedRenderer = new DroppedItemRenderer(scene);
 const selection = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
   new THREE.LineBasicMaterial({ color: '#fff4ad' }),
@@ -81,11 +65,11 @@ function targetBlock(feet = controller.renderState()) {
 }
 
 function breakBlock(feet = controller.renderState()) {
-  return breakTargetBlock({ controller, world, yaw, pitch, feet, onBreak: (x, y, z) => chunks.invalidateBlock(x, z) });
+  return breakTargetBlock({ controller, world, yaw, pitch, feet, onBreak: (x, y, z) => chunks.invalidateBlock(x, z, true) });
 }
 const placement = new BlockPlacement({ controller, world, getAim: () => ({ yaw, pitch }),
   canInteract: () => active && document.pointerLockElement === canvas && document.hasFocus() && !document.hidden,
-  onPlace: (x, y, z) => { chunks.invalidateBlock(x, z); emptyHand.equipHeight = 0; } });
+  onPlace: (x, y, z) => { chunks.invalidateBlock(x, z, true); emptyHand.equipHeight = 0; } });
 bindPlacementInput(placement, canvas, document, window);
 controller.onTick = player => {
   emptyHand.equipHeight = Math.min(1, emptyHand.equipHeight + .4);
