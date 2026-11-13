@@ -189,11 +189,13 @@ export class MovementController {
 
   get walkSpeed() { return this.settings.speed; }
   get size() { return this.settings.size; }
+  get defaultReach() { return this.gameMode === 'creative' ? 5 : DEFAULT_SETTINGS.reach; }
   get effective() { return effectiveSettings(this.settings); }
   get eyeHeight() { return (this.player.crouching ? MOVEMENT.crouchEyeHeight : MOVEMENT.eyeHeight) * this.size; }
   enableDeveloperMode() { const changed = !this.developerMode; this.developerMode = true; return changed; }
   setGameMode(mode) {
     if (!['survival', 'creative'].includes(mode)) return false;
+    if (!this.configure('reach', mode === 'creative' ? 5 : DEFAULT_SETTINGS.reach).ok) return false;
     this.gameMode = mode;
     this.lastSpacePressTick = -Infinity; this.flightToggles = 0;
     if (mode !== 'creative') this.player.flying = false;
@@ -202,7 +204,7 @@ export class MovementController {
   configure(key, value) {
     return this.configureSettings({ [key]: value });
   }
-  resetAllSettings() { return this.configureSettings({ ...DEFAULT_SETTINGS }); }
+  resetAllSettings() { return this.configureSettings({ ...DEFAULT_SETTINGS, reach: this.defaultReach }); }
   configureSettings(updates) {
     if (!Object.entries(updates).every(([key, value]) => Object.hasOwn(DEFAULT_SETTINGS, key)
       && Number.isFinite(value) && (key === 'size' ? value > 0 : value >= 0))) {

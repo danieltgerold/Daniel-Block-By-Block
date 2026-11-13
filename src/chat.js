@@ -6,8 +6,9 @@ export const canonicalName = value => value.trim().toLowerCase();
 export function validateName(value) {
   const name = typeof value === 'string' ? value.trim() : '';
   if (!name) return { ok: false, error: 'Enter a name; it cannot be blank.' };
+  if (/\s/.test(value)) return { ok: false, error: 'Spaces are not allowed in player names.' };
   if (name.length > 16) return { ok: false, error: 'Names must be 16 characters or fewer.' };
-  if (!/^[A-Za-z0-9 ]+$/.test(name)) return { ok: false, error: 'Use only letters, numbers, and spaces.' };
+  if (!/^[A-Za-z0-9]+$/.test(name)) return { ok: false, error: 'Use only letters and numbers.' };
   if (canonicalName(name) === 'server') return { ok: false, error: 'The name server is reserved for system messages.' };
   return { ok: true, name };
 }
@@ -22,8 +23,8 @@ export class PlayerDirectory {
   }
   nextDefaultName() {
     let number = 1;
-    while (!this.available(`player ${number}`)) number++;
-    return `player ${number}`;
+    while (!this.available(`player${number}`)) number++;
+    return `player${number}`;
   }
   join(id, preferredName = null) {
     if (!id || id === SERVER_ID) return { ok: false, error: 'Invalid player identity.' };
@@ -53,7 +54,9 @@ export class LocalPlayerProfile {
     let saved = null;
     try { saved = JSON.parse(storage?.getItem(PROFILE_STORAGE_KEY) || 'null'); } catch { /* Invalid/unavailable saved data uses defaults. */ }
     const id = typeof saved?.id === 'string' && saved.id && saved.id !== SERVER_ID ? saved.id : createId();
-    const joined = this.directory.join(id, saved?.displayName);
+    // Migrate old space-containing names without replacing the stable identity.
+    const savedName = typeof saved?.displayName === 'string' ? saved.displayName.replace(/\s/g, '') : undefined;
+    const joined = this.directory.join(id, savedName);
     this.player = joined.ok ? joined.player : this.directory.join(id).player;
     this.persist();
   }

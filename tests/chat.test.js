@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
@@ -51,11 +51,11 @@ function fixture(t, { captureSucceeds = false } = {}) {
   return { window, document, ui, controller, calls, key, frames, submitName, play, command };
 }
 
-test('names trim, persist only accepted values, preserve stable identity and reserve server in any case', () => {
+test('names persist only accepted values, preserve stable identity and reserve server in any case', () => {
   const storage = memoryStorage();
   const profile = new LocalPlayerProfile(storage, () => 'stable-id');
-  assert.equal(profile.player.displayName, 'player 1');
-  assert.equal(profile.rename('  Alice  ').ok, true);
+  assert.equal(profile.player.displayName, 'player1');
+  assert.equal(profile.rename('Alice').ok, true);
   assert.equal(profile.player.displayName, 'Alice');
   const saved = storage.getItem(PROFILE_STORAGE_KEY);
   for (const name of ['', ' \t ', 'server', 'SERVER', ' SeRvEr ']) {
@@ -69,29 +69,29 @@ test('names trim, persist only accepted values, preserve stable identity and res
 
 test('directory enforces case-insensitive join and rename uniqueness and allocates numbered defaults', () => {
   const directory = new PlayerDirectory();
-  assert.equal(directory.join('one').player.displayName, 'player 1');
-  assert.equal(directory.join('two').player.displayName, 'player 2');
-  assert.equal(directory.join('three', ' PLAYER 1 ').ok, false);
+  assert.equal(directory.join('one').player.displayName, 'player1');
+  assert.equal(directory.join('two').player.displayName, 'player2');
+  assert.equal(directory.join('three', ' PLAYER1 ').ok, false);
   assert.equal(directory.join('three', 'SERVER').ok, false);
-  assert.equal(directory.join('three').player.displayName, 'player 3');
-  assert.equal(directory.rename('two', 'Player 1').ok, false);
-  assert.equal(directory.rename('one', 'PLAYER 1').ok, true, 'Owner can change display casing');
-  assert.equal(directory.players.get('two').displayName, 'player 2');
+  assert.equal(directory.join('three').player.displayName, 'player3');
+  assert.equal(directory.rename('two', 'Player1').ok, false);
+  assert.equal(directory.rename('one', 'PLAYER1').ok, true, 'Owner can change display casing');
+  assert.equal(directory.players.get('two').displayName, 'player2');
   directory.rename('one', 'Alice');
-  assert.equal(directory.join('four').player.displayName, 'player 1', 'First available numbered default is reused');
+  assert.equal(directory.join('four').player.displayName, 'player1', 'First available numbered default is reused');
 });
 
 test('Escape menu name form validates beside the field and typing never reaches game keys', t => {
   const f = fixture(t);
-  assert.equal(f.ui.elements['player-name'].value, 'player 1');
-  f.submitName('  Local Player  ');
-  assert.equal(f.ui.profile.player.displayName, 'Local Player');
+  assert.equal(f.ui.elements['player-name'].value, 'player1');
+  f.submitName('LocalPlayer');
+  assert.equal(f.ui.profile.player.displayName, 'LocalPlayer');
   assert.equal(f.ui.elements['name-error'].textContent, '');
   for (const value of [' ', ' SERVER ']) {
     f.submitName(value);
     assert.ok(f.ui.elements['name-error'].textContent.length > 0);
     assert.equal(f.ui.elements['player-name'].getAttribute('aria-invalid'), 'true');
-    assert.equal(f.ui.profile.player.displayName, 'Local Player');
+    assert.equal(f.ui.profile.player.displayName, 'LocalPlayer');
   }
   for (const [key, code] of [['w', 'KeyW'], ['t', 'KeyT'], ['/', 'Slash'], [' ', 'Space'], ['F5', 'F5']]) {
     const event = f.key(key, code);
@@ -154,8 +154,8 @@ test('Enter displays literal player text with a distinct sender and keeps recent
   f.play(); f.key('t', 'KeyT');
   f.ui.elements['chat-input'].value = 'hi';
   f.key('Enter', 'Enter');
-  assert.equal(f.ui.elements['chat-log'].textContent, '<player 1>: hi');
-  assert.equal(f.ui.elements['chat-log'].querySelector('.chat-sender').textContent, 'player 1');
+  assert.equal(f.ui.elements['chat-log'].textContent, '<player1>: hi');
+  assert.equal(f.ui.elements['chat-log'].querySelector('.chat-sender').textContent, 'player1');
   assert.equal(f.ui.elements['chat-form'].hidden, true);
   assert.equal(f.ui.elements['chat-panel'].hidden, false);
   assert.equal(f.calls.broadcast.length, 1);
@@ -245,7 +245,7 @@ test('single delivery path rejects another player’s private replies and broadc
   assert.equal(service.messages.length, 0);
   service.submit('hi');
   service.submit('/help');
-  service.deliver({ senderId: 'other', senderName: 'player 2', text: 'hello', recipientId: null });
+  service.deliver({ senderId: 'other', senderName: 'player2', text: 'hello', recipientId: null });
   assert.equal(service.messages.length, 3);
   assert.equal(broadcast.length, 1, 'Incoming messages and private command replies are never rebroadcast');
   assert.equal(broadcast[0].senderId, 'local');

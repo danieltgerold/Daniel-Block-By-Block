@@ -39,7 +39,9 @@ ignored; source files and the package lock are tracked.
   starting a new sprint requires standing.
 - F5 cycles first-person, third-person rear, and third-person front views.
   Held-key repeats do not cycle again; F5's normal page reload is suppressed.
-- Default reach is **4.5 blocks** at size 1; `/reach` changes it. The outline marks the target.
+- Switching to Survival sets reach to **4.5 blocks** at size 1; switching to
+  Creative sets it to **5 blocks**. `/reach` changes it, and its `default` reset
+  follows the current mode. Reach continues to scale with `/size`.
 - **Left click / hold** mines the targeted block and swings the bare hand.
   A swing lasts six ticks (0.30 s); continued mining may restart it at tick three.
 - **Right click** queues a press for the next 20 Hz physics tick. Each queued
@@ -97,7 +99,7 @@ such as `/s`. Enter submits the completed command.
 | Command | Size-1 meaning | Normal range | Default |
 | --- | --- | --- | --- |
 | `/speed <number>` | Walking blocks/s | 0-255 | 4.3171806167 |
-| `/reach <number>` | Eye-to-hit blocks | 0-255 | 4.5 |
+| `/reach <number>` | Eye-to-hit blocks | 0-255 | 4.5 Survival / 5 Creative |
 | `/jump <number>` | Apex above takeoff, blocks | 0-255 | 1.252203352512 |
 | `/size <number>` | Player size multiplier | 0.1-4 | 1 |
 
@@ -164,6 +166,9 @@ and drops any remainder. Inventory blocks all gameplay input and releases the
 mouse, but the 20 Hz world simulation keeps running, including gravity, drops,
 pickup, merging and despawn. Closing uses the same capture/resume flow as chat.
 The Escape pause menu and lost-focus state still pause simulation.
+Static inventory labels/instructions have been removed. Hovering a stack shows
+its item name immediately in an in-game tooltip; stack counts remain visible.
+The top gameplay-controls hint and movement-test milestone banner are removed.
 
 Breaking blocks in Survival makes collectible cube items with gravity and voxel
 collision. Piles show 1 cube for one item, 2 for 2–16, 3 for 17–32, 4 for 33–48,
@@ -187,8 +192,11 @@ retains its 1.3 multiplier. Zero speed, reach and jump height are supported.
 Jump launch is tuned against the discrete tick apex; launch velocity and
 gravity scale together with size, preserving proportional flight time.
 
-Enter `Up Up Down Down Left Right Left Right B A Enter` within 60 seconds to
-enable developer mode for this load. Auto-repeat is ignored; a wrong key or
+Use `/devmode`, or enter `Up Up Down Down Left Right Left Right B A Enter`
+within 60 seconds, to enable developer mode for this load. The sequence uses
+physical B/A key codes when available, tolerates Shift/modifier key presses,
+and consumes matched keys outside text fields so they do not move the player
+or navigate the page. Auto-repeat is ignored; a wrong key or
 timeout resets the sequence. The final Enter is consumed, even in text fields.
 The server chat announces entry. Developer mode removes all four normal range
 limits, while requiring finite nonnegative speed/reach/jump and finite positive
@@ -196,13 +204,15 @@ size. Effective overflow and resizing into terrain are still rejected. This
 mode is not saved and starts disabled on a fresh load.
 
 The existing Escape screen has a **Player name** field and **Save name** button.
-The default is `player 1`. Accepted names are trimmed and saved in local storage;
+The default is `player1`. Accepted names are saved in local storage;
 blank names and all capitalizations of `server` are rejected beside the field.
-Names allow at most 16 ASCII letters, numbers and spaces, after trimming.
+Names allow at most 16 ASCII letters and numbers. All whitespace, including
+leading/trailing spaces, is invalid. Legacy saved names remove whitespace on
+load while keeping the same stable identity, with invalid names using a default.
 Invalid changes retain the last valid name. Player identity is a separate stable
 local ID, independent of display name. The reusable player directory checks join
 and rename uniqueness without case sensitivity and allocates the first free
-`player N` default for future multiplayer. An actual server will own that
+`playerN` default for future multiplayer. An actual server will own that
 registry and authenticate IDs; the current game remains single-player.
 
 All messages go through one delivery path. Public outgoing messages have an

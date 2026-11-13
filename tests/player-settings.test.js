@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { readFileSync } from 'node:fs';
@@ -146,7 +146,7 @@ test('developer sequence works in a text field, consumes final Enter, bypasses c
   for (const key of keys) final = f.key(key);
   assert.equal(final.defaultPrevented, true);
   assert.equal(f.controller.developerMode, true);
-  assert.equal(f.ui.profile.player.displayName, 'player 1');
+  assert.equal(f.ui.profile.player.displayName, 'player1');
   assert.equal(f.ui.service.messages.at(-1).text, 'You have entered developer mode.');
   assert.equal(f.document.getElementById('start-note').textContent, '<server>: You have entered developer mode.');
   for (const command of ['/speed 300', '/reach 300', '/jump 300', '/size 5']) f.ui.service.submit(command);
@@ -177,9 +177,10 @@ test('fast movement still hits a one-block wall and long reach queries stay spar
   assert.equal(world.raycast({ x: 0.5, y: 1.6, z: 0.5 }, { x: 0, y: 1, z: 0 }, 1e6), null);
 });
 
-test('names allow at most 16 letters, numbers and spaces while keeping reserved-name validation', () => {
-  assert.equal(validateName('Abc 123456789012').ok, true);
-  assert.equal(validateName('Abc 1234567890123').ok, false);
+test('names allow at most 16 letters/numbers and reject spaces and reserved names', () => {
+  assert.equal(validateName('A'.repeat(16)).ok, true);
+  assert.equal(validateName('A'.repeat(17)).ok, false);
+  assert.equal(validateName('Abc 123').ok, false);
   assert.equal(validateName('player_name').ok, false);
   assert.equal(validateName(' SERVER ').ok, false);
 });

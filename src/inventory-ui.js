@@ -3,7 +3,7 @@ import { ITEMS, MAIN, HOTBAR, ARMOR, OFFHAND } from './inventory.js';
 import { TEST_BLOCK_ICON } from './block-appearance.js';
 export function drawStack(document, element, stack, extra = 0) {
   element.replaceChildren();
-  element.title = stack ? ITEMS.get(stack.id).name : element.dataset.label ?? '';
+  element.title = ''; // Names use the immediate in-game tooltip, not the browser delay.
   if (!stack) return;
   const icon = document.createElement(stack.id === 'test.block' ? 'img' : 'span');
   icon.className = 'item-icon'; icon.setAttribute('aria-hidden', 'true');
@@ -20,6 +20,8 @@ export class InventoryUI {
     this.root = document.getElementById('inventory-screen');
     this.panel = document.getElementById('inventory-panel');
     this.cursorView = document.getElementById('cursor-stack');
+    this.tooltip = document.getElementById('inventory-tooltip');
+    this.pointer = { x: 0, y: 0 };
     this.hotbar = document.getElementById('hotbar');
     this.hovered = null; this.gesture = null; this.lastClick = null; this.isOpen = false;
     this.slotViews = new Map(); this.hudViews = new Map(); this.removers = [];
@@ -42,12 +44,14 @@ export class InventoryUI {
     listen(this.root, 'mouseover', e => {
       const slot = e.target.closest?.('[data-slot]');
       this.hovered = slot ? Number(slot.dataset.slot) : null;
+      this.pointer = { x: e.clientX, y: e.clientY }; this.updateTooltip();
       if (this.gesture && slot) this.visit(this.hovered);
     });
-    listen(this.root, 'mouseleave', () => { this.hovered = null; });
+    listen(this.root, 'mouseleave', () => { this.hovered = null; this.updateTooltip(); });
     listen(window, 'mousemove', e => {
       if (!this.isOpen) return;
       this.cursorView.style.left = `${e.clientX + 12}px`; this.cursorView.style.top = `${e.clientY + 12}px`;
+      this.pointer = { x: e.clientX, y: e.clientY }; this.updateTooltip();
       this.preview?.aim(e.clientX, e.clientY);
     });
     listen(window, 'mouseup', e => {
@@ -72,6 +76,16 @@ export class InventoryUI {
     this.inventory.close(); this.isOpen = false; this.root.hidden = true;
     this.document.activeElement?.blur();
     this.cursorView.hidden = true; this.preview?.reset();
+    this.tooltip.hidden = true;
+  }
+  updateTooltip() {
+    const stack = this.hovered === null ? null : this.inventory.slots[this.hovered];
+    this.tooltip.hidden = !this.isOpen || !stack;
+    if (this.tooltip.hidden) return;
+    this.tooltip.textContent = ITEMS.get(stack.id).name;
+    const width = this.tooltip.offsetWidth || this.tooltip.textContent.length * 7 + 16;
+    this.tooltip.style.left = `${Math.max(8, Math.min(this.pointer.x + 14, this.window.innerWidth - width - 8))}px`;
+    this.tooltip.style.top = `${Math.max(8, this.pointer.y - 30)}px`;
   }
   mouseDown(event) {
     if (!this.isOpen || (event.button !== 0 && event.button !== 2)) return;
@@ -128,8 +142,6 @@ export class InventoryUI {
       drawStack(this.document, button, stack ?? (extra ? { id: this.inventory.cursor.id, count: 0 } : null), extra);
       button.classList.toggle('drag-preview', extra > 0);
       button.classList.toggle('selected-slot', index === this.inventory.selected);
-      if (!stack && index >= 36) button.dataset.empty = button.dataset.label;
-      else delete button.dataset.empty;
     }
     for (const [index, button] of this.hudViews) {
       drawStack(this.document, button, this.inventory.slots[index]);
@@ -138,6 +150,7 @@ export class InventoryUI {
     const remaining = this.inventory.cursor ? this.inventory.cursor.count - [...plan.values()].reduce((a, b) => a + b, 0) : 0;
     drawStack(this.document, this.cursorView, remaining ? { id: this.inventory.cursor.id, count: remaining } : null);
     this.cursorView.hidden = !this.isOpen || remaining === 0;
+    this.updateTooltip();
   }
   dispose() { this.unsubscribe(); for (const remove of this.removers) remove(); }
 }

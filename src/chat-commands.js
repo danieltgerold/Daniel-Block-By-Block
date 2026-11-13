@@ -12,6 +12,7 @@ export const COMMANDS = Object.freeze([
   { name: '/tp', action: 'teleport', usage: '/tp <x> <y> <z>', description: 'Teleport feet (~ for relative)' },
   { name: '/give', action: 'give', usage: '/give <item> [quantity]', description: 'Give items' },
   { name: '/gamemode', action: 'gamemode', usage: '/gamemode <mode>', description: 'Survival / Creative' },
+  { name: '/devmode', action: 'developer', description: 'Enable developer mode' },
 ].map(Object.freeze));
 export const numberText = value => String(Number(value.toPrecision(8)));
 export function commandHelp() {
@@ -38,6 +39,10 @@ export function applyCommand(service, text) {
   const [name, ...args] = text.split(/\s+/);
   const command = COMMANDS.find(item => item.name === name.toLowerCase());
   if (!command) { service.reply('Unknown command. Type /help for available commands.'); return; }
+  if (command.action === 'developer') {
+    if (args.length) { service.reply('Usage: /devmode'); return; }
+    service.reply(service.controller.enableDeveloperMode() ? 'You have entered developer mode.' : 'Developer mode is already enabled.'); return;
+  }
   if (command.action === 'gamemode') {
     if (args.length !== 1 || !service.controller.setGameMode(args[0].toLowerCase())) {
       service.reply('Use /gamemode survival or /gamemode creative.'); return;
@@ -77,7 +82,7 @@ export function applyCommand(service, text) {
     return;
   }
   const reset = args.length === 1 && args[0].toLowerCase() === 'default';
-  const value = reset ? DEFAULT_SETTINGS[command.setting] : Number(args[0]);
+  const value = reset ? (command.setting === 'reach' ? service.controller.defaultReach : DEFAULT_SETTINGS[command.setting]) : Number(args[0]);
   const numeric = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i;
   const developer = service.controller.developerMode;
   const inRange = developer ? (command.setting === 'size' ? value > 0 : value >= 0) : value >= command.min && value <= command.max;

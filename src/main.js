@@ -19,7 +19,6 @@ const intro = document.querySelector('#intro');
 const startButton = document.querySelector('#start');
 const startNote = document.querySelector('#start-note');
 const crosshair = document.querySelector('#crosshair');
-const playingHint = document.querySelector('#playing-hint');
 const world = new VoxelWorld();
 const controller = new MovementController(world);
 controller.respawn(world.findSpawn());
@@ -100,7 +99,6 @@ function renderInputMode(mode) {
   active = mode === 'playing';
   intro.hidden = mode !== 'menu';
   updateCrosshair(crosshair, mode, cameraMode);
-  playingHint.hidden = !active;
   document.body.classList.toggle('is-playing', active);
   document.body.classList.toggle('world-view', mode !== 'menu');
   hud.root.hidden = mode === 'menu';
@@ -187,13 +185,6 @@ function animate(time) {
 function refreshWorldView() {
   const position = controller.renderState();
   updateCrosshair(crosshair, chatUI.mode, cameraMode);
-  const controlMode = position.flying ? 'flight' : controller.gameMode;
-  if (playingHint.dataset.controlMode !== controlMode) {
-    playingHint.dataset.controlMode = controlMode;
-    playingHint.textContent = position.flying
-      ? 'WASD fly · R / double W faster · SPACE up · L SHIFT down · Double SPACE stop flight · F5 camera · Left click break / right click place · ESC pause'
-      : `WASD move · R / double W sprint · L SHIFT crouch · Hold SPACE jump${controller.gameMode === 'creative' ? ' / double SPACE fly' : ''} · F5 camera · Left click break / right click place · ESC pause`;
-  }
   animatePlayerModel(playerModel, position, position.animation, cameraMode, controller.inventory);
   syncEquipment(playerModel, controller.inventory);
   updateEmptyHand(emptyHand, position.animation, controller.inventory);

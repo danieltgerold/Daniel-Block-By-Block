@@ -159,6 +159,9 @@ export class ChatUI {
       if (this.controller.enableDeveloperMode()) this.service.reply('You have entered developer mode.');
       return;
     }
+    if (this.developerSequence.index > 0 && !isTextEntry(event.target)) {
+      event.preventDefault(); event.stopPropagation(); return;
+    }
     if (this.mode === 'inventory') {
       event.preventDefault(); event.stopPropagation();
       if (!event.repeat && (event.code === 'KeyE' || event.key === 'Escape')) this.closeInventory();
