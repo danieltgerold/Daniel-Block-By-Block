@@ -1,6 +1,7 @@
 ﻿import * as THREE from 'three';
 import { MOVEMENT } from './movement.js';
 import { swingCurves } from './player-animation.js';
+import { ITEMS, ARMOR } from './inventory.js';
 
 export const MODEL_SCALE = 0.9375 / 16;
 export const THIRD_PERSON_DISTANCE = 4;
@@ -57,6 +58,12 @@ export function createPlayerModel() {
   faceRect(2.6, 0.4, 0, -1.5, '#264b38');
   model.userData.parts = parts;
   model.userData.joints = joints;
+  const rightItem = createBlockItem(), leftItem = createBlockItem();
+  rightItem.position.set(MODEL_SCALE, -10 * MODEL_SCALE, -.1);
+  leftItem.position.set(-MODEL_SCALE, -10 * MODEL_SCALE, -.1);
+  rightItem.visible = leftItem.visible = false;
+  joints['Right Arm'].add(rightItem); joints['Left Arm'].add(leftItem);
+  model.userData.equipment = { rightItem, leftItem, armor: new Map() };
   return model;
 }
 
@@ -130,6 +137,10 @@ export function createEmptyHand(aspect = 1) {
   rig.add(arm);
   scene.add(rig);
   const hand = { scene, camera, rig, arm };
+  hand.mainItem = createBlockItem(); hand.offhandItem = createBlockItem();
+  hand.mainItem.visible = hand.offhandItem.visible = false;
+  hand.equipHeight = 1;
+  scene.add(hand.mainItem, hand.offhandItem);
   updateEmptyHand(hand, { swingActive: false, swingProgress: 0 });
   return hand;
 }
@@ -140,7 +151,7 @@ const fixedArmAlignment = new THREE.Matrix4().makeTranslation(-1, 3.6, 3.5)
   .multiply(new THREE.Matrix4().makeRotationY(-135 * Math.PI / 180))
   .multiply(new THREE.Matrix4().makeTranslation(5.6, 0, 0));
 const handRotation = new THREE.Matrix4();
-export function updateEmptyHand(hand, pose) {
+export function updateEmptyHand(hand, pose, inventory = null) {
   const p = pose.swingActive ? pose.swingProgress : 0;
   const { inward: q, vertical: r, reach: a } = swingCurves(p, pose.swingActive);
   const b = Math.sin(Math.PI * p * p);
@@ -151,6 +162,46 @@ export function updateEmptyHand(hand, pose) {
     .multiply(handRotation.makeRotationZ(-20 * b * Math.PI / 180))
     .multiply(fixedArmAlignment);
   hand.rig.matrixWorldNeedsUpdate = true;
+  const main = inventory?.mainHand, offhand = inventory?.offhand;
+  hand.rig.visible = !main;
+  hand.mainItem.visible = Boolean(main); hand.offhandItem.visible = Boolean(offhand);
+  if (main) {
+    hand.mainItem.position.set(.56 - .4 * q, -.52 + .2 * r - .6 * (1 - hand.equipHeight), -.72 - .2 * a);
+    hand.mainItem.matrixAutoUpdate = false;
+    hand.mainItem.matrix.makeTranslation(...hand.mainItem.position.toArray())
+      .multiply(handRotation.makeRotationY((45 - 20 * b) * Math.PI / 180))
+      .multiply(handRotation.makeRotationZ(-20 * q * Math.PI / 180))
+      .multiply(handRotation.makeRotationX(-80 * q * Math.PI / 180))
+      .multiply(handRotation.makeRotationY(-45 * Math.PI / 180));
+    hand.mainItem.matrixWorldNeedsUpdate = true;
+  }
+  if (offhand) { hand.offhandItem.position.set(-.56, -.52, -.72); hand.offhandItem.rotation.set(.12, -.35, 0); }
+}
+
+export function createBlockItem(size = .35, map = null) {
+  const mesh = coloredBox([size, size, size], '#d9dfcd');
+  mesh.material.map = map;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), new THREE.LineBasicMaterial({ color: '#839479' }));
+  mesh.add(edges); return mesh;
+}
+
+export function syncEquipment(model, inventory) {
+  const equipment = model.userData.equipment;
+  equipment.rightItem.visible = Boolean(inventory.mainHand);
+  equipment.leftItem.visible = Boolean(inventory.offhand);
+  const groups = [['Head'], ['Chest', 'Left Arm', 'Right Arm'], ['Left Leg', 'Right Leg'], ['Left Leg', 'Right Leg']];
+  for (let n = 0; n < ARMOR.length; n++) {
+    const stack = inventory.slots[36 + n], item = ITEMS.get(stack?.id);
+    for (const part of groups[n]) {
+      const key = `${n}:${part}`;
+      let overlay = equipment.armor.get(key);
+      if (item && !overlay) {
+        overlay = new THREE.Mesh(model.userData.parts[part].geometry.clone(), new THREE.MeshBasicMaterial({ color: item.color ?? '#aab6c0' }));
+        overlay.scale.setScalar(1.04); model.userData.parts[part].add(overlay); equipment.armor.set(key, overlay);
+      }
+      if (overlay) { overlay.visible = Boolean(item); if (item) overlay.material.color.set(item.color ?? '#aab6c0'); }
+    }
+  }
 }
 export function renderPlayerScene(renderer, scene, camera, hand, mode) {
   const autoClear = renderer.autoClear;

@@ -36,17 +36,22 @@ ignored; source files and the package lock are tracked.
 - Default reach is **4.5 blocks** at size 1; `/reach` changes it. The outline marks the target.
 - **Left click / hold** mines the targeted block and swings the bare hand.
   A swing lasts six ticks (0.30 s); continued mining may restart it at tick three.
-- **Right click** attempts placement immediately. Hold it to attempt again on
-  every 20 Hz physics tick, with a fresh eye raycast and the current reach.
-  Each attempt can target faces created earlier in the same hold. Only empty
-  destinations outside the current collision box are accepted; only successful
-  placements request a swing. The game currently uses one unlimited block type.
+- **Right click** queues a press for the next 20 Hz physics tick. Each queued
+  press attempts placement even during cooldown. Each attempt, successful or
+  not, resets the four-tick repeat delay; a hold repeats every 0.20 seconds.
+  Every attempt uses fresh eye targeting, current reach and the selected
+  main-hand stack. Only empty destinations outside the collision box succeed.
+  Success consumes one Test Block and requests one swing; failure consumes none.
   New blocks must stay at least three blocks from the eye, measured to the
-  nearest part of the cube. Retreating faster allows extra fresh attempts in
-  that tick to catch the build up to the gap, while still respecting reach.
+  nearest part of the cube. This retains the earlier placement distance buffer;
+  adaptive speed-based repeats have been replaced by the Java tick timer.
   Releasing the button, opening chat or menus, losing focus or releasing mouse
   capture cancels the hold and requires a new press. Browser context menus are
   suppressed while playing.
+- **E** opens/closes inventory; Escape closes it. **1-9** or the mouse wheel
+  selects a hotbar slot, **F** swaps the selected stack and offhand, and **Q**
+  drops one item (**Ctrl+Q** drops the selected stack). Middle click picks an
+  existing matching hotbar stack, or swaps a matching main-inventory stack in.
 - Esc releases the mouse. Unlocking, switching windows, or hiding the tab clears
   held inputs, sprint, and double-tap history. Click again to resume.
 - **F3 + B** toggles depth-tested collision outlines, including the local player
@@ -87,10 +92,46 @@ All accept decimals and `default`; each reset changes only its own setting.
 `/default` resets all four settings together, subject to the same resize checks.
 `/help` is one compact multiline server reply, with range details kept in errors.
 `/tp <x> <y> <z>` teleports the feet to exact finite coordinates, including air
-or inside blocks. Commas also work, for example `/tp 10, 64, -20`. Negative and
-decimal values are accepted. Teleporting clears velocity, held inputs and
+or inside blocks. Commas also work, for example `/tp 10, 64, -20`. Each axis may
+use `~` for its current coordinate or `~offset`, for example `/tp ~ ~1 ~-2`.
+All relative values resolve against one position snapshot. Tab suggests
+`~ ~ ~` for the coordinates. Negative and decimal values are accepted.
+Teleporting clears velocity, held inputs and
 interpolation, and immediately refreshes the camera, hitbox and nearby chunks.
 Aim and player settings are preserved. `/tp` also appears in help and autocomplete.
+
+## Inventory and collectible items
+
+The registered **Test Block** (`test.block`) stacks to 64. Inventory starts
+empty for the session; `/give test.block [quantity]` defaults to one, fills
+partial storage stacks before empty slots, and drops all overflow near the
+player. Quantities use exact integers, including totals larger than JavaScript's
+safe Number range. Tab completes the item ID and leaves a space for quantity.
+
+There are 27 main slots, nine shared HUD/inventory hotbar slots, four typed
+armor slots and one offhand slot. Test Blocks cannot enter armor slots. The
+reserved 2x2 crafting grid/output is visibly inactive. Item definitions and
+armor slot rules support future items. The separate preview uses the actual
+colored rig and equipment at size one; its limited mouse-follow pose never
+changes player aim. Offhand contents display in world and first-person views.
+
+Left click picks up, merges or swaps full stacks; right click takes the rounded-up
+half or places one. With a held cursor stack, left drag shares equal whole-number
+amounts across eligible distinct slots, right drag places one per slot, and both
+show previews. Shift-click transfers between main inventory and hotbar, partial
+stacks first. Double click collects matching stacks up to 64; shift-double-click
+transfers matching source-area stacks. Hover plus 1-9 or F swaps with that hotbar
+slot or offhand. Hover plus Q/Ctrl+Q drops one/all. Left/right clicking outside
+the panel drops all/one cursor items. Closing returns cursor items to storage
+and drops any remainder. Inventory blocks all gameplay input and releases the
+mouse; closing uses the same capture/resume flow as chat.
+
+Breaking blocks makes collectible cube items with gravity, voxel collision,
+rotation and bobbing. Touching picks up as much as storage can hold. Nearby
+compatible drops merge within two blocks; a visible pile may exceed 64, while
+inventory stacks stay capped. Each merged lot retains its original five-minute
+active-game-time expiry. Thrown items have a half-second pickup delay. Drops,
+inventory and block edits currently reset together on page reload.
 Values are stored independently. Effective speed, reach and jump height are
 their size-1 values times size. Thus speed 6 at size 2 is 12 blocks/s; sprint
 retains its 1.3 multiplier. Zero speed, reach and jump height are supported.

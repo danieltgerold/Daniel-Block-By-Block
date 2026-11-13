@@ -1,5 +1,6 @@
 ﻿import { DEFAULT_SETTINGS } from './player-settings.js';
 
+import { ITEMS } from './inventory.js';
 // One registry drives parsing, help, and Tab completions.
 export const COMMANDS = Object.freeze([
   { name: '/help', description: 'Show commands' },
@@ -8,7 +9,8 @@ export const COMMANDS = Object.freeze([
   { name: '/jump', setting: 'jump', label: 'Jump apex', unit: 'blocks', min: 0, max: 255, description: 'jump apex above takeoff at size 1' },
   { name: '/size', setting: 'size', label: 'Size', unit: 'multiplier', min: 0.1, max: 4, description: 'player size multiplier' },
   { name: '/default', action: 'defaults', description: 'Reset all player settings' },
-  { name: '/tp', action: 'teleport', usage: '/tp <x> <y> <z>', description: 'Teleport feet' },
+  { name: '/tp', action: 'teleport', usage: '/tp <x> <y> <z>', description: 'Teleport feet (~ for relative)' },
+  { name: '/give', action: 'give', usage: '/give <item> [quantity]', description: 'Give items' },
 ].map(Object.freeze));
 export const numberText = value => String(Number(value.toPrecision(8)));
 export function commandHelp() {
@@ -24,6 +26,9 @@ export function commandCompletions(text) {
   const [, prefix, separator, argument] = match;
   if (!separator) return COMMANDS.filter(command => command.name.startsWith(`/${prefix.toLowerCase()}`)).map(command => `${command.name} `);
   const command = COMMANDS.find(item => item.name === `/${prefix.toLowerCase()}`);
+  if (command?.action === 'teleport') return '~ ~ ~'.startsWith(argument) ? [`/tp ~ ~ ~`] : [];
+  if (command?.action === 'give') return /\s/.test(argument) ? [] : [...ITEMS.keys()]
+    .filter(id => id.startsWith(argument.toLowerCase())).map(id => `/give ${id} `);
   if (!command?.setting || /\s/.test(argument)) return [];
   return 'default'.startsWith(argument.toLowerCase()) ? [`${command.name} default`] : [];
 }
@@ -31,13 +36,25 @@ export function applyCommand(service, text) {
   const [name, ...args] = text.split(/\s+/);
   const command = COMMANDS.find(item => item.name === name.toLowerCase());
   if (!command) { service.reply('Unknown command. Type /help for available commands.'); return; }
+  if (command.action === 'give') {
+    if (!ITEMS.has(args[0])) { service.reply('Unknown item. Use /give test.block [quantity].'); return; }
+    if (args.length > 2 || (args[1] !== undefined && !/^\+?\d+$/.test(args[1])) || BigInt(args[1] ?? '1') <= 0n) {
+      service.reply('Quantity must be a positive whole number. Use /give test.block [quantity].'); return;
+    }
+    const amount = BigInt(args[1] ?? '1');
+    service.controller.giveItem(args[0], amount);
+    service.reply(`Gave ${amount} ${ITEMS.get(args[0]).name}.`); return;
+  }
   if (command.action === 'teleport') {
     const number = '[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:e[+-]?\\d+)?';
     const values = text.slice(name.length).trim();
-    const whitespace = new RegExp(`^(${number})\\s+(${number})\\s+(${number})$`, 'i');
-    const commas = new RegExp(`^(${number})\\s*,\\s*(${number})\\s*,\\s*(${number})$`, 'i');
+    const coordinate = `(?:${number}|~(?:${number})?)`;
+    const whitespace = new RegExp(`^(${coordinate})\\s+(${coordinate})\\s+(${coordinate})$`, 'i');
+    const commas = new RegExp(`^(${coordinate})\\s*,\\s*(${coordinate})\\s*,\\s*(${coordinate})$`, 'i');
     const match = whitespace.exec(values) ?? commas.exec(values);
-    const coords = match?.slice(1).map(Number);
+    const origin = { ...service.controller.player };
+    const coords = match?.slice(1).map((value, index) => value.startsWith('~')
+      ? origin[['x', 'y', 'z'][index]] + Number(value.slice(1) || 0) : Number(value));
     if (!coords?.every(Number.isFinite)) { service.reply(`Usage: ${command.usage}`); return; }
     service.controller.teleport({ x: coords[0], y: coords[1], z: coords[2] });
     service.reply(`Teleported to ${coords.join(', ')}.`);

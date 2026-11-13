@@ -3,6 +3,8 @@
 import { createPlayerAnimation, tickPlayerAnimation, interpolatePlayerAnimation } from './player-animation.js';
 import { DEFAULT_SETTINGS, DEFAULT_WALK_SPEED, effectiveSettings, jumpVelocityForHeight } from './player-settings.js';
 import { protectSneakingEdge } from './player-posture.js';
+import { PlayerInventory } from './inventory.js';
+import { DroppedItems } from './dropped-items.js';
 export { DEFAULT_WALK_SPEED };
 export const MOVEMENT = Object.freeze({
   ticksPerSecond: 20,
@@ -153,6 +155,10 @@ export class MovementController {
     this.sprintRequested = false;
     this.miningHeld = false;
     this.placementHeld = false;
+    this.placementPresses = 0;
+    this.placementRepeat = 0;
+    this.inventory = new PlayerInventory({ onDrop: stack => this.throwItem(stack) });
+    this.drops = new DroppedItems(world, this.inventory);
     this.swingQueued = false;
     this.onTick = null;
     this.settings = { ...DEFAULT_SETTINGS };
@@ -207,6 +213,16 @@ export class MovementController {
 
   setMining(held) { this.miningHeld = held; }
   requestSwing() { this.swingQueued = true; }
+  giveItem(id, count) {
+    const remaining = this.inventory.insert(id, count);
+    if (remaining) this.drops.spawn(id, remaining, { x: this.player.x, y: this.player.y + .2, z: this.player.z });
+  }
+  throwItem(stack) {
+    const { yaw, pitch } = this.getAim?.() ?? { yaw: this.player.animation.aimYaw, pitch: this.player.animation.aimPitch };
+    const ray = this.interactionRay(this.player, yaw, pitch);
+    this.drops.spawn(stack.id, stack.count, { x: ray.origin.x, y: ray.origin.y - .2 * this.size, z: ray.origin.z },
+      { thrown: true, velocity: { x: ray.direction.x * .18, y: ray.direction.y * .18 + .1, z: ray.direction.z * .18 } });
+  }
 
   keyDown(code, repeat = false) {
     // Count actual transitions, not OS repeats or duplicate keydown events.
@@ -259,6 +275,7 @@ export class MovementController {
       this.accumulator -= MOVEMENT.fixedStep;
       this.totalSteps++;
       this.onTick?.(this.player);
+      this.drops.step(this.player);
     }
     this.accumulator = Math.max(0, this.accumulator);
   }
@@ -297,6 +314,8 @@ export class MovementController {
   pause() {
     this.miningHeld = false;
     this.placementHeld = false;
+    this.placementPresses = 0;
+    this.placementRepeat = 0;
     this.swingQueued = false;
     this.player.animation.swingAge = -1;
     this.player.animation.amount = 0;

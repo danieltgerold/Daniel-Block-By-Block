@@ -4,10 +4,13 @@ import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
 import { EntityHitboxes } from './entity-hitboxes.js';
 import { GameplayHUD } from './gameplay-hud.js';
-import { BlockPlacement, bindPlacementInput } from './block-placement.js';
+import { InventoryUI } from './inventory-ui.js';
+import { InventoryPreview } from './inventory-preview.js';
+import { DroppedItemRenderer } from './dropped-item-renderer.js';
+import { BlockPlacement, bindPlacementInput, breakTargetBlock } from './block-placement.js';
 import { ChatUI, isTextEntry } from './chat-ui.js';
 import { createPlayerModel, animatePlayerModel, nextCameraMode, updatePlayerCamera,
-  createEmptyHand, updateEmptyHand, renderPlayerScene } from './player-visuals.js';
+  createEmptyHand, updateEmptyHand, renderPlayerScene, syncEquipment } from './player-visuals.js';
 import './style.css';
 
 const canvas = document.querySelector('#world');
@@ -21,6 +24,7 @@ const controller = new MovementController(world);
 controller.respawn(world.findSpawn());
 let yaw = 0;
 let pitch = -0.12;
+controller.getAim = () => ({ yaw, pitch });
 let active = false;
 let previousTime = null;
 let cameraMode = 0;
@@ -64,6 +68,7 @@ gridTexture.generateMipmaps = true;
 gridTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 const material = new THREE.MeshBasicMaterial({ map: gridTexture, vertexColors: true, fog: true });
 const chunks = new ChunkRenderer(world, scene, material);
+const droppedRenderer = new DroppedItemRenderer(scene, gridTexture);
 const selection = new THREE.LineSegments(
   new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
   new THREE.LineBasicMaterial({ color: '#fff4ad' }),
@@ -76,18 +81,14 @@ function targetBlock(feet = controller.renderState()) {
 }
 
 function breakBlock(feet = controller.renderState()) {
-  const hit = targetBlock(feet);
-  if (!hit) return false;
-  const { x, y, z } = hit;
-  const changed = world.setBlock(x, y, z, false);
-  if (changed) chunks.invalidateBlock(x, z);
-  return changed;
+  return breakTargetBlock({ controller, world, yaw, pitch, feet, onBreak: (x, y, z) => chunks.invalidateBlock(x, z) });
 }
 const placement = new BlockPlacement({ controller, world, getAim: () => ({ yaw, pitch }),
   canInteract: () => active && document.pointerLockElement === canvas && document.hasFocus() && !document.hidden,
-  onPlace: (x, y, z) => chunks.invalidateBlock(x, z) });
+  onPlace: (x, y, z) => { chunks.invalidateBlock(x, z); emptyHand.equipHeight = 0; } });
 bindPlacementInput(placement, canvas, document, window);
 controller.onTick = player => {
+  emptyHand.equipHeight = Math.min(1, emptyHand.equipHeight + .4);
   if (player.animation.swingStartedThisTick && (controller.miningHeld || primaryClickQueued)) {
     breakBlock(player);
   }
@@ -95,6 +96,9 @@ controller.onTick = player => {
   placement.tick();
 };
 canvas.addEventListener('mousedown', event => {
+  if (active && event.button === 1) {
+    event.preventDefault(); if (targetBlock(controller.player)) controller.inventory.pick('test.block'); return;
+  }
   // The click that captures the mouse does not also break a block.
   if (!active || event.button !== 0) return;
   event.preventDefault();
@@ -115,15 +119,18 @@ function renderInputMode(mode) {
   document.body.classList.toggle('is-playing', active);
   document.body.classList.toggle('world-view', mode !== 'menu');
   hud.root.hidden = mode === 'menu';
+  inventoryUI.hotbar.hidden = !['playing', 'ready', 'chat'].includes(mode);
   previousTime = null;
 }
 
 let profileStorage = null;
 try { profileStorage = window.localStorage; } catch { /* Session identity still works without browser storage. */ }
 const hud = new GameplayHUD(document, profileStorage);
+const inventoryUI = new InventoryUI({ inventory: controller.inventory, document, window, onClose: () => chatUI.closeInventory() });
+inventoryUI.preview = new InventoryPreview(document.getElementById('inventory-preview'), controller.inventory);
 const chatUI = new ChatUI({ document, window, controller, clearInput, requestCapture: captureMouse,
   requestUnlock: () => { if (document.pointerLockElement === canvas) document.exitPointerLock(); },
-  onModeChange: renderInputMode,
+  onModeChange: renderInputMode, inventoryUI,
   onCameraCycle: () => { cameraMode = nextCameraMode(cameraMode); },
   onHitboxToggle: () => { hitboxesVisible = !hitboxesVisible; }, storage: profileStorage });
 controller.onTeleport = () => {
@@ -133,7 +140,7 @@ controller.onTeleport = () => {
 };
 
 async function captureMouse() {
-  if (chatUI.mode === 'chat') return false;
+  if (chatUI.mode === 'chat' || chatUI.mode === 'inventory') return false;
   if (isTextEntry(document.activeElement)) document.activeElement.blur();
   try {
     if (!canvas.requestPointerLock) throw new Error('Pointer lock unavailable');
@@ -148,6 +155,10 @@ async function captureMouse() {
 }
 startButton.addEventListener('click', captureMouse);
 canvas.addEventListener('click', () => { if (!active && chatUI.mode !== 'chat') captureMouse(); });
+canvas.addEventListener('wheel', event => {
+  if (!active) return;
+  event.preventDefault(); controller.inventory.select(controller.inventory.selected + Math.sign(event.deltaY));
+}, { passive: false });
 document.addEventListener('pointerlockchange', () => chatUI.onPointerLockChange(document.pointerLockElement === canvas));
 document.addEventListener('pointerlockerror', () => {
   startNote.textContent = 'Mouse capture was blocked. Click again, or open this page directly in a desktop browser.';
@@ -184,13 +195,16 @@ function animate(time) {
   const position = refreshWorldView();
   chatUI.updateVisibility();
   renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);
+  if (inventoryUI.isOpen) inventoryUI.preview.render();
   hud.renderedFrame(time, position);
 }
 
 function refreshWorldView() {
   const position = controller.renderState();
   animatePlayerModel(playerModel, position, position.animation, cameraMode);
-  updateEmptyHand(emptyHand, position.animation);
+  syncEquipment(playerModel, controller.inventory);
+  updateEmptyHand(emptyHand, position.animation, controller.inventory);
+  droppedRenderer.update(controller.drops, controller.accumulator / .05);
   updatePlayerCamera(camera, cameraMode, position, yaw, pitch, world);
   const fov = baseFov * position.fovMultiplier;
   if (Math.abs(camera.fov - fov) > 1e-8) {
@@ -201,7 +215,9 @@ function refreshWorldView() {
   const target = active ? targetBlock() : null;
   selection.visible = Boolean(target);
   if (target) selection.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
-  hitboxes.update([{ id: chatUI.profile.player.id, ...position, local: true }], cameraMode, hitboxesVisible);
+  hitboxes.update([{ id: chatUI.profile.player.id, ...position, local: true }, ...controller.drops.piles.map(p => ({
+    id: `drop:${p.id}`, bounds: { min: { x: p.x - .125, y: p.y, z: p.z - .125 }, max: { x: p.x + .125, y: p.y + .25, z: p.z + .125 } },
+  }))], cameraMode, hitboxesVisible);
   hud.updatePosition(position);
   return position;
 }

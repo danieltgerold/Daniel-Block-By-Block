@@ -17,7 +17,7 @@
     <main id="intro" class="intro">
       <section class="intro-card" aria-labelledby="intro-title">
         <h1 id="intro-title">Block test</h1>
-        <p class="description">Ground is three blocks deep. Type /help for commands.</p>
+        <p class="description">E opens inventory. Use /give test.block 64 for blocks.<br />Ground is three blocks deep. Type /help for commands.</p>
         <form id="name-form" class="name-form">
           <label for="player-name">Player name</label>
           <div class="name-row">
@@ -29,6 +29,8 @@
         <label class="menu-toggle"><input id="show-coordinates" type="checkbox" checked /> Show Coordinates</label>
         <label class="menu-toggle"><input id="show-fps" type="checkbox" checked /> Show FPS</label>
         <div class="controls">
+          <div><span class="key-group"><kbd>E</kbd><kbd>1–9</kbd></span><span>Inventory / select hotbar</span></div>
+          <div><span class="key-group"><kbd>F</kbd><kbd>Q</kbd></span><span>Swap offhand / drop item</span></div>
           <div><span class="key-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Walk</span></div>
           <div><span class="key-group"><kbd class="wide">MOUSE</kbd><kbd>F5</kbd></span><span>Look / switch camera</span></div>
           <div><span class="key-group"><kbd>W</kbd><kbd>R</kbd></span><span>Sprint (or double-tap W)</span></div>
@@ -48,6 +50,24 @@
       <div id="coordinates" title="Feet position: +X east, +Y up, +Z south">X: 0 Y: 0 Z: 0</div>
       <div id="fps">FPS: —</div>
     </div>
+    <div id="hotbar" class="hotbar" aria-label="Hotbar" hidden></div>
+    <section id="inventory-screen" class="inventory-screen" aria-label="Player inventory" hidden>
+      <div id="inventory-panel" class="inventory-panel">
+        <div class="inventory-heading"><strong>Inventory</strong><button id="inventory-close" type="button">Close · E / Esc</button></div>
+        <div class="inventory-top">
+          <div id="inventory-armor" class="armor-slots" aria-label="Armor"></div>
+          <canvas id="inventory-preview" width="180" height="200" aria-label="Player appearance preview"></canvas>
+          <div class="offhand-area"><small>Offhand</small><div id="inventory-offhand"></div></div>
+          <div class="crafting-area"><small>Crafting (soon)</small><div class="crafting-layout"><div class="crafting-grid">
+            <button class="inventory-slot" disabled></button><button class="inventory-slot" disabled></button><button class="inventory-slot" disabled></button><button class="inventory-slot" disabled></button>
+          </div><span>→</span><button class="inventory-slot" disabled aria-label="Crafting output (inactive)"></button></div></div>
+        </div>
+        <div id="inventory-main" class="slot-grid" aria-label="Main inventory"></div>
+        <div id="inventory-hotbar" class="slot-grid inventory-hotbar" aria-label="Hotbar"></div>
+        <p class="inventory-tip">Shift-click move · Drag distribute · Double-click collect · 1–9 swap · F offhand · Q drop · Ctrl+Q drop stack</p>
+      </div>
+      <div id="cursor-stack" class="cursor-stack" hidden></div>
+    </section>
     <div id="crosshair" class="crosshair" hidden aria-hidden="true"></div>
     <button id="resume-note" class="resume-note" type="button" hidden>Click to resume mouse look</button>
     <section id="chat-panel" class="chat-panel" aria-label="Chat" hidden>

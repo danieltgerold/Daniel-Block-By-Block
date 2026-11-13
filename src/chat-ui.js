@@ -8,7 +8,7 @@ export const isTextEntry = target => Boolean(target?.closest?.('input, textarea,
 // production; tests inject only the browser capture/unlock boundaries.
 export class ChatUI {
   constructor({ document, window, controller, clearInput, requestCapture, requestUnlock,
-    onModeChange = () => {}, onCameraCycle = () => {}, onHitboxToggle = () => {}, storage, createId, broadcast, now }) {
+    onModeChange = () => {}, onCameraCycle = () => {}, onHitboxToggle = () => {}, inventoryUI = null, storage, createId, broadcast, now }) {
     this.document = document;
     this.window = window;
     this.controller = controller;
@@ -18,6 +18,7 @@ export class ChatUI {
     this.onModeChange = onModeChange;
     this.onCameraCycle = onCameraCycle;
     this.onHitboxToggle = onHitboxToggle;
+    this.inventoryUI = inventoryUI;
     this.f3Held = false;
     this.bHeld = false;
     this.now = now ?? (() => performance.now());
@@ -69,6 +70,7 @@ export class ChatUI {
     if (mode !== 'chat') { this.completion = null; this.renderCompletions([]); }
     this.clearInput();
     this.document.body.classList.toggle('chat-open', mode === 'chat');
+    this.document.body.classList.toggle('inventory-open', mode === 'inventory');
     this.elements['resume-note'].hidden = mode !== 'ready';
     this.onModeChange(mode);
     this.renderHistory();
@@ -96,8 +98,16 @@ export class ChatUI {
     this.resume();
   }
 
+  openInventory() {
+    if (!this.inventoryUI || !['playing', 'ready'].includes(this.mode)) return;
+    this.setMode('inventory'); this.pointerLocked = false; this.requestUnlock(); this.inventoryUI.open();
+  }
+  closeInventory() {
+    this.inventoryUI?.close(); this.setMode('ready'); this.resume();
+  }
+
   resume() {
-    if (this.mode === 'chat') return;
+    if (this.mode === 'chat' || this.mode === 'inventory') return;
     // Capture may be denied after Escape's browser unlock gesture. In that case
     // stay ready, with a real click-to-resume button instead of opening the menu.
     Promise.resolve(this.requestCapture()).catch(() => {
@@ -108,7 +118,7 @@ export class ChatUI {
   onPointerLockChange(locked) {
     this.pointerLocked = locked;
     if (locked) {
-      if (this.mode === 'chat') { this.requestUnlock(); return; }
+      if (this.mode === 'chat' || this.mode === 'inventory') { this.requestUnlock(); return; }
       this.setMode('playing');
     } else if (this.mode === 'playing') {
       this.setMode('menu');
@@ -116,6 +126,7 @@ export class ChatUI {
   }
 
   pause() {
+    if (this.mode === 'inventory') this.inventoryUI?.close();
     this.elements['chat-input'].value = '';
     this.elements['chat-input'].blur();
     this.pointerLocked = false;
@@ -148,6 +159,12 @@ export class ChatUI {
       if (this.controller.enableDeveloperMode()) this.service.reply('You have entered developer mode.');
       return;
     }
+    if (this.mode === 'inventory') {
+      event.preventDefault(); event.stopPropagation();
+      if (!event.repeat && (event.code === 'KeyE' || event.key === 'Escape')) this.closeInventory();
+      else this.inventoryUI?.handleKey(event);
+      return;
+    }
     if (this.mode === 'chat') {
       if (event.key === 'Tab') {
         event.preventDefault(); event.stopPropagation(); this.complete(event.shiftKey); return;
@@ -171,7 +188,11 @@ export class ChatUI {
         return;
       }
     }
+    if (event.code === 'KeyE') {
+      event.preventDefault(); event.stopPropagation(); if (!event.repeat) this.openInventory(); return;
+    }
     if (this.mode !== 'playing') return;
+    if (this.inventoryUI?.gameplayKey(event)) { event.preventDefault(); event.stopPropagation(); return; }
     if (event.key === 'Escape') {
       event.preventDefault(); event.stopPropagation(); this.pause(); return;
     }
