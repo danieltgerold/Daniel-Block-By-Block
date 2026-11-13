@@ -188,13 +188,14 @@ function refreshWorldView() {
   animatePlayerModel(playerModel, position, position.animation, cameraMode, controller.inventory);
   syncEquipment(playerModel, controller.inventory);
   updateEmptyHand(emptyHand, position.animation, controller.inventory);
-  droppedRenderer.update(controller.drops, controller.accumulator / .05);
   updatePlayerCamera(camera, cameraMode, position, yaw, pitch, world);
   const fov = baseFov * position.fovMultiplier;
   if (Math.abs(camera.fov - fov) > 1e-8) {
     camera.fov = fov;
     camera.updateProjectionMatrix();
   }
+  // Camera pose/FOV must be current before entity culling, including F5 changes.
+  droppedRenderer.update(controller.drops, controller.accumulator / .05, camera);
   chunks.update(camera);
   const target = active ? targetBlock() : null;
   selection.visible = Boolean(target);

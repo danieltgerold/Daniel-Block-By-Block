@@ -294,6 +294,14 @@ floors and ceilings, and restores the full scaled distance when clear. Editing a
 player's scaled eye and aim with the configured effective reach, independently of camera mode.
 
 - Terrain is divided into **16 x 16 block chunks**.
+- Dropped entities use a reusable `EntityVisibility` policy with authored sphere
+  bounds and per-type detail settings. Bounds cover the complete animated
+  cluster without rebuilding model bounds each frame. The active game camera,
+  including its F5 offset and current FOV, drives frustum culling and distance.
+  Piles use their normal cluster within 24 blocks and one cube farther away,
+  with a 0.5-block hysteresis buffer. Existing cube nodes, geometry and materials
+  are reused. Hidden and simplified piles still simulate, merge, pick up and
+  despawn normally; merge effects track the live destination even offscreen.
 - Only exposed block faces are meshed. Adjacent coplanar faces are greedily merged;
   an untouched chunk needs just a top quad and a bottom quad.
 - Camera-frustum culling skips chunks outside the view. GPU back-face culling

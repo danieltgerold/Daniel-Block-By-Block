@@ -1,9 +1,20 @@
 import * as THREE from 'three';
 import { createBlockItem } from './player-visuals.js';
 import { mergeEase } from './dropped-items.js';
+import { EntityVisibility } from './entity-visibility.js';
+export const DROPPED_ITEM_RENDER_SETTINGS = Object.freeze({
+  // The five rotating .25 cubes plus fixed offsets and the full .2 bob range
+  // fit inside this sphere. Merge bob blending stays in the same envelope.
+  bounds: Object.freeze({ radius: .5, offset: Object.freeze({ x: 0, y: .3, z: 0 }) }),
+  detail: Object.freeze({ distance: 24, hysteresis: .5 }),
+});
 export class DroppedItemRenderer {
-  constructor(scene) { this.scene = scene; this.prototype = createBlockItem(.25); this.meshes = new Map(); }
-  update(drops, alpha = 0) {
+  constructor(scene, { visibility = new EntityVisibility(), settings = DROPPED_ITEM_RENDER_SETTINGS } = {}) {
+    Object.assign(this, { scene, visibility, settings });
+    this.prototype = createBlockItem(.25); this.meshes = new Map(); this.states = new Map();
+  }
+  update(drops, alpha = 0, camera = null) {
+    this.visibility.beginFrame(camera);
     const live = new Set();
     const now = drops.time + alpha * .05;
     const targets = new Map(drops.piles.map(p => [p.id, p]));
@@ -23,20 +34,28 @@ export class DroppedItemRenderer {
     }
     for (const { pile, at, bobDelta = 0 } of visible) {
       live.add(pile.id);
+      let state = this.states.get(pile.id);
+      if (!state) { state = {}; this.states.set(pile.id, state); }
+      this.visibility.evaluate(at, this.settings, state);
       let mesh = this.meshes.get(pile.id);
+      if (!state.visible) { if (mesh) mesh.visible = false; continue; }
       if (!mesh) { mesh = new THREE.Group(); this.meshes.set(pile.id, mesh); this.scene.add(mesh); }
-      const desired = droppedCubeCount(pile.count);
-      while (mesh.children.length > desired) mesh.remove(mesh.children.at(-1));
+      mesh.visible = true;
+      const desired = state.simplified ? 1 : droppedCubeCount(pile.count);
+      // Retain allocated cube nodes across detail/count changes. Only visible
+      // children draw; all nodes share the existing geometry and material.
       while (mesh.children.length < desired) {
         const i = mesh.children.length, cube = this.prototype.clone();
         cube.position.fromArray(PILE_OFFSETS[i]); cube.rotation.y = i * .37; mesh.add(cube);
       }
+      mesh.children.forEach((cube, i) => { cube.visible = i < desired; });
       const ageTicks = (drops.time - pile.born) * 20 + alpha;
       const bob = Math.sin(ageTicks / 10 + pile.phase) * .1 + .1;
       mesh.position.set(at.x, at.y + .2 + bob + bobDelta, at.z);
       mesh.rotation.y = ageTicks / 20 + pile.phase;
     }
     for (const [id, mesh] of this.meshes) if (!live.has(id)) { this.scene.remove(mesh); this.meshes.delete(id); }
+    for (const id of this.states.keys()) if (!live.has(id)) this.states.delete(id);
   }
 }
 export const PILE_OFFSETS = Object.freeze([[0, 0, 0], [.09, .025, -.07], [-.09, -.025, .06], [.04, .04, .10], [-.06, -.035, -.10]].map(Object.freeze));
