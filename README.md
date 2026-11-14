@@ -118,7 +118,7 @@ Aim and player settings are preserved. `/tp` also appears in help and autocomple
 `/gamemode survival` or `/gamemode creative` changes the mode for the current
 session, with argument autocomplete and a server confirmation. New loads start
 in Survival. Survival consumes one selected block per successful placement
-and breaking creates a collectible drop. Creative preserves the selected stack
+and breaking uses the block's drop rule. Creative preserves the selected stack
 and breaking creates no drop, but an empty main hand still cannot place. Mode
 changes preserve inventory and terrain, movement and breaking timing. They do
 not add health or hunger. Creative flight uses the controls described above.
@@ -137,8 +137,10 @@ Registered blocks stack to 64 and have cached, static three-face isometric icons
 shared across inventory, hotbar and cursor slots. World, held and dropped blocks
 use the corresponding block's face textures. Test Block retains its original
 palette and filtered fine grid. Third-person blocks use Java's ordered hand/block-model
-transforms, converted with the rig's X/Y-flipped basis and a single 0.9375
-render scale. Their side length is 0.3515625 blocks at size one; both attachments
+transforms, converting only the shoulder/output frame with the rig's X/Y-flipped
+basis: block geometry already uses Y-up, so flipping its input frame as well
+would invert Grass Block faces. A single 0.9375 render scale gives a side length
+of 0.3515625 blocks at size one; both attachments
 follow the animated shoulders. Held arms halve their base walk pitch and add
 the Java hold pose before crouch/action offsets. First-person item transforms
 remain on their separate path. Inventory starts
@@ -170,7 +172,7 @@ Static inventory labels/instructions have been removed. Hovering a stack shows
 its item name immediately in an in-game tooltip; stack counts remain visible.
 The top gameplay-controls hint and movement-test milestone banner are removed.
 
-Breaking blocks in Survival makes collectible cube items with gravity and voxel
+Survival block drops make collectible cube items with gravity and voxel
 collision. Piles show 1 cube for one item, 2 for 2–16, 3 for 17–32, 4 for 33–48,
 and 5 for 49 or more. Extra cubes have stable offsets and shared geometry/materials.
 Only the visual group bobs by `sin(ageTicks/10 + phase)*0.1 + 0.1` above a fixed
@@ -343,7 +345,8 @@ varies during each jump; the value below averages consecutive jumps.
 
 Commands provide Test Block (`test.block`), Stone (`stone`), Cobblestone
 (`cobblestone`), Dirt (`dirt`), Grass Block (`grass.block`), Sand (`sand`),
-Gravel (`gravel`), Oak Log (`oak.log`), and Oak Planks (`oak.planks`).
+Gravel (`gravel`), Oak Log (`oak.log`), Oak Planks (`oak.planks`), Glass (`glass`),
+and Oak Leaves (`oak.leaves`).
 For example, `/give grass.block 64`; Tab completes all registered item IDs.
 There is no creative inventory, crafting, tool requirement, log rotation, or
 falling Sand/Gravel behavior yet.
@@ -354,10 +357,14 @@ optional behavior hooks and recipe tags. All current breaking times remain zero.
 Wood tags allow future recipes to accept a group or an exact block ID.
 Sparse world edits retain the actual block ID; old boolean edits map to Test
 Block and untouched ground remains unchanged. `loadEdits` accepts both formats.
-Survival breaks drop the actual block item; Creative pick-block provides that
-actual type, while Survival still requires an existing matching stack.
+Survival breaks normally drop the actual block item, with explicit rules for
+Grass (one Dirt), Glass (none), and Leaves (no leaf block). Creative breaking
+always drops nothing. Drop rules may be data or functions of a tool/context,
+ready for future shears, Silk Touch and other loot without adding those today.
+Creative pick-block provides the actual targeted type, while Survival still
+requires an existing matching stack.
 
-The eight new blocks use original, low-noise 16x16 pixel face artwork with
+The basic blocks use original, low-noise 16x16 pixel face artwork with
 nearest magnification and shared mipmaps. Test Block deliberately keeps its
 legacy 128-pixel fine-grid sampler to preserve its appearance. Cached SVG icons
 project the same pixel artwork onto three shaded cube faces; no slot needs a
@@ -365,16 +372,34 @@ live renderer. Grass has distinct top/side/bottom faces and logs have bark/end
 faces. Held blocks, drop clusters, merge ghosts and particles use their own
 block's appearance. Different item IDs never merge.
 
+Glass uses clear pixels, a thin light border and a few highlights. Leaves use
+opaque green clusters with clear gaps. Their textures and cached SVG icons retain
+binary alpha; shared materials use alpha testing with depth writes and front-face
+culling rather than blended translucent cubes. Holes do not write depth, leaving
+the world and entities visible through them. Particles retain the source alpha.
+Both blocks still have full solid-cube collision, targeting and outlines.
+
 Greedy meshes merge only compatible face textures, hide contacting opaque faces,
 and repeat the tile once per world block, including at distant LODs. Side UVs
 keep grass edges at the top and bark vertical. Chunk material groups reuse face
 materials and rebuild on identity changes, including grass behavior changes.
+Stone faces beside Glass/Leaves remain visible. Matching Glass omits shared
+internal faces; fancy-style Leaves retain their layered internal surfaces.
+Opposite-facing leaf interfaces use front-face culling to avoid coplanar fighting.
+The same rules apply to coarse LOD samples and neighboring chunks.
+
+Sparse edits also preserve per-block state. Oak Leaves default to
+`{ persistent: true, distance: 7 }`, so player placements remain until broken.
+Future natural generation may set persistent false and track log distance;
+there is no natural-leaf decay, tree generation or waterlogging system yet.
 
 Covering Grass with a solid opaque block changes it to Dirt immediately. Area
 refresh also checks covered grass. Every second of active 20 Hz simulation,
 each uncovered Grass Block chooses a random neighbor within one block on each
 axis; uncovered Dirt there becomes Grass. Newly spread grass waits until the
-next round. Uncovering Dirt does not instantly restore Grass. Inventory keeps
+next round. Glass and Leaves are solid but nonopaque and do not count as covers
+in this simplified rule; it is not Minecraft's full lighting system.
+Uncovering Dirt does not instantly restore Grass. Inventory keeps
 this timer running, while the Escape menu pauses it.
 
 ## Pickup and block particles

@@ -32,11 +32,12 @@ function thirdPersonHeldBlock(handSign) {
     .multiply(new THREE.Matrix4().makeRotationX(75 * Math.PI / 180))
     .multiply(new THREE.Matrix4().makeRotationY(handSign * Math.PI / 4))
     .multiply(new THREE.Matrix4().makeScale(.375, .375, .375));
-  // Convert the complete ordered transform with C * M * C^-1 (C^-1 = C),
-  // then apply the rig render scale once to translations AND cube dimensions.
+  // C converts the MC shoulder/output frame into our Y-up rig. The block
+  // model itself is already Y-up, unlike the MC skeleton: do not conjugate
+  // its input frame with C again (that inverted grass tops and side edges).
   item.matrixAutoUpdate = false;
   item.matrix.makeScale(PLAYER_RENDER_SCALE, PLAYER_RENDER_SCALE, PLAYER_RENDER_SCALE)
-    .multiply(basis).multiply(mc).multiply(basis);
+    .multiply(basis).multiply(mc);
   item.matrixWorldNeedsUpdate = true;
   return item;
 }

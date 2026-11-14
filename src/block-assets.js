@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { BLOCK_COLOR, BLOCK_GRID_COLOR, blockShade } from './block-appearance.js';
 import { BLOCK_TYPES, blockFaceTexture } from './block-types.js';
-import { texturePixels } from './block-textures.js';
+import { texturePixels, textureHasAlpha } from './block-textures.js';
 let assets;
 export function getBlockAssets(anisotropy = 1) {
   if (!assets) {
@@ -41,6 +41,9 @@ export function getFaceMaterial(id) {
   if (id === 'test.block') return getBlockAssets().material;
   if (!faceMaterials.has(id)) faceMaterials.set(id, new THREE.MeshBasicMaterial({
     map: getFaceTexture(id), vertexColors: true, depthTest: true, depthWrite: true, fog: true,
+    // Binary cutouts discard clear pixels before depth writes. Front-side
+    // culling avoids coplanar opposing leaf/mixed-block faces fighting.
+    alphaTest: textureHasAlpha(id) ? .5 : 0, transparent: false, side: THREE.FrontSide,
   }));
   return faceMaterials.get(id);
 }

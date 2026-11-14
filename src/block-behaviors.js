@@ -1,4 +1,5 @@
 // Optional definition hooks keep special blocks out of common cube mechanics.
+// Cover checks are intentionally simplified opacity tests, not Java light propagation.
 export const grassBehavior = Object.freeze({
   neighborChanged(world, block) {
     if (world.isOpaqueSolid(block.x, block.y + 1, block.z)) world.setBlock(block.x, block.y, block.z, 'dirt');

@@ -1,12 +1,15 @@
 // Registered blocks share a placement transaction. All placement paths share
 // this transaction so invalid attempts never edit terrain or request a swing.
 import { ITEMS } from './inventory.js';
+import { blockDrops } from './block-types.js';
 export function breakTargetBlock({ controller, world, yaw, pitch, feet = controller.player, onBreak = () => {} }) {
   const hit = controller.targetBlock(feet, yaw, pitch);
   const block = hit ? world.blockAt(hit.x, hit.y, hit.z) : null;
   if (!block || !world.setBlock(hit.x, hit.y, hit.z, false)) return false;
   controller.particles?.breakBlock(block);
-  if (controller.gameMode !== 'creative') controller.drops.spawn(block.definition.id, 1, { x: hit.x + .5, y: hit.y + .25, z: hit.z + .5 });
+  for (const drop of blockDrops(block, { gameMode: controller.gameMode, tool: controller.inventory.mainHand, player: controller.player })) {
+    controller.drops.spawn(drop.id, drop.count, { x: hit.x + .5, y: hit.y + .25, z: hit.z + .5 });
+  }
   onBreak(hit.x, hit.y, hit.z); return true;
 }
 export class BlockPlacement {

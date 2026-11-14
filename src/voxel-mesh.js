@@ -1,7 +1,7 @@
 ﻿import { CHUNK_SIZE } from './voxel-world.js';
 
 import { blockShade } from './block-appearance.js';
-import { BLOCK_TYPES, blockFaceTexture } from './block-types.js';
+import { blockFaceVisible, blockFaceTexture } from './block-types.js';
 // Coarsen horizontal samples at distance; keep vertical layers one meter thick.
 // Majority coverage intentionally drops sub-LOD details only in distant meshes.
 export function buildChunkMesh(world, cx, cz, level = 1) {
@@ -53,7 +53,7 @@ export function buildChunkMesh(world, cx, cz, level = 1) {
             cell[axis] = slice; cell[u] = i; cell[v] = j;
             const neighbor = [...cell]; neighbor[axis] += sign;
             const id = type(cell), adjacent = type(neighbor);
-            if (id && !BLOCK_TYPES.get(adjacent)?.opaque) mask[i + j * width] = blockFaceTexture(id, axis, sign);
+            if (blockFaceVisible(id, adjacent)) mask[i + j * width] = blockFaceTexture(id, axis, sign);
           }
         }
         // Greedily merge coplanar exposed faces; never create internal faces.

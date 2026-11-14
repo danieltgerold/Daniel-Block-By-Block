@@ -4,6 +4,7 @@ import { BLOCK_TYPES } from './block-types.js';
 export const BLOCK_REACH = 4.5;
 const EPSILON = 1e-7;
 const AXES = ['x', 'y', 'z'];
+const sameState = (a, b) => Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(key => Object.is(a[key], b[key]));
 export const chunkKey = (x, z) => `${x},${z}`;
 const blockKey = (x, y, z) => `${x},${y},${z}`;
 const tolerance = (min, max) => Math.min(EPSILON, Math.max(0, max - min) * 1e-6);
@@ -53,13 +54,18 @@ export class VoxelWorld {
     return Boolean(definition?.solid && definition.opaque);
   }
   subscribe(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
-  setBlock(x, y, z, value) {
+  blockStateAt(x, y, z) {
+    const edit = this.chunkEdits.get(chunkKey(Math.floor(x / CHUNK_SIZE), Math.floor(z / CHUNK_SIZE)))?.get(blockKey(x, y, z));
+    return edit?.state ?? BLOCK_TYPES.get(this.blockIdAt(x, y, z))?.defaultState ?? {};
+  }
+  setBlock(x, y, z, value, properties = {}) {
     if (![x, y, z].every(Number.isSafeInteger)) return false;
     const id = value === true ? 'test.block' : value === false || value === null ? null : value;
     const definition = BLOCK_TYPES.get(id);
     if (id !== null && !definition) return false;
     const previousId = this.blockIdAt(x, y, z);
-    if (previousId === id) return false;
+    const state = Object.freeze(id === null ? {} : { ...definition.defaultState, ...properties });
+    if (previousId === id && sameState(this.blockStateAt(x, y, z), state)) return false;
     const solid = Boolean(definition?.solid && definition.collisionShape === 'cube');
     const previous = BLOCK_TYPES.get(previousId);
     const previousSolid = Boolean(previous?.solid && previous.collisionShape === 'cube');
@@ -67,17 +73,17 @@ export class VoxelWorld {
     let edits = this.chunkEdits.get(key);
     const isDefault = y >= -this.depth && y < 0;
     if (isDefault) this.removedCount += Number(previousSolid) - Number(solid);
-    if (id === (isDefault ? 'test.block' : null)) {
+    if (id === (isDefault ? 'test.block' : null) && !Object.keys(state).length) {
       edits?.delete(blockKey(x, y, z));
       if (edits?.size === 0) this.chunkEdits.delete(key);
     } else {
       if (!edits) { edits = new Map(); this.chunkEdits.set(key, edits); }
-      edits.set(blockKey(x, y, z), { x, y, z, id, solid });
+      edits.set(blockKey(x, y, z), { x, y, z, id, solid, state });
     }
     const coordinateKey = blockKey(x, y, z);
     this.behaviorBlocks.delete(coordinateKey);
     if (definition?.behavior) this.behaviorBlocks.set(coordinateKey, { x, y, z });
-    for (const listener of this.listeners) listener({ x, y, z, id, previousId });
+    for (const listener of this.listeners) listener({ x, y, z, id, previousId, state });
     for (const [dx, dy, dz] of [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
       const block = this.blockAt(x + dx, y + dy, z + dz);
       block?.definition.behavior?.neighborChanged?.(this, block);
@@ -86,11 +92,11 @@ export class VoxelWorld {
   }
   blockAt(x, y, z) {
     const id = this.blockIdAt(x, y, z);
-    return id === null ? null : { x, y, z, id, definition: BLOCK_TYPES.get(id) };
+    return id === null ? null : { x, y, z, id, state: this.blockStateAt(x, y, z), definition: BLOCK_TYPES.get(id) };
   }
   // Migration entry point for old {solid:true/false} and current typed edits.
   loadEdits(entries) {
-    for (const edit of entries) this.setBlock(edit.x, edit.y, edit.z, edit.id === undefined ? edit.solid : edit.id);
+    for (const edit of entries) this.setBlock(edit.x, edit.y, edit.z, edit.id === undefined ? edit.solid : edit.id, edit.state);
     this.updateArea();
   }
   updateArea(min = { x: -Infinity, y: -Infinity, z: -Infinity }, max = { x: Infinity, y: Infinity, z: Infinity }) {

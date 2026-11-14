@@ -7,10 +7,11 @@ const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 const stack = () => ({ id: 'test.block', count: 1 });
 const base = { torsoYaw: .2, headYaw: .1, aimPitch: -.4, phase: 2, amount: .8, crouch: 0, swingActive: false, swingProgress: 0 };
 // Independent point-transform oracle: apply the written MC operations from
-// right to left, converting both the source and destination coordinate bases.
+// right to left. Only the shoulder/output basis is MC Y-down; block model
+// vertices already use Y-up, so a second source-basis flip would invert them.
 function expected(point, sign) {
   const x = new THREE.Vector3(1, 0, 0), y = new THREE.Vector3(0, 1, 0);
-  return point.clone().multiply(new THREE.Vector3(-1, -1, 1)).multiplyScalar(.375)
+  return point.clone().multiplyScalar(.375)
     .applyAxisAngle(y, sign * Math.PI / 4).applyAxisAngle(x, 75 * Math.PI / 180)
     .add(new THREE.Vector3(0, 2.5 / 16, 0)).add(new THREE.Vector3(sign / 16, 2 / 16, -10 / 16))
     .applyAxisAngle(y, Math.PI).applyAxisAngle(x, -Math.PI / 2)

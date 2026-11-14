@@ -7,8 +7,10 @@ export function registerBlockType(definition) {
   if (!definition.id) throw new Error('A block needs a unique ID');
   const block = Object.freeze({ name: definition.id, maxStack: 64, solid: true, opaque: true,
     collisionShape: 'cube', breakTime: 0, behavior: null, tags: [],
+    renderMode: 'opaque', cullSameType: false, defaultState: {}, drops: 'self',
     faces: { all: definition.id }, particleTexture: definition.id,
-    particles: true, particleTint: [1, 1, 1], ...definition });
+    particles: true, particleTint: [1, 1, 1], ...definition,
+    defaultState: Object.freeze({ ...definition.defaultState }) });
   if (BLOCK_TYPES.has(block.id)) throw new Error(`Duplicate block ID: ${block.id}`);
   BLOCK_TYPES.set(block.id, block);
   for (const listener of listeners) listener(block);
@@ -20,6 +22,21 @@ export function blockFaceTexture(id, axis, sign) {
   return faces[`${sign > 0 ? 'p' : 'n'}${'xyz'[axis]}`]
     ?? faces[axis === 1 ? (sign > 0 ? 'top' : 'bottom') : 'side'] ?? faces.all ?? id;
 }
+export function blockFaceVisible(id, neighborId) {
+  if (!id) return false;
+  const block = BLOCK_TYPES.get(id), neighbor = BLOCK_TYPES.get(neighborId);
+  if (neighbor?.solid && neighbor.opaque) return false;
+  return !(block?.cullSameType && id === neighborId);
+}
+// Tool/enchantment-sensitive rules can later be functions of this context.
+// Collision and render opacity have no bearing on what an item drops.
+export function blockDrops(block, context = {}) {
+  if (context.gameMode === 'creative') return [];
+  const rule = block.definition.drops;
+  const drops = typeof rule === 'function' ? rule({ ...context, block })
+    : rule === 'self' ? [{ id: block.definition.id, count: 1 }] : rule ?? [];
+  return drops.map(stack => ({ ...stack }));
+}
 // Future recipe ingredients can name an exact ID or a shared tag.
 export const blockMatches = (id, ingredient) => typeof ingredient === 'string' ? id === ingredient
   : Boolean(ingredient?.tag && BLOCK_TYPES.get(id)?.tags.includes(ingredient.tag));
@@ -27,8 +44,11 @@ for (const [id, name, color, extra = {}] of [
   ['test.block', 'Test Block', '#d9dfcd'],
   ['stone', 'Stone', '#929da4'], ['cobblestone', 'Cobblestone', '#879198'],
   ['dirt', 'Dirt', '#a47145'],
-  ['grass.block', 'Grass Block', '#74ba42', { faces: { top: 'grass.top', bottom: 'dirt', side: 'grass.side' }, particleTexture: 'grass.side', behavior: grassBehavior }],
+  ['grass.block', 'Grass Block', '#74ba42', { faces: { top: 'grass.top', bottom: 'dirt', side: 'grass.side' }, particleTexture: 'grass.side', behavior: grassBehavior, drops: [{ id: 'dirt', count: 1 }] }],
   ['sand', 'Sand', '#edda98'], ['gravel', 'Gravel', '#a0a09a'],
   ['oak.log', 'Oak Log', '#997044', { faces: { top: 'oak.end', bottom: 'oak.end', side: 'oak.bark' }, particleTexture: 'oak.bark', tags: ['wood.logs', 'wood.oak'] }],
   ['oak.planks', 'Oak Planks', '#c79456', { tags: ['wood.planks', 'wood.oak'] }],
+  ['glass', 'Glass', '#dceff4', { opaque: false, renderMode: 'glass', cullSameType: true, drops: [] }],
+  ['oak.leaves', 'Oak Leaves', '#55a141', { opaque: false, renderMode: 'cutout',
+    defaultState: { persistent: true, distance: 7 }, drops: [], tags: ['leaves', 'wood.oak'] }],
 ]) registerBlockType({ id, name, color, ...extra });

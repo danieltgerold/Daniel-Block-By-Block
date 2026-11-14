@@ -51,11 +51,29 @@ tile('oak.planks', ['#c79456', '#9a6d3c', '#d6a466', '#bd874b'], r => {
   }
   r(3, 6, 5, 1, 3); r(8, 14, 5, 1, 3);
 });
+tile('glass', ['#00000000', '#dceff4', '#b8d3dc'], r => {
+  r(0, 0, 16, 1, 1); r(0, 15, 16, 1, 2); r(0, 0, 1, 16, 1); r(15, 0, 1, 16, 2);
+  r(3, 3, 1, 2, 1); r(4, 3, 2, 1, 1); r(11, 10, 1, 2, 1); r(10, 12, 1, 1, 1);
+});
+tile('oak.leaves', ['#00000000', '#4e913c', '#63ab48', '#78bb55', '#3c7d32'], r => {
+  r(0, 1, 5, 4, 1); r(1, 0, 3, 1, 2); r(1, 2, 3, 1, 3);
+  r(7, 0, 5, 4, 2); r(8, 1, 3, 1, 3); r(11, 3, 4, 3, 1);
+  r(14, 0, 2, 3, 1); r(0, 7, 3, 5, 2); r(1, 8, 2, 1, 3);
+  r(4, 5, 6, 5, 1); r(5, 5, 4, 2, 2); r(6, 5, 2, 1, 3); r(8, 8, 3, 3, 4);
+  r(12, 8, 4, 4, 2); r(13, 8, 2, 1, 3);
+  r(2, 12, 6, 4, 1); r(3, 12, 4, 2, 2); r(4, 12, 2, 1, 3);
+  r(10, 13, 5, 3, 1); r(11, 13, 3, 1, 2); r(0, 14, 1, 2, 2);
+});
+export const paletteAlpha = color => color.length === 9 ? parseInt(color.slice(7), 16) : 255;
+export const textureHasAlpha = id => Boolean(BLOCK_TEXTURES.get(id)?.palette.some(color => paletteAlpha(color) < 255));
 export function texturePixels(id) {
   const tile = BLOCK_TEXTURES.get(id); if (!tile) return null;
   if (!tile.pixels) {
     tile.pixels = new Uint8Array(16 * 16 * 4);
-    tile.indices.forEach((index, n) => tile.pixels.set([...tile.palette[index].slice(1).match(/../g).map(c => parseInt(c, 16)), 255], n * 4));
+    tile.indices.forEach((index, n) => {
+      const color = tile.palette[index];
+      tile.pixels.set([...color.slice(1, 7).match(/../g).map(c => parseInt(c, 16)), paletteAlpha(color)], n * 4);
+    });
   }
   return tile.pixels;
 }

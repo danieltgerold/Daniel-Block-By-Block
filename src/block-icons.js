@@ -1,5 +1,5 @@
 import { BLOCK_TYPES, blockFaceTexture } from './block-types.js';
-import { BLOCK_TEXTURES } from './block-textures.js';
+import { BLOCK_TEXTURES, paletteAlpha } from './block-textures.js';
 import { TEST_BLOCK_ICON, shaded } from './block-appearance.js';
 const icons = new Map();
 export function blockIcon(id) {
@@ -19,7 +19,8 @@ export function blockIcon(id) {
       while (x + w < 16 && tile.indices[y * 16 + x + w] === color) w++;
       paths[color] += `M${x} ${y}h${w}v1h-${w}z`; x += w;
     }
-    return `<g transform="matrix(${matrix})">${paths.map((d, i) => d ? `<path fill="${shaded(tile.palette[i], shade)}" d="${d}"/>` : '').join('')}</g>`;
+    return `<g transform="matrix(${matrix})">${paths.map((d, i) => d && paletteAlpha(tile.palette[i])
+      ? `<path fill="${shaded(tile.palette[i].slice(0, 7), shade)}" fill-opacity="${paletteAlpha(tile.palette[i]) / 255}" d="${d}"/>` : '').join('')}</g>`;
   }).join('')}</svg>`;
   const icon = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; icons.set(id, icon); return icon;
 }

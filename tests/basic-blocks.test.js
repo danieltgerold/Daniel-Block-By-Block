@@ -102,7 +102,7 @@ test('all block kinds place/consume, break/drop their own item, retain Creative 
     assert.equal(c.particles.active.length, 64);
     assert.ok(c.particles.pool.every(p => p.texture === BLOCK_TYPES.get(id).particleTexture));
     assert.equal(c.drops.total(), mode === 'survival' ? 1n : 0n);
-    if (mode === 'survival') assert.equal(c.drops.piles[0].item, id);
+    if (mode === 'survival') assert.equal(c.drops.piles[0].item, id === 'grass.block' ? 'dirt' : id);
     c.inventory.slots[0] = null; c.inventory.slots[9] = stack(id, 7);
     assert.equal(c.pickBlock(Math.PI / 2, 0), true); assert.equal(c.inventory.mainHand.id, id);
     assert.equal(c.inventory.mainHand.count, mode === 'survival' ? 7 : 1);
@@ -167,7 +167,7 @@ test('give/autocomplete includes every ID, splits 130, rejects errors, and prese
     c.inventory.insert(id, 2304); const before = total(c); service.submit(`/give ${id} 130`);
     assert.equal(total(c), before + 130n); assert.ok(c.drops.piles.every(p => p.item === id));
   }
-  assert.deepEqual(commandCompletions('/give oak.'), ['/give oak.log ', '/give oak.planks ']);
+  assert.deepEqual(commandCompletions('/give oak.'), ['/give oak.log ', '/give oak.planks ', '/give oak.leaves ']);
 });
 
 test('different dropped block kinds never merge; matching kinds merge once and keep the correct hand/offhand/ghost textures', () => {
