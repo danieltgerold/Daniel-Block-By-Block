@@ -133,6 +133,7 @@ span.item-icon { background: var(--item-color, #d9dfcd); }
 .creative-grid { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; }
 .creative-scroll { writing-mode: vertical-lr; direction: rtl; width: 20px; height: 100%; margin: 0; accent-color: #41654e; }
 .creative-scroll:disabled { opacity: .35; }
+.creative-grid .empty-catalog-slot { opacity: .45; }
 .creative-view .crafting-area, .creative-view #recipe-book { display: none; }
 .creative-catalog-view .inventory-top, .creative-catalog-view #inventory-main { display: none; }
 button.creative-destroy { margin-top: 10px; width: auto; padding: 6px 10px; height: 36px; color: #693b30; border-color: #9c6c60; }

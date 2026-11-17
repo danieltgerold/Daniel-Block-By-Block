@@ -4,7 +4,7 @@ import { swingCurves } from './player-animation.js';
 import { ITEMS, ARMOR } from './inventory.js';
 import { createSharedBlock } from './block-assets.js';
 import { createItemMesh, setItemAppearance } from './item-assets.js';
-import { displayProfile, thirdPersonItemTransform, itemModelTransform, itemSourceAlignment } from './item-display.js';
+import { ITEM_DISPLAY, displayProfile, thirdPersonItemTransform, itemModelTransform, itemSourceAlignment } from './item-display.js';
 
 export const MODEL_SCALE = 0.9375 / 16;
 export const PLAYER_RENDER_SCALE = 0.9375;
@@ -167,19 +167,19 @@ const fixedArmAlignment = new THREE.Matrix4().makeTranslation(-1, 3.6, 3.5)
   .multiply(new THREE.Matrix4().makeRotationY(-135 * Math.PI / 180))
   .multiply(new THREE.Matrix4().makeTranslation(5.6, 0, 0));
 const handRotation = new THREE.Matrix4();
+const doorPictureScale = new THREE.Vector3().setScalar(ITEM_DISPLAY.generated.first.right.scale * .5);
 function spriteInFirstPerson(mesh, item, sign, pose, equipHeight) {
   const p = pose.swingActive ? pose.swingProgress : 0, { inward: q, vertical: r, reach: a } = swingCurves(p, pose.swingActive);
   const b = Math.sin(Math.PI * p * p), profile = displayProfile(item);
   if (profile === 'generated') {
-    // Door sprites are unit-sized, bottom-gripped pictures. The former full
-    // .68 display plus endpoint alignment lifted most of one above the hand.
-    // Use ONE compact camera-facing display, rather than stacking another
-    // Java hand/model alignment onto that already-adapted source origin.
+    // One centered, camera-facing picture: unit plane * .68 reference display
+    // * .5 renderer adaptation. No extrusion, bottom-origin lift, extra Java
+    // model translation or empty-hand arm is stacked behind the held picture.
     mesh.matrixAutoUpdate = false;
-    mesh.position.set(sign * (.50 - .22 * q), -.57 + .12 * r - .6 * (1 - equipHeight), -.95 - .14 * a);
+    mesh.position.set(sign * (.48 - .22 * q), -.48 + .12 * r - .6 * (1 - equipHeight), -1 - .14 * a);
     mesh.matrix.makeTranslation(...mesh.position.toArray())
-      .multiply(handRotation.makeRotationY(-sign * .15 * q)).multiply(handRotation.makeRotationZ(-sign * (.08 + .3 * q)))
-      .scale(new THREE.Vector3(.40, .40, .40)).multiply(handRotation.makeTranslation(0, .40625, 0));
+      .multiply(handRotation.makeRotationY((sign < 0 ? Math.PI : 0) - sign * .15 * q))
+      .multiply(handRotation.makeRotationZ(-sign * .3 * q)).scale(doorPictureScale);
     mesh.matrixWorldNeedsUpdate = true; return;
   }
   // The camera-space hand/swing/equip parent is separate from item model units.

@@ -22,6 +22,17 @@ export function itemModelTransform(profile, view, sign = 1) {
 }
 export function thirdPersonItemTransform(profile = 'block', sign = 1) {
   const key = `${profile}:${sign}`; if (third.has(key)) return third.get(key);
+  if (profile === 'generated') {
+    // Our arm mesh center is one pixel out from its shoulder, with its hand
+    // nine pixels below the joint. Put the picture's bottom grip on the front
+    // of that actual palm (two pixels deep), not in a second model-origin frame.
+    // The unit plane is Y-up already; only the left-side picture is mirrored.
+    const pixel = .9375 / 16, scale = .9375 * ITEM_DISPLAY.generated.third.right.scale;
+    const matrix = new THREE.Matrix4().makeTranslation(sign * pixel, -9 * pixel, -2 * pixel - .001)
+      .multiply(new THREE.Matrix4().makeRotationY(sign < 0 ? Math.PI : 0))
+      .scale(new THREE.Vector3(scale, scale, scale)).multiply(new THREE.Matrix4().makeTranslation(0, .40625, 0));
+    third.set(key, matrix); return matrix;
+  }
   const matrix = new THREE.Matrix4().makeScale(.9375, .9375, .9375)
     .multiply(new THREE.Matrix4().makeScale(-1, -1, 1)) // MC shoulder/output basis only.
     .multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2)).multiply(new THREE.Matrix4().makeRotationY(Math.PI))

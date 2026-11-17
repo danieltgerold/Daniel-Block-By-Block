@@ -84,10 +84,10 @@ test('creative catalog UI clicks, numbered slots, Q, tooltips and search focus c
   const total = c.drops.total(); key('KeyQ'); key('KeyQ', document.body, { ctrlKey: true }); assert.equal(c.drops.total() - total, 65n);
   key('KeyT'); assert.equal(document.activeElement, view.creative.search); assert.equal(view.creative.tab, 'search');
   view.creative.search.value = 'PINE DOOR'; view.creative.search.dispatchEvent(new window.Event('input'));
-  assert.deepEqual(view.creative.cells.filter(cell => !cell.disabled).map(cell => cell.dataset.catalog), ['pine.door']);
+  assert.deepEqual(view.creative.cells.filter(cell => cell.dataset.catalog).map(cell => cell.dataset.catalog), ['pine.door']);
   hover(catalog('pine.door')); const event = key('Digit9', view.creative.search); assert.equal(event.defaultPrevented, true); assert.equal(c.inventory.slots[8].id, 'pine.door');
   key('KeyW', view.creative.search); key('Space', view.creative.search); key('Slash', view.creative.search); assert.equal(c.heldKeys.size, 0); assert.equal(f.ui.mode, 'inventory');
-  view.creative.search.value = 'no such item'; view.creative.search.dispatchEvent(new window.Event('input')); assert.ok(view.creative.cells.every(cell => cell.disabled));
+  view.creative.search.value = 'no such item'; view.creative.search.dispatchEvent(new window.Event('input')); assert.ok(view.creative.cells.every(cell => !cell.dataset.catalog));
   view.creative.search.value = ''; view.creative.search.dispatchEvent(new window.Event('input')); assert.equal(view.creative.scroll.disabled, true);
   key('Escape', view.creative.search); assert.equal(view.isOpen, false);
 });
@@ -120,4 +120,51 @@ test('catalog scrolls by rows without recreating cells and resets after filterin
   view.creative.scroll.value = view.creative.scroll.max; view.creative.scroll.dispatchEvent(new window.Event('input')); assert.ok(view.creative.row > 1);
   view.creative.search.value = 'catalog.test.64'; view.creative.search.dispatchEvent(new window.Event('input'));
   assert.equal(view.creative.row, 0); assert.equal(view.creative.cells[0].dataset.catalog, 'catalog.test.64'); assert.equal(view.creative.scroll.disabled, true);
+});
+
+test('blank creative catalog clicks delete the cursor without drops, exclude controls/real slots, and preserve outside/Survival behavior', t => {
+  const f = fixture(t), { inventoryUI: view, c, click, document, key, ui } = f, inv = c.inventory;
+  const empty = view.creative.cells.find(cell => !cell.dataset.catalog);
+  assert.equal(empty.disabled, false, 'empty cells must receive real mouse presses');
+  const dropped = c.drops.total();
+  inv.cursor = stack('stone', 5); click(empty, 2); assert.equal(inv.cursor.count, 4);
+  click(view.creative.grid, 2); assert.equal(inv.cursor.count, 3); click(view.panel); assert.equal(inv.cursor, null);
+  inv.cursor = stack('stone', 5); click(empty); assert.equal(inv.cursor, null); click(empty, 2); assert.equal(inv.cursor, null);
+  inv.cursor = stack('stone', 1); click(empty, 2); assert.equal(inv.cursor, null); assert.equal(c.drops.total(), dropped);
+  view.creative.select('search'); inv.cursor = stack('stone', 3);
+  const custom = document.createElement('button'); custom.textContent = 'Control'; view.creative.area.append(custom);
+  for (const control of [view.creative.search, view.creative.scroll, view.creative.tabs.querySelector('button'), document.getElementById('inventory-close'), custom]) {
+    click(control); assert.deepEqual(inv.cursor, stack('stone', 3));
+  }
+  click(view.slotViews.get(0)); assert.equal(inv.cursor, null); assert.equal(inv.slots[0].count, 3, 'real hotbar receives items');
+  inv.cursor = stack('stone', 2); click(document.getElementById('inventory-hotbar')); assert.equal(inv.cursor.count, 2, 'hotbar gaps are not catalog space');
+  view.creative.select('inventory'); click(view.panel); assert.equal(inv.cursor.count, 2);
+  view.creative.select('building'); inv.cursor = stack('stone', 4); click(view.root); assert.equal(inv.cursor, null); assert.equal(c.drops.total() - dropped, 4n);
+  inv.cursor = stack('stone', 4); click(view.root, 2); assert.equal(inv.cursor.count, 3); assert.equal(c.drops.total() - dropped, 5n);
+  key('Escape'); c.setGameMode('survival'); ui.onPointerLockChange(true); key('KeyE'); inv.cursor = stack('stone', 3);
+  click(view.panel); assert.equal(inv.cursor.count, 3); assert.equal(view.creative.model.discardCursor(), false); assert.equal(inv.cursor.count, 3);
+});
+
+test('creative ordering keeps kinds together in categories/search and accepts future material and explicit kind metadata', t => {
+  const catalog = new CreativeInventory(new PlayerInventory(), () => true);
+  const kinds = ['planks', 'log', 'slab', 'stairs', 'fence', 'door', 'leaves'];
+  const expected = kinds.flatMap(kind => [`oak.${kind}`, `pine.${kind}`]);
+  const wood = items => items.map(i => i.id).filter(id => expected.includes(id));
+  assert.deepEqual(wood(catalog.items('search')), expected);
+  for (const [category] of CREATIVE_CATEGORIES) {
+    const members = new Set(catalog.items(category).map(i => i.id));
+    assert.deepEqual(wood(catalog.items(category)), expected.filter(id => members.has(id)));
+  }
+  assert.deepEqual(wood(catalog.items('search', 'oak')), expected.filter(id => id.startsWith('oak.')));
+  const additions = [
+    { id: 'birch.planks', name: 'Birch Planks', block: true },
+    { id: 'custom.item', name: 'Cherry Fence', block: true, creativeKind: 'fence', creativeMaterial: 'cherry' },
+    { id: 'future.material', name: 'Future Material' },
+  ];
+  t.after(() => additions.forEach(i => ITEMS.delete(i.id)));
+  for (const item of additions) registerItem({ ...item, maxStack: 64 });
+  const sorted = catalog.items().map(i => i.id);
+  assert.equal(sorted.indexOf('birch.planks'), sorted.indexOf('pine.planks') + 1);
+  assert.equal(sorted.indexOf('custom.item'), sorted.indexOf('pine.fence') + 1);
+  assert.ok(sorted.includes('future.material'), 'unclassified registrations remain visible');
 });

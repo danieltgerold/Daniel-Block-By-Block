@@ -54,6 +54,11 @@ export class CreativeInventoryUI {
       event.preventDefault(); this.owner.gesture = null; this.owner.lastClick = null;
       this.model.click(id, event.button, event.shiftKey); return true;
     }
+    const control = event.target.closest?.('input, textarea, select, a, button:not([data-catalog]), .creative-tabs, [data-slot], #inventory-hotbar, #inventory-main, .inventory-top, [data-recipe-book]');
+    if (this.catalog && this.owner.panel.contains(event.target) && !control && event.button !== 1) {
+      event.preventDefault(); this.owner.gesture = null; this.owner.lastClick = null;
+      this.model.discardCursor(event.button === 0); return true;
+    }
     if (this.tab === 'inventory' && event.target.closest?.('[data-destroy]')) {
       event.preventDefault(); this.owner.gesture = null; this.model.destroy(event.shiftKey); return true;
     }
@@ -94,7 +99,8 @@ export class CreativeInventoryUI {
     const max = Math.max(0, Math.ceil(items.length / 9) - 5); this.row = Math.max(0, Math.min(this.row, max));
     this.scroll.max = max; this.scroll.value = this.row; this.scroll.disabled = max === 0;
     this.cells.forEach((cell, i) => {
-      const item = items[this.row * 9 + i]; cell.dataset.catalog = item?.id ?? ''; cell.disabled = !item;
+      const item = items[this.row * 9 + i]; cell.dataset.catalog = item?.id ?? ''; cell.disabled = false;
+      cell.classList.toggle('empty-catalog-slot', !item);
       cell.setAttribute('aria-label', item?.name ?? 'Empty catalog slot'); this.drawStack(this.owner.document, cell, item ? { id: item.id, count: 1 } : null);
     });
   }

@@ -497,9 +497,10 @@ templates drive collision, rays, outlines and exact partial-block LOD rendering.
 
 Door items use separate original transparent 16px complete-door sprites in all
 slot/book icons, hands and dropped piles; placed two-cell doors are unchanged.
-Door and Stick sprites have shared 1/16-thick generated geometry with transparent
-holes and edge faces. Separate generated/handheld Java display transforms use
-model-unit translations and end-grip source alignment in both animated hands;
+Stick sprites retain shared 1/16-thick generated geometry and edge faces. Door
+items use a shared double-sided flat plane, crisp alpha-cutout silhouettes and a
+filled panel/window pattern with no interior transparent holes. Separate
+generated/handheld display paths adapt Java's model units to the animated hands;
 ordinary block and first-person equip/action paths remain separate. The carried
 stack icon centers on viewport pointer coordinates with percentage transforms,
 keeping the count at lower right and pointer events disabled in every inventory.
@@ -508,10 +509,12 @@ Pine Leaves retain a connected dark-green canopy with approximately 20% small,
 irregular clear pixels across the whole tile. Shared binary-cutout textures serve
 world faces, icons, held items and drops; fancy neighboring leaf faces remain
 visible through gaps. Collision, persistence and leaf drop rules are unchanged.
-First-person Door items use one compact camera-facing picture, bottom-gripped in
-the lower right/left, rather than lifting a full-size generated sprite through
-stacked alignments. Stick, regular-block, third-person and equip/swing paths stay
-separate. Internal projection checks keep resting Doors clear of the crosshair.
+First-person Door items use one compact, upright, center-origin camera picture
+in the lower right/left, without an extra model-origin lift or empty-hand arm
+behind a held item. Empty main hands still show the hand. Third-person pictures
+attach their bottom grip directly to the animated arm's actual palm, with player
+render scale applied once. Stick, regular-block and equip/swing behavior remain.
+Internal projection checks keep complete resting Doors clear of the crosshair.
 
 ## Creative inventory
 
@@ -523,12 +526,23 @@ the next interface update. Search matches names/IDs without case sensitivity;
 T opens it, row scrolling resets on filtering, and the scrollbar disables when
 all items fit. Forty-five reusable cells and cached icons avoid per-frame rebuilds.
 
+Catalog sorting groups kinds first (planks, logs, slabs, stairs, fences, doors,
+leaves), then material variants (Oak, Pine, future woods) in both categories and
+search. `creativeKind`/`creativeMaterial` registry metadata can override defaults
+inferred from conventional material.kind IDs; unknown registrations still appear.
+The kind/material ordering tables are independent of category membership.
+
 Catalog left/right click takes one, Shift-click/middle-click takes a full stack.
 With a carried matching stack, left adds one, Shift fills it, right removes one.
 A different template clears the carried stack on left-click or removes one on
 right-click. Number keys replace the numbered hotbar slot with a full stack;
 Q/Ctrl+Q creates a thrown item/full stack. The catalog itself never loses items.
 Shift-clicking a real hotbar slot deletes it only in the catalog view.
+Empty catalog cells and unused panel space delete the cursor on left-click or
+one carried item on right-click, without world drops. Cells remain clickable;
+fields, tabs, scrollbar, buttons, real slots and their hotbar area are excluded.
+Outside-panel clicks still drop items, and Survival/Player Inventory blank-space
+behavior is unchanged.
 
 Player Inventory exposes the same main storage, hotbar, armor, offhand and preview,
 with crafting disabled. Normal real-slot interactions are reused, plus empty-cursor

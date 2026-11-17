@@ -3,6 +3,25 @@ import { ITEMS, HOTBAR, MAIN, OFFHAND } from './inventory.js';
 export const CREATIVE_CATEGORIES = [
   ['building', 'Building'], ['nature', 'Nature'], ['functional', 'Functional'], ['materials', 'Materials'],
 ];
+// Explicit kind/material metadata wins; conventional <material>.<kind> IDs
+// supply useful defaults. Unknown kinds/items remain visible after known ones.
+export const CREATIVE_KIND_ORDER = ['test.block', 'stone', 'cobblestone', 'dirt', 'grass.block', 'sand', 'gravel',
+  'planks', 'log', 'slab', 'stairs', 'fence', 'door', 'leaves', 'glass', 'crafting.table', 'furnace', 'stick'];
+export const CREATIVE_MATERIAL_ORDER = ['oak', 'pine'];
+export function creativeOrder(item) {
+  const parts = item.id.split('.');
+  const kind = item.creativeKind ?? (parts.length > 1 && !CREATIVE_KIND_ORDER.includes(item.id) ? parts.slice(1).join('.') : item.id);
+  const material = item.creativeMaterial ?? (kind !== item.id ? parts[0] : '');
+  return { kind, material };
+}
+function compareItems(a, b) {
+  const x = creativeOrder(a), y = creativeOrder(b);
+  const rank = (list, value) => { const index = list.indexOf(value); return index < 0 ? list.length : index; };
+  const compareText = (s, t) => s.localeCompare(t, 'en', { numeric: true, sensitivity: 'base' });
+  return rank(CREATIVE_KIND_ORDER, x.kind) - rank(CREATIVE_KIND_ORDER, y.kind) || compareText(x.kind, y.kind)
+    || rank(CREATIVE_MATERIAL_ORDER, x.material) - rank(CREATIVE_MATERIAL_ORDER, y.material)
+    || compareText(x.material, y.material) || compareText(a.name ?? a.id, b.name ?? b.id) || compareText(a.id, b.id);
+}
 export function creativeCategory(item) {
   if (item.creativeCategory) return item.creativeCategory;
   if (!item.block) return 'materials';
@@ -19,7 +38,7 @@ export class CreativeInventory {
     const term = query.trim().toLowerCase();
     return [...ITEMS.values()].filter(item => item.creativeVisible !== false
       && (category === 'search' || creativeCategory(item) === category)
-      && (!term || `${item.name} ${item.id}`.toLowerCase().includes(term)));
+      && (!term || `${item.name} ${item.id}`.toLowerCase().includes(term))).sort(compareItems);
   }
   click(id, button = 0, shift = false) {
     if (!this.enabled() || !ITEMS.has(id)) return false;
@@ -60,6 +79,11 @@ export class CreativeInventory {
   remove(index) {
     if (!this.enabled() || !HOTBAR.includes(index)) return false;
     this.inventory.slots[index] = null; this.inventory.changed(); return true;
+  }
+  discardCursor(whole = true) {
+    if (!this.enabled() || !this.inventory.cursor) return false;
+    if (whole || --this.inventory.cursor.count === 0) this.inventory.cursor = null;
+    this.inventory.changed(); return true;
   }
   destroy(all = false) {
     if (!this.enabled()) return false;

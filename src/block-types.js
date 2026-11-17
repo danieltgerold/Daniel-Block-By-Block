@@ -77,7 +77,7 @@ for (const wood of ['oak', 'pine']) {
   registerBlockType({ id: `${wood}.stairs`, name: `${name} Stairs`, faces, particleTexture: `${wood}.planks`, collisionShape: 'stairs', opaque: false,
     defaultState: { facing: 'north', half: 'bottom', shape: 'straight' } });
   registerBlockType({ id: `${wood}.door`, name: `${name} Door`, faces: { all: `${wood}.door.lower` }, particleTexture: `${wood}.door.lower`, collisionShape: 'door', opaque: false,
-    interaction: 'door', itemModel: 'generated', itemTexture: `${wood}.door.item`, defaultState: { facing: 'north', hinge: 'left', open: false, half: 'lower' } });
+    interaction: 'door', itemModel: 'generated', itemTexture: `${wood}.door.item`, itemSpriteDepth: 0, defaultState: { facing: 'north', hinge: 'left', open: false, half: 'lower' } });
 }
 registerBlockType({ id: 'furnace', name: 'Furnace', particleTexture: 'furnace.side', interaction: 'furnace',
   defaultState: { facing: 'north', lit: false }, itemState: { facing: 'south', lit: false } });

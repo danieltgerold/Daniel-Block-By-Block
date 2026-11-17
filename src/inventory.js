@@ -8,8 +8,9 @@ export function registerItem(definition) {
   ITEMS.set(definition.id, Object.freeze({ ...definition }));
 }
 const registerBlockItem = block => registerItem({ id: block.id, name: block.name,
-  maxStack: block.maxStack, block: true, color: block.color, tags: block.tags, creativeCategory: block.creativeCategory, icon: blockIcon(block.id),
-  ...(block.itemTexture ? { model: 'flat', display: block.itemModel, texture: block.itemTexture } : {}) });
+  maxStack: block.maxStack, block: true, color: block.color, tags: block.tags, creativeCategory: block.creativeCategory,
+  creativeKind: block.creativeKind, creativeMaterial: block.creativeMaterial, icon: blockIcon(block.id),
+  ...(block.itemTexture ? { model: 'flat', display: block.itemModel, texture: block.itemTexture, spriteDepth: block.itemSpriteDepth } : {}) });
 for (const block of BLOCK_TYPES.values()) registerBlockItem(block);
 onBlockTypeRegistered(registerBlockItem);
 registerItem({ id: 'stick', name: 'Stick', maxStack: 64, block: false, model: 'flat', display: 'handheld', texture: 'stick', color: '#ab8052', icon: textureIcon('stick') });

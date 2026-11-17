@@ -1,6 +1,16 @@
 import * as THREE from 'three';
 import { texturePixels } from './block-textures.js';
 const cache = new Map();
+// A generated picture can opt out of extrusion. Keep one shared, centered
+// plane per size; transparent silhouette pixels are handled by alpha testing.
+export function spritePlaneGeometry(size = 1) {
+  const key = `plane:${size}`;
+  if (!cache.has(key)) {
+    const geometry = new THREE.PlaneGeometry(size, size);
+    geometry.computeBoundingBox(); geometry.computeBoundingSphere(); cache.set(key, geometry);
+  }
+  return cache.get(key);
+}
 // Generated-item model: a 16px Y-up sprite, with 1/16-unit thickness and
 // exposed silhouette/hole edges. One shared mesh geometry, never pixel meshes.
 export function spriteGeometry(texture, size = 1) {

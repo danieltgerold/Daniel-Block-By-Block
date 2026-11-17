@@ -16,20 +16,19 @@ import { createPlayerModel, animatePlayerModel, syncEquipment, createEmptyHand, 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 const base = { torsoYaw: .2, headYaw: .1, aimPitch: -.4, phase: 2, amount: .8, crouch: 0, swingActive: false, swingProgress: 0 };
 
-test('Door uses a complete transparent sprite in every item context and a thin shared generated mesh; placed panels stay unchanged', () => {
+test('Door uses a complete flat picture with a filled interior in every item context; placed panels stay unchanged', () => {
   for (const wood of ['oak', 'pine']) {
     const id = `${wood}.door`, item = ITEMS.get(id), pixels = texturePixels(item.texture);
     assert.equal(BLOCK_TEXTURES.get(item.texture).indices.length, 256);
-    assert.equal(pixels[3], 0); assert.equal(pixels[(3 * 16 + 6) * 4 + 3], 0, 'interior window remains clear');
+    assert.equal(pixels[3], 0);
+    for (let y = 1; y < 15; y++) for (let x = 3; x < 13; x++) assert.equal(pixels[(y * 16 + x) * 4 + 3], 255, 'no interior holes');
     assert.match(decodeURIComponent(item.icon), /viewBox="0 0 16 16"/);
     const mesh = createItemMesh(1, id), box = mesh.geometry.boundingBox;
-    near(box.max.z - box.min.z, 1 / 16); assert.ok(box.max.y - box.min.y > .8);
+    near(box.max.z - box.min.z, 0); assert.equal(mesh.geometry.type, 'PlaneGeometry');
+    assert.equal(mesh.geometry.getAttribute('position').count, 4); assert.equal(mesh.material.vertexColors, false);
     assert.equal(createItemMesh(1, id).geometry, mesh.geometry);
-    const attr = mesh.geometry.getAttribute('position'); let frontFaces = 0;
-    for (let n = 0; n < attr.count; n += 4) if ([0, 1, 2, 3].every(i => attr.getZ(n + i) === 1 / 32)) frontFaces++;
-    const opaque = [...pixels].filter((a, n) => n % 4 === 3 && a === 255).length;
-    assert.equal(frontFaces, opaque, 'only opaque pixels generate front geometry');
-    const drop = createItemMesh(.25, id); near(drop.geometry.boundingBox.max.z - drop.geometry.boundingBox.min.z, .25 / 16);
+    assert.equal(mesh.material.alphaTest, .5); assert.equal(mesh.material.side, THREE.DoubleSide);
+    const drop = createItemMesh(.25, id); near(drop.geometry.boundingBox.max.z - drop.geometry.boundingBox.min.z, 0);
     const w = new VoxelWorld(); placeBlock(w, id, { x: 0, y: -1, z: 0, normal: { x: 0, y: 1, z: 0 }, point: { x: .5, y: 0, z: .5 } }, 0);
     assert.deepEqual(blockBoxes(w.blockAt(0, 0, 0)), [[0, 0, .8125, 1, 1, 1]]);
     assert.deepEqual(blockBoxes(w.blockAt(0, 1, 0)), [[0, 0, .8125, 1, 1, 1]]);
@@ -56,12 +55,19 @@ test('both sprite profiles grip by their end, use model-unit TRS, and follow ani
           const item = model.userData.equipment[key], joint = model.userData.joints[arm]; assert.equal(item.parent, joint);
           const expected = joint.matrixWorld.clone().multiply(item.matrix); assert.deepEqual(item.matrixWorld.elements, expected.elements);
           near(new THREE.Vector3().setFromMatrixScale(item.matrixWorld).x, .9375 * (profile === 'handheld' ? .85 : .55) * size);
+          if (profile === 'generated') {
+            const sign = key === 'rightItem' ? 1 : -1, pixel = .9375 / 16;
+            const grip = new THREE.Vector3(0, -.40625, 0).applyMatrix4(item.matrix);
+            near(grip.x, sign * pixel); near(grip.y, -9 * pixel); near(grip.z, -2 * pixel - .001);
+            assert.ok(grip.y > -10 * pixel && grip.y < -8 * pixel, 'grip overlaps the palm rather than floating below the hand');
+          }
           matrices.push([...item.matrixWorld.elements]);
         }
         if (view === 1) rear = matrices; else assert.deepEqual(matrices, rear);
       }
     }
     const hand = createEmptyHand(16 / 9); updateEmptyHand(hand, base, inventory); hand.scene.updateMatrixWorld(true); hand.camera.updateProjectionMatrix();
+    assert.equal(hand.rig.visible, false, 'held picture never draws an empty-hand arm behind it');
     for (const mesh of [hand.mainItem, hand.offhandItem]) {
       const vertices = mesh.geometry.getAttribute('position'), projected = new THREE.Box3();
       for (let n = 0; n < vertices.count; n++) projected.expandByPoint(new THREE.Vector3().fromBufferAttribute(vertices, n).applyMatrix4(mesh.matrixWorld).project(hand.camera));
@@ -69,8 +75,9 @@ test('both sprite profiles grip by their end, use model-unit TRS, and follow ani
       assert.ok(projected.getSize(new THREE.Vector3()).x < 1, 'not oversized across the screen');
       if (profile === 'generated') {
         assert.ok(projected.max.y < -.2, 'Door stays entirely in the lower view, clear of the crosshair');
-        assert.ok(projected.getSize(new THREE.Vector3()).y < .65, 'Door occupies less than a third of the screen height');
+        assert.ok(projected.getSize(new THREE.Vector3()).y < .5, 'Door occupies less than a quarter of the screen height');
         assert.ok(projected.getSize(new THREE.Vector3()).x < .35, 'Door is a compact held picture');
+        assert.ok(projected.min.y > -1, 'complete Door stays on-screen at rest');
       }
     }
     const rest = [...hand.mainItem.matrix.elements]; updateEmptyHand(hand, { ...base, swingActive: true, swingProgress: .35 }, inventory);
@@ -78,6 +85,7 @@ test('both sprite profiles grip by their end, use model-unit TRS, and follow ani
     assert.ok(hand.mainItem.position.y < -.9); updateEmptyHand(hand, base, inventory); assert.deepEqual(hand.mainItem.matrix.elements, rest);
     inventory.slots[0] = { id: 'grass.block', count: 1 }; // Return to the ordinary block path.
     updateEmptyHand(hand, base, inventory); assert.equal(hand.mainItem.geometry.type, 'BoxGeometry');
+    inventory.slots[0] = null; updateEmptyHand(hand, base, inventory); assert.equal(hand.rig.visible, true); assert.equal(hand.mainItem.visible, false);
   }
 });
 
