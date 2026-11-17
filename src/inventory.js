@@ -1,7 +1,8 @@
 export const ITEMS = new Map();
 import { BLOCK_TYPES, onBlockTypeRegistered } from './block-types.js';
 import { blockIcon, textureIcon } from './block-icons.js';
-import { CraftingSession } from './crafting.js';
+import { CraftingSession, insertItemStacks } from './crafting.js';
+import { SMELTING, FUELS } from './smelting.js';
 export function registerItem(definition) {
   if (!definition.id || !Number.isSafeInteger(definition.maxStack) || definition.maxStack < 1) throw new Error('Invalid item definition');
   ITEMS.set(definition.id, Object.freeze({ ...definition }));
@@ -17,6 +18,7 @@ export const STORAGE = [...HOTBAR, ...MAIN];
 export const ARMOR = ['head', 'chest', 'legs', 'feet'];
 export const OFFHAND = 40;
 export const CRAFT_START = 41, CRAFT_OUTPUT = 50;
+export const FURNACE_INPUT = 51, FURNACE_FUEL = 52, FURNACE_OUTPUT = 53;
 export const copyStack = stack => stack ? { ...stack } : null;
 export const quantity = count => typeof count === 'bigint' ? count : BigInt(count);
 
@@ -28,12 +30,17 @@ export class PlayerInventory {
     this.onDrop = onDrop;
     this.listeners = new Set();
     this.crafting = new CraftingSession(this, { items: ITEMS, storage: STORAGE, start: CRAFT_START });
+    this.furnace = null;
   }
   subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
-  changed() { this.crafting.refresh(); for (const fn of this.listeners) fn(); }
-  isSlot(index) { return Number.isInteger(index) && index >= 0 && (index < 41 || this.crafting.active && this.crafting.indices.includes(index)); }
+  changed() { this.crafting.refresh(); this.furnace?.changed(); for (const fn of this.listeners) fn(); }
+  isSlot(index) { return Number.isInteger(index) && index >= 0 && (index < 41 || this.crafting.active && this.crafting.indices.includes(index)
+    || this.furnace && index >= FURNACE_INPUT && index <= FURNACE_OUTPUT); }
   accepts(index, id) {
     const item = ITEMS.get(id);
+    if (index === FURNACE_OUTPUT) return false;
+    if (index === FURNACE_FUEL) return Boolean(this.furnace && item && FUELS.has(id));
+    if (index === FURNACE_INPUT) return Boolean(this.furnace && item);
     return Boolean(item && this.isSlot(index) && (index < 36 || index === OFFHAND || index >= CRAFT_START || item.armor === ARMOR[index - 36]));
   }
   capacity(id, indices = STORAGE) {
@@ -68,6 +75,12 @@ export class PlayerInventory {
   }
   click(index, button = 0) {
     const stack = this.slots[index];
+    if (index === FURNACE_OUTPUT && this.cursor) {
+      if (!stack || stack.id !== this.cursor.id) return;
+      const n = Math.min(button === 2 ? 1 : stack.count, ITEMS.get(stack.id).maxStack - this.cursor.count);
+      if (n > 0) { this.cursor.count += n; stack.count -= n; if (!stack.count) this.slots[index] = null; this.changed(); }
+      return;
+    }
     if (!this.cursor) {
       if (!stack) return;
       const count = button === 2 ? Math.ceil(stack.count / 2) : stack.count;
@@ -108,7 +121,10 @@ export class PlayerInventory {
   shift(index) {
     const stack = this.slots[index];
     if (!stack) return;
-    const target = index < 9 ? MAIN : index < 36 ? HOTBAR : STORAGE;
+    let target = index < 9 ? MAIN : index < 36 ? HOTBAR : STORAGE;
+    if (this.furnace && index < 36) {
+      if (SMELTING.has(stack.id)) target = [FURNACE_INPUT]; else if (FUELS.has(stack.id)) target = [FURNACE_FUEL];
+    }
     const remaining = this.insert(stack.id, stack.count, target);
     this.slots[index] = remaining ? { id: stack.id, count: Number(remaining) } : null;
     this.changed();
@@ -119,7 +135,7 @@ export class PlayerInventory {
   collect(id = this.cursor?.id) {
     if (!id || (this.cursor && this.cursor.id !== id)) return;
     if (!this.cursor) this.cursor = { id, count: 0 };
-    for (const i of [...STORAGE, OFFHAND, 36, 37, 38, 39, ...(this.crafting.active ? this.crafting.indices : [])]) {
+    for (const i of [...STORAGE, OFFHAND, 36, 37, 38, 39, ...(this.crafting.active ? this.crafting.indices : []), ...(this.furnace ? [FURNACE_INPUT, FURNACE_FUEL, FURNACE_OUTPUT] : [])]) {
       const stack = this.slots[i];
       if (stack?.id !== id) continue;
       const amount = Math.min(stack.count, ITEMS.get(id).maxStack - this.cursor.count);
@@ -152,6 +168,7 @@ export class PlayerInventory {
     this.changed();
   }
   close() {
+    this.closeFurnace();
     this.crafting.end();
     if (this.cursor) {
       const { id, count } = this.cursor;
@@ -160,6 +177,36 @@ export class PlayerInventory {
       this.cursor = null;
     }
     this.changed();
+  }
+  openFurnace(entity) {
+    this.closeFurnace(); this.crafting.end(); this.furnace = entity;
+    for (let n = 0; n < 3; n++) Object.defineProperty(this.slots, FURNACE_INPUT + n, {
+      configurable: true, enumerable: true, get: () => entity.slots[n], set: value => { entity.slots[n] = value; },
+    });
+    this.changed();
+  }
+  closeFurnace() {
+    if (!this.furnace) return;
+    for (let n = FURNACE_INPUT; n <= FURNACE_OUTPUT; n++) delete this.slots[n];
+    this.slots.length = 50; this.furnace = null;
+  }
+  takeFurnaceOutputTo(index) {
+    const out = this.furnace?.slots[2], target = this.slots[index];
+    if (!out || !this.accepts(index, out.id) || target && target.id !== out.id) return false;
+    const n = Math.min(out.count, ITEMS.get(out.id).maxStack - (target?.count ?? 0)); if (!n) return false;
+    this.slots[index] = { id: out.id, count: (target?.count ?? 0) + n }; out.count -= n;
+    if (!out.count) this.furnace.slots[2] = null; this.changed(); return true;
+  }
+  fillFurnaceInput(maximum = false, recipe = SMELTING.get('sand')) {
+    const entity = this.furnace; if (!entity || !recipe) return { ok: false, reason: 'No furnace is open.' };
+    const slots = this.slots.map(copyStack), old = copyStack(entity.slots[0]);
+    const available = STORAGE.reduce((n, i) => n + (slots[i]?.id === recipe.input ? slots[i].count : 0), old?.id === recipe.input ? old.count : 0);
+    if (!available) return { ok: false, reason: `Missing ${ITEMS.get(recipe.input).name}.` };
+    const count = maximum ? Math.min(64, available) : 1; let need = count;
+    if (old?.id === recipe.input) { const n = Math.min(need, old.count); need -= n; old.count -= n; }
+    for (const i of STORAGE) if (slots[i]?.id === recipe.input && need) { const n = Math.min(need, slots[i].count); need -= n; slots[i].count -= n; if (!slots[i].count) slots[i] = null; }
+    if (old?.count && insertItemStacks(slots, STORAGE, old, ITEMS)) return { ok: false, reason: 'Not enough inventory space to move the old input.' };
+    for (const i of STORAGE) this.slots[i] = slots[i]; entity.slots[0] = { id: recipe.input, count }; this.changed(); return { ok: true };
   }
   pick(id, { creative = false } = {}) {
     if (!ITEMS.has(id)) return false;

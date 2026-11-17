@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { ITEMS } from './inventory.js';
-import { createSharedBlock, getBlockGeometry, getBlockMaterials, getFaceTexture } from './block-assets.js';
+import { createSharedBlock, getItemGeometry, getItemMaterials, getFaceTexture } from './block-assets.js';
 const flatGeometry = new Map(), flatMaterials = new Map();
 export function setItemAppearance(mesh, id = 'test.block') {
   if (mesh.userData.itemId === id) return;
@@ -11,7 +11,7 @@ export function setItemAppearance(mesh, id = 'test.block') {
       map: getFaceTexture(item.texture), alphaTest: .5, side: THREE.DoubleSide, depthWrite: true, depthTest: true,
     }));
     mesh.geometry = flatGeometry.get(size); mesh.material = flatMaterials.get(item.texture);
-  } else { mesh.geometry = getBlockGeometry(size); mesh.material = getBlockMaterials(id); }
+  } else { mesh.geometry = getItemGeometry(size, id); mesh.material = getItemMaterials(id, mesh.geometry); }
   mesh.userData.itemId = id; mesh.userData.blockId = item?.block ? id : null;
 }
 export function createItemMesh(size = .375, id = 'test.block') {

@@ -1,4 +1,4 @@
-import { ITEMS, MAIN, HOTBAR, ARMOR, OFFHAND, CRAFT_START, CRAFT_OUTPUT } from './inventory.js';
+import { ITEMS, MAIN, HOTBAR, ARMOR, OFFHAND, CRAFT_START, CRAFT_OUTPUT, FURNACE_INPUT, FURNACE_FUEL, FURNACE_OUTPUT } from './inventory.js';
 import { RecipeBookUI } from './recipe-book-ui.js';
 
 export function drawStack(document, element, stack, extra = 0) {
@@ -46,6 +46,7 @@ export class InventoryUI {
     this.output = document.getElementById('crafting-output'); this.output.dataset.slot = CRAFT_OUTPUT;
     this.slotViews.set(CRAFT_OUTPUT, this.output);
     this.book = new RecipeBookUI({ document, crafting: inventory.crafting, drawStack });
+    for (const [id, index, label] of [['furnace-input', FURNACE_INPUT, 'Furnace input'], ['furnace-fuel', FURNACE_FUEL, 'Furnace fuel'], ['furnace-output', FURNACE_OUTPUT, 'Furnace output']]) makeSlot(document.getElementById(id), index, label, this.slotViews);
     const listen = (target, name, fn) => { target.addEventListener(name, fn); this.removers.push(() => target.removeEventListener(name, fn)); };
     listen(this.root, 'contextmenu', e => e.preventDefault());
     listen(this.root, 'mousedown', e => this.mouseDown(e));
@@ -71,14 +72,17 @@ export class InventoryUI {
       this.render();
     });
     listen(document.getElementById('inventory-close'), 'click', onClose);
-    listen(document.getElementById('recipe-book-toggle'), 'click', () => {
+    const toggleBook = () => {
       this.book.root.hidden = !this.book.root.hidden; this.panel.classList.toggle('book-open', !this.book.root.hidden);
       document.getElementById('recipe-book-toggle').setAttribute('aria-expanded', String(!this.book.root.hidden)); this.book.render(true);
-    });
+    };
+    listen(document.getElementById('recipe-book-toggle'), 'click', toggleBook);
+    listen(document.getElementById('furnace-book-toggle'), 'click', toggleBook);
     this.unsubscribe = inventory.subscribe(() => this.render());
     this.render();
   }
   open(size = 2) {
+    this.inventory.closeFurnace(); this.book.furnaceInventory = null; this.root.classList.remove('furnace-view');
     this.isOpen = true; this.root.hidden = false; this.hotbar.hidden = true;
     this.root.classList.toggle('table-view', size === 3);
     this.document.getElementById('crafting-grid').style.setProperty('--craft-size', size);
@@ -87,11 +91,19 @@ export class InventoryUI {
     this.document.activeElement?.blur(); this.preview?.reset(); this.render();
   }
   close() {
+    this.furnaceUnsubscribe?.(); this.furnaceUnsubscribe = null; this.book.furnaceInventory = null;
     this.gesture = null; this.hovered = null; this.lastClick = null;
     this.inventory.close(); this.isOpen = false; this.root.hidden = true;
     this.document.activeElement?.blur();
     this.cursorView.hidden = true; this.preview?.reset();
     this.tooltip.hidden = true;
+  }
+  openFurnace(entity) {
+    this.isOpen = true; this.root.hidden = false; this.hotbar.hidden = true; this.root.classList.add('furnace-view');
+    this.hovered = null; this.gesture = null; this.lastClick = null; this.document.activeElement?.blur();
+    this.book.furnaceInventory = this.inventory; this.inventory.openFurnace(entity);
+    this.furnaceUnsubscribe = entity.subscribe(() => { if (entity.removed) this.onClose(); else this.render(); });
+    this.book.reset(); this.render();
   }
   updateTooltip() {
     const stack = this.hovered === null ? null : this.stackAt(this.hovered);
@@ -104,7 +116,7 @@ export class InventoryUI {
   }
   mouseDown(event) {
     if (!this.isOpen || (event.button !== 0 && event.button !== 2)) return;
-    if (event.target.closest?.('[data-recipe-book], #recipe-book-toggle, input, select')) return;
+    if (event.target.closest?.('[data-recipe-book], #recipe-book-toggle, #furnace-book-toggle, input, select')) return;
     event.preventDefault();
     const slot = event.target.closest?.('[data-slot]');
     if (!slot) {
@@ -122,7 +134,9 @@ export class InventoryUI {
     const double = event.button === 0 && this.lastClick?.button === 0 && this.lastClick?.index === i && now - this.lastClick.time < 250
       && this.lastClick.shift === event.shiftKey && id === this.lastClick.id;
     if (event.shiftKey) {
-      if (double) this.inventory.shiftMatching(id, i < 9, i >= CRAFT_START);
+      if (double && i >= FURNACE_INPUT) {
+        for (const index of [FURNACE_INPUT, FURNACE_FUEL, FURNACE_OUTPUT]) if (this.inventory.slots[index]?.id === id) this.inventory.shift(index);
+      } else if (double) this.inventory.shiftMatching(id, i < 9, i >= CRAFT_START && i < CRAFT_OUTPUT);
       else this.inventory.shift(i);
     } else if (double) this.inventory.collect(id);
     else if (this.inventory.cursor) {
@@ -145,6 +159,9 @@ export class InventoryUI {
       if (digit || event.code === 'KeyF') this.inventory.crafting.take({ destination: 'slot', slot: digit ? Number(digit[1]) - 1 : OFFHAND });
       else if (event.code === 'KeyQ') this.inventory.crafting.take({ destination: 'drop', repeat: event.ctrlKey });
       return;
+    }
+    if (i === FURNACE_OUTPUT && (digit || event.code === 'KeyF')) {
+      this.inventory.takeFurnaceOutputTo(digit ? Number(digit[1]) - 1 : OFFHAND); return;
     }
     if (digit) this.inventory.swap(i, Number(digit[1]) - 1);
     else if (event.code === 'KeyF') this.inventory.swap(i, OFFHAND);
@@ -182,7 +199,14 @@ export class InventoryUI {
     this.cursorView.hidden = !this.isOpen || remaining === 0;
     this.updateTooltip();
     this.book.render();
+    const entity = this.inventory.furnace;
+    this.document.getElementById('furnace-area').hidden = !entity;
+    this.document.getElementById('furnace-flame').value = entity ? entity.burnTime / Math.max(1, entity.burnDuration) : 0;
+    const fuelLevel = entity ? entity.burnTime / Math.max(1, entity.burnDuration) : 0;
+    this.document.getElementById('furnace-flame-level').setAttribute('y', String(26 * (1 - fuelLevel)));
+    this.document.getElementById('furnace-flame-level').setAttribute('height', String(26 * fuelLevel));
+    this.document.getElementById('furnace-progress').value = entity ? entity.cookTime / (entity.recipe?.ticks ?? 200) : 0;
   }
   stackAt(index) { return index === CRAFT_OUTPUT ? this.inventory.crafting.output : this.inventory.slots[index]; }
-  dispose() { this.unsubscribe(); this.book.dispose(); for (const remove of this.removers) remove(); }
+  dispose() { this.furnaceUnsubscribe?.(); this.unsubscribe(); this.book.dispose(); for (const remove of this.removers) remove(); }
 }

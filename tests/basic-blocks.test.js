@@ -167,7 +167,7 @@ test('give/autocomplete includes every ID, splits 130, rejects errors, and prese
     c.inventory.insert(id, 2304); const before = total(c); service.submit(`/give ${id} 130`);
     assert.equal(total(c), before + 130n); assert.ok(c.drops.piles.every(p => p.item === id));
   }
-  assert.deepEqual(commandCompletions('/give oak.'), ['/give oak.log ', '/give oak.planks ', '/give oak.leaves ']);
+  assert.deepEqual(commandCompletions('/give oak.'), ['/give oak.log ', '/give oak.planks ', '/give oak.leaves ', '/give oak.slab ', '/give oak.fence ', '/give oak.door ']);
 });
 
 test('different dropped block kinds never merge; matching kinds merge once and keep the correct hand/offhand/ghost textures', () => {

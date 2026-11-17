@@ -189,6 +189,11 @@ export class MovementController {
     this.placementRepeat = 0;
     this.inventory = new PlayerInventory({ onDrop: stack => this.throwItem(stack) });
     this.drops = new DroppedItems(world, this.inventory);
+    if (world) {
+      world.onDrop = (stack, at) => this.drops.spawn(stack.id, stack.count, at);
+      world.getGameMode = () => this.gameMode;
+      for (const drop of world.pendingDrops?.splice(0) ?? []) world.onDrop(drop.stack, drop.at);
+    }
     this.swingQueued = false;
     this.onTick = null;
     this.settings = { ...DEFAULT_SETTINGS };

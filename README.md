@@ -347,11 +347,12 @@ Commands provide Test Block (`test.block`), Stone (`stone`), Cobblestone
 (`cobblestone`), Dirt (`dirt`), Grass Block (`grass.block`), Sand (`sand`),
 Gravel (`gravel`), Oak Log (`oak.log`), Oak Planks (`oak.planks`), Glass (`glass`),
 Oak Leaves (`oak.leaves`), Pine Log (`pine.log`), Pine Planks (`pine.planks`),
-Pine Leaves (`pine.leaves`), and Crafting Table (`crafting.table`). Stick (`stick`)
+Pine Leaves (`pine.leaves`), Crafting Table (`crafting.table`), Oak/Pine Slab
+(`oak.slab`, `pine.slab`), Oak/Pine Fence (`oak.fence`, `pine.fence`), Oak/Pine Door
+(`oak.door`, `pine.door`), and Furnace (`furnace`). Stick (`stick`)
 is a separate non-placeable item with a shared cutout sprite, rather than a cube.
 For example, `/give grass.block 64`; Tab completes all registered item IDs.
-There is no creative inventory, tool requirement, log rotation, or
-falling Sand/Gravel behavior yet.
+There is no creative inventory, tool requirement, or falling Sand/Gravel behavior yet.
 
 Definitions share cube collision/placement/breaking code and specify names, IDs,
 face textures, stack sizes, solidity, opacity, collision shape, breaking time,
@@ -406,8 +407,8 @@ this timer running, while the Escape menu pauses it.
 
 ## Crafting and recipe book
 
-Pine has original 16x16 dark bark, lighter log ends, cooler planks and dark-green
-needle clusters with pixel gaps. Its log/plank/cutout-leaf behavior shares the
+Pine has original 16x16 dark bark, lighter log ends, cooler planks and dense,
+connected dark-green foliage with a few small pixel gaps. Its log/plank/cutout-leaf behavior shares the
 existing block system, including persistent player placements and no leaf-block
 drop. The Crafting Table has workstation top/side textures, full cube collision,
 and drops itself in Survival. All five additions work with `/give` and Tab.
@@ -437,7 +438,7 @@ storage and drops overflow; the preview and missing-ingredient ghosts own no ite
 Crafting consumes real ingredients in both Survival and Creative.
 
 The Recipe book button opens a side panel with output icons/names, search,
-categories and a Craftable only filter. All four implemented recipes are visible
+categories and a Craftable only filter. All implemented recipes are visible
 without unlocks, filtered by grid size. Click a recipe to fill one craft; Shift-click
 fills the maximum allowed by ingredients and each input stack's cap. This only
 moves ingredients; take the output to craft. Supplies come from main inventory,
@@ -452,7 +453,64 @@ offset shaped matching, optional horizontal mirroring and shapeless assignment.
 The same registry drives both interfaces. Future plank definitions only need the
 `wood.planks` tag to join the `planks` group. Matching/craftability updates on
 relevant inventory changes; cached icons and unchanged slot nodes are reused.
-No tools, furnace, tree generation or creative inventory are added.
+The 3x3 book also offers matching-wood slabs (three planks in a row -> six), fences
+(two rows of plank/stick/plank -> three), doors (two columns of three planks ->
+three), and a Furnace (eight Cobblestone around an empty center -> one). These
+wood recipes require a single species, unlike the mixed-plank Stick/Table recipes.
+No tools, tree generation or creative inventory are added.
+
+## Partial blocks and directional placement
+
+`block-shapes.js` supplies shared local boxes for collision, targeting, placement,
+camera sweeps and outlines. Full cubes retain chunk-wide greedy meshing; partial
+blocks use a box-union surface mesh and stay partial even at distant LODs. Static
+inventory icons and cached held/drop geometry use the corresponding shapes and
+textures. Fence connections derive from current neighbors, including chunk edges.
+
+Log placement stores X/Y/Z axis from the actual clicked face. End grain appears
+at both axis ends and bark follows the long direction. Missing legacy axis state
+defaults to Y. Slabs use the clicked height/face to choose bottom/top, combine only
+matching exposed halves into a double slab, consume one item per placement, and
+drop one or two items accordingly. Slab step assist respects scaled step height
+and headroom without changing the earlier full-block wall behavior. Crouch support
+probes use the actual shape footprint. Fences have one-block visible/selection
+height and 1.5-block post/connection collision, preventing a normal flat-ground
+jump over them. All physical sweeps remain continuous at high configured speeds.
+
+Doors atomically occupy two vertical cells above a suitable full top surface.
+Player yaw selects facing; neighboring doors, solid neighbors and the click point
+choose a hinge. Right-click either half to toggle just that door. Both halves share
+facing/hinge/open state and rotate their thin collision/selection panel. Breaking a
+half or removing support removes the pair and drops exactly one item in Survival;
+Creative drops none. Sneaking with a held block places against interactive blocks.
+No waterlogging or redstone is implemented.
+
+## Furnaces
+
+Furnaces face their placing player and show a lit front while burning. Right-click
+to open input, registered-fuel and take-only output slots, a fuel flame, cooking
+arrow, player storage/hotbar, and a simple smelting book. Shift-click routes Sand
+and fuels to the appropriate slot; splitting, dragging, hotbar swaps and output
+pickup reuse inventory controls. Closing leaves the three slots in that furnace.
+Missing-book previews are read-only; selecting Sand moves ingredients, not results.
+
+`smelting.js` separately registers Sand -> Glass (200 cooking ticks) and fuels:
+logs, planks, fences and Crafting Tables burn 300 ticks; doors 200, slabs 150,
+Sticks 100. Every active 20 Hz world tick burns fuel even with blocked/removed
+input. Fresh fuel starts only for a valid recipe with output capacity. Cooking
+consumes one Sand and creates one Glass after 200 ticks; unfueled unfinished
+progress cools by two ticks per tick. Invalid input or blocked output resets the
+current cook while remaining fuel keeps burning. A plank supplies one complete
+Sand plus 100 cooking ticks; a lone Stick cannot finish a Sand.
+
+Furnace entities simulate independently of camera visibility and open screens.
+Inventory/furnace screens preserve momentum and simulation; Escape pause retains
+its pause behavior. Versioned `world.save()`/`world.load()` and compatible
+`loadEdits()` include block states plus furnace slots/burn/cook counters. This
+extends the existing programmatic world snapshots; page reload still starts the
+current local session afresh. Breaking a furnace drops its actual stored contents
+once (also in Creative), plus the block itself in Survival; consumed burning fuel
+stays consumed. No experience, extra smelting items, or tool requirements are added.
 
 ## Pickup and block particles
 

@@ -107,6 +107,10 @@ export class ChatUI {
   closeInventory() {
     this.inventoryUI?.close(); this.setMode('ready'); this.resume();
   }
+  openFurnace(entity) {
+    if (!entity || !this.inventoryUI || !['playing', 'ready'].includes(this.mode)) return;
+    this.setMode('inventory'); this.pointerLocked = false; this.requestUnlock(); this.inventoryUI.openFurnace(entity);
+  }
 
   resume() {
     if (this.mode === 'chat' || this.mode === 'inventory') return;

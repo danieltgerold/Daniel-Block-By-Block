@@ -91,3 +91,8 @@ RECIPES.register({ id: 'sticks', type: 'shaped', pattern: ['P', 'P'], key: { P: 
   output: { id: 'stick', count: 4 }, name: 'Sticks', category: 'materials', grids: [2, 3] });
 RECIPES.register({ id: 'crafting.table', type: 'shaped', pattern: ['PP', 'PP'], key: { P: { group: 'planks' } },
   output: { id: 'crafting.table', count: 1 }, name: 'Crafting Table', category: 'building', grids: [2, 3] });
+for (const wood of ['oak', 'pine']) for (const [part, pattern, count] of [['slab', ['PPP'], 6], ['fence', ['PSP', 'PSP'], 3], ['door', ['PP', 'PP', 'PP'], 3]]) {
+  RECIPES.register({ id: `${wood}.${part}`, type: 'shaped', pattern, key: { P: `${wood}.planks`, S: 'stick' },
+    output: { id: `${wood}.${part}`, count }, name: `${wood === 'oak' ? 'Oak' : 'Pine'} ${part[0].toUpperCase() + part.slice(1)}`, category: 'building', grids: [3] });
+}
+RECIPES.register({ id: 'furnace', type: 'shaped', pattern: ['CCC', 'C C', 'CCC'], key: { C: 'cobblestone' }, output: { id: 'furnace', count: 1 }, name: 'Furnace', category: 'building', grids: [3] });

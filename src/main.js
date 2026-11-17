@@ -2,6 +2,7 @@
 import { MovementController } from './movement.js';
 import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
+import { BlockOutline } from './block-outline.js';
 import { EntityHitboxes } from './entity-hitboxes.js';
 import { GameplayHUD, gameSimulationRunning, updateCrosshair } from './gameplay-hud.js';
 import { InventoryUI } from './inventory-ui.js';
@@ -58,10 +59,7 @@ const droppedRenderer = new DroppedItemRenderer(scene);
 const visualQuality = new AdaptiveVisualQuality();
 controller.particles = new BlockParticles(world, { quality: visualQuality });
 const particleRenderer = new BlockParticleRenderer(scene);
-const selection = new THREE.LineSegments(
-  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
-  new THREE.LineBasicMaterial({ color: '#fff4ad' }),
-);
+const selection = new BlockOutline();
 selection.visible = false;
 scene.add(selection);
 
@@ -73,7 +71,10 @@ function breakBlock(feet = controller.renderState()) {
   return breakTargetBlock({ controller, world, yaw, pitch, feet, onBreak: (x, y, z) => chunks.invalidateBlock(x, z, true) });
 }
 const placement = new BlockPlacement({ controller, world, getAim: () => ({ yaw, pitch }),
-  onUse: block => { if (block.definition.interaction !== 'crafting.table') return false; chatUI.openInventory(3); return true; },
+  onUse: block => {
+    if (block.definition.interaction === 'furnace') { chatUI.openFurnace(world.furnaceAt(block.x, block.y, block.z)); return true; }
+    if (block.definition.interaction !== 'crafting.table') return false; chatUI.openInventory(3); return true;
+  },
   canInteract: () => active && document.pointerLockElement === canvas && document.hasFocus() && !document.hidden,
   onPlace: (x, y, z) => { chunks.invalidateBlock(x, z, true); controller.lowerMainHand(); } });
 bindPlacementInput(placement, canvas, document, window);
@@ -186,7 +187,7 @@ function animate(time) {
   const position = refreshWorldView();
   chatUI.updateVisibility();
   renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);
-  if (inventoryUI.isOpen && controller.inventory.crafting.size === 2) inventoryUI.preview.render();
+  if (inventoryUI.isOpen && !controller.inventory.furnace && controller.inventory.crafting.size === 2) inventoryUI.preview.render();
   hud.renderedFrame(time, position);
 }
 
@@ -207,8 +208,7 @@ function refreshWorldView() {
   particleRenderer.update(controller.particles, controller.accumulator / .05, camera);
   chunks.update(camera);
   const target = active ? targetBlock() : null;
-  selection.visible = Boolean(target);
-  if (target) selection.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
+  selection.update(target, world);
   hitboxes.update([{ id: chatUI.profile.player.id, ...position, local: true }, ...controller.drops.piles.map(p => ({
     id: `drop:${p.id}`, bounds: { min: { x: p.x - .125, y: p.y, z: p.z - .125 }, max: { x: p.x + .125, y: p.y + .25, z: p.z + .125 } },
   }))], cameraMode, hitboxesVisible);

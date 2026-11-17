@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { BLOCK_COLOR, BLOCK_GRID_COLOR, blockShade } from './block-appearance.js';
 import { BLOCK_TYPES, blockFaceTexture } from './block-types.js';
 import { texturePixels, textureHasAlpha } from './block-textures.js';
+import { itemBlock } from './block-shapes.js';
+import { faceUv, shapeQuads } from './shape-mesh.js';
 let assets;
 export function getBlockAssets(anisotropy = 1) {
   if (!assets) {
@@ -22,6 +24,32 @@ export function getBlockAssets(anisotropy = 1) {
   return assets;
 }
 const faceTextures = new Map(), faceMaterials = new Map(), blockMaterials = new Map();
+const partialGeometries = new Map();
+export function getItemGeometry(size, id) {
+  const block = itemBlock(id); if (!block.definition || block.definition.collisionShape === 'cube') return getBlockGeometry(size);
+  const key = `${id}:${size}`; if (partialGeometries.has(key)) return partialGeometries.get(key);
+  const parts = block.definition.collisionShape === 'door' ? [block, { ...block, state: { ...block.state, half: 'upper' } }] : [block];
+  const positions = [], normals = [], uv = [], colors = [], indices = [], groups = [];
+  for (const [n, part] of parts.entries()) for (const q of shapeQuads(part)) {
+    const first = positions.length / 3, normal = [0, 0, 0]; normal[q.axis] = q.sign;
+    for (const p of q.corners) {
+      const at = parts.length === 2 ? [p[0] * .5 + .25, (p[1] + n) * .5, p[2] * .5 + .25] : p;
+      positions.push(...at.map(v => (v - .5) * size)); normals.push(...normal); uv.push(...faceUv(p, q.axis, part)); colors.push(q.shade, q.shade, q.shade);
+    }
+    const order = q.sign > 0 ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2];
+    groups.push({ start: indices.length, count: 6, materialIndex: q.axis * 2 + (q.sign < 0 ? 1 : 0), texture: q.texture });
+    indices.push(...order.map(i => first + i));
+  }
+  const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3)); geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.setIndex(indices);
+  // Doors need separate upper/lower textures; other partials share one material.
+  if (parts.length === 2) groups.forEach((g, i) => geometry.addGroup(g.start, g.count, i));
+  geometry.userData.textures = groups.map(g => g.texture); partialGeometries.set(key, geometry); return geometry;
+}
+export function getItemMaterials(id, geometry) {
+  return BLOCK_TYPES.get(id)?.collisionShape === 'door' ? geometry.userData.textures.map(getFaceMaterial) : getBlockMaterials(id);
+}
 export function getFaceTexture(id) {
   if (id === 'test.block') return getBlockAssets().texture; // Preserve the legacy fine grid exactly.
   if (!faceTextures.has(id)) {
@@ -52,7 +80,7 @@ export function getBlockMaterials(id = 'test.block') {
   if (!blockMaterials.has(id)) {
     // BoxGeometry groups: +X, -X, +Y, -Y, +Z, -Z.
     const materials = [[0, 1], [0, -1], [1, 1], [1, -1], [2, 1], [2, -1]]
-      .map(([axis, sign]) => getFaceMaterial(blockFaceTexture(id, axis, sign)));
+      .map(([axis, sign]) => getFaceMaterial(blockFaceTexture(id, axis, sign, BLOCK_TYPES.get(id).itemState)));
     blockMaterials.set(id, materials.every(m => m === materials[0]) ? materials[0] : materials);
   }
   return blockMaterials.get(id);

@@ -1,7 +1,7 @@
 import { RECIPES, ingredientMatches, recipeLayout } from './recipes.js';
 const copy = stack => stack ? { ...stack } : null;
 // Only explicit storage indices participate; armor/offhand are never book supplies.
-function insert(slots, indices, stack, items) {
+export function insertItemStacks(slots, indices, stack, items) {
   let left = stack.count; const cap = items.get(stack.id).maxStack;
   for (const empty of [false, true]) for (const i of indices) {
     const at = slots[i]; if (empty ? Boolean(at) : !at || at.id !== stack.id) continue;
@@ -11,6 +11,7 @@ function insert(slots, indices, stack, items) {
   }
   return left;
 }
+const insert = insertItemStacks;
 export class CraftingSession {
   constructor(inventory, { items, storage, start = 41, registry = RECIPES }) {
     Object.assign(this, { inventory, items, storage, start, registry });

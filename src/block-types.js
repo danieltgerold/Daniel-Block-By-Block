@@ -16,7 +16,20 @@ export function registerBlockType(definition) {
   for (const listener of listeners) listener(block);
   return block;
 }
-export function blockFaceTexture(id, axis, sign) {
+export function blockFaceTexture(id, axis, sign, state = BLOCK_TYPES.get(id)?.defaultState ?? {}) {
+  const definition = BLOCK_TYPES.get(id);
+  if (definition?.tags.includes('wood.logs')) return axis === 'xyz'.indexOf(state.axis ?? 'y') ? `${id.split('.')[0]}.end` : `${id.split('.')[0]}.bark`;
+  if (definition?.collisionShape === 'door') {
+    const turns = ['north', 'east', 'south', 'west']; let facing = state.facing ?? 'north';
+    if (state.open) facing = turns[(turns.indexOf(facing) + (state.hinge === 'right' ? 3 : 1)) % 4];
+    const frontAxis = facing === 'east' || facing === 'west' ? 0 : 2;
+    return axis === frontAxis ? `${id}.${state.half ?? 'lower'}` : `${id.split('.')[0]}.planks`;
+  }
+  if (id === 'furnace') {
+    if (axis === 1) return 'furnace.top';
+    const face = axis === 0 ? sign > 0 ? 'east' : 'west' : sign > 0 ? 'south' : 'north';
+    return face === (state.facing ?? 'north') ? state.lit ? 'furnace.lit' : 'furnace.front' : 'furnace.side';
+  }
   const faces = BLOCK_TYPES.get(id)?.faces ?? { all: 'test.block' };
   if (typeof faces === 'string') return faces;
   return faces[`${sign > 0 ? 'p' : 'n'}${'xyz'[axis]}`]
@@ -46,13 +59,23 @@ for (const [id, name, color, extra = {}] of [
   ['dirt', 'Dirt', '#a47145'],
   ['grass.block', 'Grass Block', '#74ba42', { faces: { top: 'grass.top', bottom: 'dirt', side: 'grass.side' }, particleTexture: 'grass.side', behavior: grassBehavior, drops: [{ id: 'dirt', count: 1 }] }],
   ['sand', 'Sand', '#edda98'], ['gravel', 'Gravel', '#a0a09a'],
-  ['oak.log', 'Oak Log', '#997044', { faces: { top: 'oak.end', bottom: 'oak.end', side: 'oak.bark' }, particleTexture: 'oak.bark', tags: ['wood.logs', 'wood.oak'] }],
+  ['oak.log', 'Oak Log', '#997044', { defaultState: { axis: 'y' }, faces: { top: 'oak.end', bottom: 'oak.end', side: 'oak.bark' }, particleTexture: 'oak.bark', tags: ['wood.logs', 'wood.oak'] }],
   ['oak.planks', 'Oak Planks', '#c79456', { tags: ['wood.planks', 'wood.oak'] }],
   ['glass', 'Glass', '#dceff4', { opaque: false, renderMode: 'glass', cullSameType: true, drops: [] }],
   ['oak.leaves', 'Oak Leaves', '#55a141', { opaque: false, renderMode: 'cutout',
     defaultState: { persistent: true, distance: 7 }, drops: [], tags: ['leaves', 'wood.oak'] }],
-  ['pine.log', 'Pine Log', '#635044', { faces: { top: 'pine.end', bottom: 'pine.end', side: 'pine.bark' }, particleTexture: 'pine.bark', tags: ['wood.logs', 'wood.pine'] }],
+  ['pine.log', 'Pine Log', '#635044', { defaultState: { axis: 'y' }, faces: { top: 'pine.end', bottom: 'pine.end', side: 'pine.bark' }, particleTexture: 'pine.bark', tags: ['wood.logs', 'wood.pine'] }],
   ['pine.planks', 'Pine Planks', '#80634c', { tags: ['wood.planks', 'wood.pine'] }],
   ['pine.leaves', 'Pine Leaves', '#326b47', { opaque: false, renderMode: 'cutout', defaultState: { persistent: true, distance: 7 }, drops: [], tags: ['leaves', 'wood.pine'] }],
   ['crafting.table', 'Crafting Table', '#b08450', { faces: { top: 'crafting.top', bottom: 'oak.planks', side: 'crafting.side' }, particleTexture: 'crafting.side', interaction: 'crafting.table' }],
 ]) registerBlockType({ id, name, color, ...extra });
+for (const wood of ['oak', 'pine']) {
+  const name = wood === 'oak' ? 'Oak' : 'Pine', faces = { all: `${wood}.planks` };
+  registerBlockType({ id: `${wood}.slab`, name: `${name} Slab`, faces, particleTexture: `${wood}.planks`, collisionShape: 'slab', opaque: false,
+    defaultState: { type: 'bottom' }, drops: ({ block }) => [{ id: block.id, count: block.state?.type === 'double' ? 2 : 1 }] });
+  registerBlockType({ id: `${wood}.fence`, name: `${name} Fence`, faces, particleTexture: `${wood}.planks`, collisionShape: 'fence', opaque: false });
+  registerBlockType({ id: `${wood}.door`, name: `${name} Door`, faces: { all: `${wood}.door.lower` }, particleTexture: `${wood}.door.lower`, collisionShape: 'door', opaque: false,
+    interaction: 'door', defaultState: { facing: 'north', hinge: 'left', open: false, half: 'lower' } });
+}
+registerBlockType({ id: 'furnace', name: 'Furnace', particleTexture: 'furnace.side', interaction: 'furnace',
+  defaultState: { facing: 'north', lit: false }, itemState: { facing: 'south', lit: false } });

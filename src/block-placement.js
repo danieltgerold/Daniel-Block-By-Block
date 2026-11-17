@@ -1,15 +1,12 @@
 // Registered blocks share a placement transaction. All placement paths share
 // this transaction so invalid attempts never edit terrain or request a swing.
 import { ITEMS } from './inventory.js';
-import { blockDrops } from './block-types.js';
+import { placeBlock } from './block-actions.js';
 export function breakTargetBlock({ controller, world, yaw, pitch, feet = controller.player, onBreak = () => {} }) {
   const hit = controller.targetBlock(feet, yaw, pitch);
   const block = hit ? world.blockAt(hit.x, hit.y, hit.z) : null;
-  if (!block || !world.setBlock(hit.x, hit.y, hit.z, false)) return false;
+  if (!block || !world.destroyBlock(hit.x, hit.y, hit.z, { gameMode: controller.gameMode, tool: controller.inventory.mainHand, player: controller.player })) return false;
   controller.particles?.breakBlock(block);
-  for (const drop of blockDrops(block, { gameMode: controller.gameMode, tool: controller.inventory.mainHand, player: controller.player })) {
-    controller.drops.spawn(drop.id, drop.count, { x: hit.x + .5, y: hit.y + .25, z: hit.z + .5 });
-  }
   onBreak(hit.x, hit.y, hit.z); return true;
 }
 export class BlockPlacement {
@@ -54,18 +51,20 @@ export class BlockPlacement {
     const hit = this.controller.targetBlock(this.controller.player, yaw, pitch);
     if (this.controller.miningHeld) return false;
     const block = hit && this.world.blockAt(hit.x, hit.y, hit.z);
-    if (block?.definition.interaction && !this.controller.player.crouching && this.onUse(block)) {
+    const stack = this.controller.inventory.mainHand;
+    const secondary = this.controller.player.crouching && ITEMS.get(stack?.id)?.block;
+    if (block?.definition.interaction === 'door' && !secondary) {
+      this.world.toggleDoor(block); this.controller.requestSwing(); return true;
+    }
+    if (block?.definition.interaction && !secondary && this.onUse(block)) {
       this.release(true); return true;
     }
-    const stack = this.controller.inventory.mainHand;
     if (this.controller.miningHeld || !stack || !ITEMS.get(stack.id)?.block) return false;
     if (!hit || !Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return false;
-    const x = hit.x + hit.normal.x, y = hit.y + hit.normal.y, z = hit.z + hit.normal.z;
-    if (!this.world.canPlaceBlock(x, y, z, [this.controller.player])) return false;
-    if (!this.world.setBlock(x, y, z, stack.id)) return false;
+    const placed = placeBlock(this.world, stack.id, hit, yaw, [this.controller.player]); if (!placed) return false;
     if (this.controller.gameMode !== 'creative') this.controller.inventory.consumeSelected();
     this.controller.requestSwing();
-    this.onPlace(x, y, z);
+    this.onPlace(placed.x, placed.y, placed.z);
     return true;
   }
 }

@@ -71,6 +71,11 @@
           <div class="crafting-area"><div class="crafting-layout"><div id="crafting-grid" class="crafting-grid" aria-label="Crafting inputs"></div>
           <span class="crafting-arrow" aria-hidden="true">&#8594;</span><button id="crafting-output" class="inventory-slot" type="button" aria-label="Crafting output"></button></div>
           <button id="recipe-book-toggle" type="button" aria-expanded="false" aria-controls="recipe-book">Recipe book</button></div>
+          <div id="furnace-area" class="furnace-area" hidden>
+            <div class="furnace-inputs"><div id="furnace-input"></div><div class="furnace-flame-display"><svg viewBox="0 0 20 26" aria-hidden="true"><defs><clipPath id="furnace-flame-clip"><rect id="furnace-flame-level" x="0" y="26" width="20" height="0"/></clipPath></defs><path fill="#8b9f8c" d="M10 0L12 9L16 5L20 17L16 24L10 26L4 24L0 17L5 6L6 15Z"/><path fill="#e99c36" clip-path="url(#furnace-flame-clip)" d="M10 0L12 9L16 5L20 17L16 24L10 26L4 24L0 17L5 6L6 15Z"/></svg><progress id="furnace-flame" max="1" value="0" aria-label="Fuel remaining"></progress></div><div id="furnace-fuel"></div></div>
+            <progress id="furnace-progress" max="1" value="0" aria-label="Smelting progress"></progress><div id="furnace-output"></div>
+            <button id="furnace-book-toggle" type="button">Recipe book</button>
+          </div>
         </div>
         <div id="inventory-main" class="slot-grid" aria-label="Main inventory"></div>
         <div id="inventory-hotbar" class="slot-grid inventory-hotbar" aria-label="Hotbar"></div>
