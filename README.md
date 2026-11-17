@@ -509,9 +509,11 @@ Pine Leaves retain a connected dark-green canopy with approximately 20% small,
 irregular clear pixels across the whole tile. Shared binary-cutout textures serve
 world faces, icons, held items and drops; fancy neighboring leaf faces remain
 visible through gaps. Collision, persistence and leaf drop rules are unchanged.
-First-person Door items use one compact, upright, center-origin camera picture
-in the lower right/left, without an extra model-origin lift or empty-hand arm
-behind a held item. Empty main hands still show the hand. Third-person pictures
+First-person Door items use a compact, angled 2D picture in the lower right/left,
+with a small part beyond the bottom edge. A shared wrist moves the picture and
+its visible grip arm together during equip/actions; the arm stays behind the
+face. Other held items and empty main hands retain their prior paths. Oak has
+wooden panels and Pine has horizontal bands, with no accidental holes. Third-person pictures
 attach their bottom grip directly to the animated arm's actual palm, with player
 render scale applied once. Stick, regular-block and equip/swing behavior remain.
 Internal projection checks keep complete resting Doors clear of the crosshair.

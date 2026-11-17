@@ -11,6 +11,19 @@ export const ITEM_DISPLAY = Object.freeze({
   },
 });
 const models = new Map(), third = new Map(), alignments = new Map();
+const doorFirst = new Map();
+export function firstPersonDoorAttachment(sign = 1) {
+  if (!doorFirst.has(sign)) {
+    // Flat source picture, held at a lower grip. The complete local pose is
+    // mirrored for the offhand; the shared wrist supplies equip/action motion.
+    const pose = new THREE.Matrix4().makeRotationY(-25 * radians)
+      .multiply(new THREE.Matrix4().makeRotationZ(18 * radians))
+      .scale(new THREE.Vector3(.42, .42, .42)).multiply(new THREE.Matrix4().makeTranslation(0, .18, 0));
+    if (sign < 0) pose.premultiply(new THREE.Matrix4().makeScale(-1, 1, 1));
+    doorFirst.set(sign, pose);
+  }
+  return doorFirst.get(sign);
+}
 export const displayProfile = item => item?.model === 'flat' ? item.display ?? 'generated' : 'block';
 export function itemModelTransform(profile, view, sign = 1) {
   const key = `${profile}:${view}:${sign}`; if (models.has(key)) return models.get(key);
@@ -30,6 +43,7 @@ export function thirdPersonItemTransform(profile = 'block', sign = 1) {
     const pixel = .9375 / 16, scale = .9375 * ITEM_DISPLAY.generated.third.right.scale;
     const matrix = new THREE.Matrix4().makeTranslation(sign * pixel, -9 * pixel, -2 * pixel - .001)
       .multiply(new THREE.Matrix4().makeRotationY(sign < 0 ? Math.PI : 0))
+      .multiply(new THREE.Matrix4().makeRotationZ(8 * radians))
       .scale(new THREE.Vector3(scale, scale, scale)).multiply(new THREE.Matrix4().makeTranslation(0, .40625, 0));
     third.set(key, matrix); return matrix;
   }
