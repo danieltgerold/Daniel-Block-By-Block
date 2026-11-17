@@ -81,3 +81,5 @@ for (const wood of ['oak', 'pine']) {
 }
 registerBlockType({ id: 'furnace', name: 'Furnace', particleTexture: 'furnace.side', interaction: 'furnace',
   defaultState: { facing: 'north', lit: false }, itemState: { facing: 'south', lit: false } });
+registerBlockType({ id: 'water', name: 'Water', solid: false, opaque: false, collisionShape: 'fluid', renderMode: 'fluid', inventoryItem: false,
+  particles: false, drops: [], defaultState: { level: 0, falling: false } });

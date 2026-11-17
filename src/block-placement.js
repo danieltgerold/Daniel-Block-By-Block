@@ -2,6 +2,7 @@
 // this transaction so invalid attempts never edit terrain or request a swing.
 import { ITEMS } from './inventory.js';
 import { placeBlock } from './block-actions.js';
+import { useBucket } from './bucket-use.js';
 export function breakTargetBlock({ controller, world, yaw, pitch, feet = controller.player, onBreak = () => {} }) {
   const hit = controller.targetBlock(feet, yaw, pitch);
   const block = hit ? world.blockAt(hit.x, hit.y, hit.z) : null;
@@ -46,6 +47,12 @@ export class BlockPlacement {
   attempt() {
     if (!this.canInteract()) { this.release(true); return false; }
     const { yaw, pitch } = this.getAim();
+    if (this.controller.miningHeld) return false;
+    const bucket = useBucket(this.controller, this.world, yaw, pitch);
+    if (bucket.handled) {
+      if (bucket.success) { this.controller.requestSwing(); this.controller.lowerMainHand(); }
+      return bucket.success;
+    }
     // Never cache a hit or use the third-person camera as the ray origin.
     // Tick callbacks use the actual post-collision feet, even in catch-up frames.
     const hit = this.controller.targetBlock(this.controller.player, yaw, pitch);

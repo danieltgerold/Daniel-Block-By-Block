@@ -24,10 +24,10 @@ export function placeBlock(world, id, hit, yaw, players = []) {
   if (![x, y, z].every(Number.isSafeInteger)) return false;
   const existing = world.blockAt(x, y, z);
   const combine = shape === 'slab' && state.type === 'double' && existing?.id === id && existing.state.type !== 'double';
-  if (existing && !combine) return false;
+  if (existing && !combine && !world.isReplaceable(x, y, z)) return false;
   const block = { x, y, z, id, definition, state };
   if (shape === 'door') {
-    if (!Number.isSafeInteger(y + 1) || !world.topSupport(x, y - 1, z) || world.hasBlock(x, y + 1, z)) return false;
+    if (!Number.isSafeInteger(y + 1) || !world.topSupport(x, y - 1, z) || !world.isReplaceable(x, y + 1, z)) return false;
     state.facing = facingFromYaw(yaw);
     const [fx, , fz] = DIRECTIONS[state.facing], right = [-fz, fx];
     const leftDoor = world.blockAt(x - right[0], y, z - right[1]), rightDoor = world.blockAt(x + right[0], y, z + right[1]);

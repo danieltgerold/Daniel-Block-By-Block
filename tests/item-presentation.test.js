@@ -81,6 +81,7 @@ test('both sprite profiles grip by their end, use model-unit TRS, and follow ani
         for (const x of [picture.min.x, picture.max.x]) for (const y of [picture.min.y, picture.max.y]) projected.expandByPoint(new THREE.Vector3(x, y, 0).applyMatrix4(mesh.matrixWorld).project(hand.camera));
         const wrist = hand.doorHands[index], arm = wrist.children.find(child => child.name === 'Door Grip Arm');
         assert.equal(wrist.visible, true); assert.equal(mesh.parent, wrist); assert.equal(arm.geometry, hand.arm.geometry);
+        assert.equal(arm.visible, false, 'Door hides its associated first-person arm');
         near(new THREE.Vector3(0, -.18, 0).applyMatrix4(mesh.matrix).length(), 0);
         for (const p of [[0, 0, 0], [0, .3, 0], [-.2, .2, 0], [.2, .2, 0]]) {
           const point = new THREE.Vector3(...p).applyMatrix4(mesh.matrixWorld), ray = new THREE.Raycaster(new THREE.Vector3(), point.clone().normalize());

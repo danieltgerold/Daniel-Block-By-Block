@@ -2,6 +2,7 @@
 import { CHUNK_SIZE, chunkKey } from './voxel-world.js';
 import { buildChunkMesh, chooseLod } from './voxel-mesh.js';
 import { getFaceMaterial } from './block-assets.js';
+import { buildWaterMesh } from './fluid-mesh.js';
 
 export class ChunkRenderer {
   constructor(world, scene, material, { viewDistance = 160, buildsPerFrame = 4 } = {}) {
@@ -15,13 +16,16 @@ export class ChunkRenderer {
     this.projectionView = new THREE.Matrix4();
     this.box = new THREE.Box3();
     this.stats = { visibleChunks: 0, visibleQuads: 0, loadedChunks: 0, lods: [0, 0, 0] };
-    this.unsubscribe = world.subscribe(({ x, z }) => this.invalidateBlock(x, z));
+    this.unsubscribe = world.subscribe(({ x, y, z, id, previousId }) => {
+      const fluid = id === 'water' || previousId === 'water' || [-1, 0, 1].some(dx => [-1, 0, 1].some(dz => world.blockIdAt(x + dx, y, z + dz) === 'water'));
+      this.invalidateBlock(x, z, false, fluid);
+    });
   }
 
-  invalidateBlock(x, z, immediate = false) {
+  invalidateBlock(x, z, immediate = false, fluid = false) {
     const cx = Math.floor(x / CHUNK_SIZE), cz = Math.floor(z / CHUNK_SIZE);
     // Neighbors must expose/hide shared boundary faces, too.
-    for (const [dx, dz] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    for (const [dx, dz] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], ...(fluid ? [[-1, -1], [-1, 1], [1, -1], [1, 1]] : [])]) {
       const chunk = this.chunks.get(chunkKey(cx + dx, cz + dz));
       if (chunk) {
         chunk.dirty = true;
@@ -46,9 +50,19 @@ export class ChunkRenderer {
     const mesh = new THREE.Mesh(geometry, materials.length === 1 ? materials[0] : materials);
     mesh.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
     mesh.frustumCulled = true;
-    if (old) { this.scene.remove(old.mesh); old.mesh.geometry.dispose(); }
+    if (old) {
+      this.scene.remove(old.mesh); old.mesh.geometry.dispose();
+      if (old.waterMesh) { this.scene.remove(old.waterMesh); old.waterMesh.geometry.dispose(); }
+    }
     this.scene.add(mesh);
-    const entry = { mesh, level, quads: data.quads, dirty: false };
+    const water = buildWaterMesh(this.world, cx, cz); let waterMesh = null;
+    if (water.positions.length) {
+      const buffer = new THREE.BufferGeometry();
+      for (const [name, values, size] of [['position', water.positions, 3], ['normal', water.normals, 3], ['uv', water.uvs, 2], ['color', water.colors, 3]]) buffer.setAttribute(name, new THREE.Float32BufferAttribute(values, size));
+      buffer.setIndex(water.indices); buffer.computeBoundingSphere(); waterMesh = new THREE.Mesh(buffer, getFaceMaterial('water'));
+      waterMesh.position.copy(mesh.position); waterMesh.renderOrder = 2; this.scene.add(waterMesh);
+    }
+    const entry = { mesh, waterMesh, level, quads: data.quads + water.indices.length / 6, dirty: false };
     this.chunks.set(chunkKey(cx, cz), entry);
     return entry;
   }
@@ -61,12 +75,12 @@ export class ChunkRenderer {
     const radius = Math.ceil(this.viewDistance / CHUNK_SIZE);
     // Beyond integer-grid precision, do not run non-advancing coordinate loops.
     if (![cx - radius, cx + radius, cz - radius, cz + radius].every(Number.isSafeInteger)) {
-      for (const chunk of this.chunks.values()) chunk.mesh.visible = false;
+      for (const chunk of this.chunks.values()) { chunk.mesh.visible = false; if (chunk.waterMesh) chunk.waterMesh.visible = false; }
       this.stats.visibleChunks = this.stats.visibleQuads = 0;
       return;
     }
     const visible = [];
-    for (const chunk of this.chunks.values()) chunk.mesh.visible = false;
+    for (const chunk of this.chunks.values()) { chunk.mesh.visible = false; if (chunk.waterMesh) chunk.waterMesh.visible = false; }
     for (let z = cz - radius; z <= cz + radius; z++) {
       for (let x = cx - radius; x <= cx + radius; x++) {
         const distance = Math.hypot((x + 0.5) * CHUNK_SIZE - camera.position.x, (z + 0.5) * CHUNK_SIZE - camera.position.z);
@@ -94,6 +108,7 @@ export class ChunkRenderer {
       }
       if (chunk) {
         chunk.mesh.visible = true;
+        if (chunk.waterMesh) chunk.waterMesh.visible = true;
         this.stats.visibleChunks++;
         this.stats.visibleQuads += chunk.quads;
         this.stats.lods[chunk.level === 1 ? 0 : chunk.level === 2 ? 1 : 2]++;
@@ -103,6 +118,7 @@ export class ChunkRenderer {
       if (Math.hypot(chunk.mesh.position.x + 8 - camera.position.x, chunk.mesh.position.z + 8 - camera.position.z) > this.viewDistance + CHUNK_SIZE * 2) {
         this.scene.remove(chunk.mesh);
         chunk.mesh.geometry.dispose();
+        if (chunk.waterMesh) { this.scene.remove(chunk.waterMesh); chunk.waterMesh.geometry.dispose(); }
         this.chunks.delete(key);
       }
     }
@@ -111,7 +127,7 @@ export class ChunkRenderer {
 
   dispose() {
     this.unsubscribe();
-    for (const chunk of this.chunks.values()) { this.scene.remove(chunk.mesh); chunk.mesh.geometry.dispose(); }
+    for (const chunk of this.chunks.values()) { this.scene.remove(chunk.mesh); chunk.mesh.geometry.dispose(); if (chunk.waterMesh) { this.scene.remove(chunk.waterMesh); chunk.waterMesh.geometry.dispose(); } }
     this.chunks.clear();
   }
 }

@@ -85,6 +85,13 @@ export function recipeLayout(recipe, size) {
   return layout;
 }
 export const RECIPES = new RecipeRegistry();
+// Ready for the future iron item; deliberately absent from the active book
+// until that ingredient exists. No iron progression is introduced here.
+export const BUCKET_RECIPE = Object.freeze({ id: 'bucket', type: 'shaped', pattern: ['I I', ' I '],
+  key: { I: 'iron.ingot' }, output: { id: 'bucket', count: 1 }, name: 'Bucket', category: 'materials', grids: [3] });
+export function registerBucketRecipe(items) {
+  if (items.has('iron.ingot') && items.has('bucket') && !RECIPES.recipes.has('bucket')) RECIPES.register(BUCKET_RECIPE);
+}
 for (const wood of ['oak', 'pine']) RECIPES.register({ id: `${wood}.planks`, type: 'shapeless',
   ingredients: [`${wood}.log`], output: { id: `${wood}.planks`, count: 4 }, name: `${wood === 'oak' ? 'Oak' : 'Pine'} Planks`, category: 'building', grids: [2, 3] });
 RECIPES.register({ id: 'sticks', type: 'shaped', pattern: ['P', 'P'], key: { P: { group: 'planks' } },

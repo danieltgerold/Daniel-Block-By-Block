@@ -54,6 +54,11 @@ export function stepPlayer(player, input = {}, world = null) {
   if (!input.canFly) player.flying = false;
   else if (input.toggleFlight) player.flying = !player.flying;
   const flying = player.flying;
+  const scale = player.size ?? 1;
+  const medium = world?.fluids?.sample({ x: player.x - .3 * scale, y: player.y + .1 * scale, z: player.z - .3 * scale },
+    { x: player.x + .3 * scale, y: player.y + (player.crouching ? 1.4 : 1.7) * scale, z: player.z + .3 * scale });
+  const wet = !flying && Boolean(medium?.inWater); player.inWater = Boolean(medium?.inWater);
+  if (wet) { player.jumpInProgress = false; player.fallDistance = 0; }
   if (flying) { player.jumpInProgress = false; player.jumpCooldown = 0; player.fallDistance = 0; }
   if (input.crouch && !flying) player.crouching = true;
   else if (player.crouching && (!world || !world.intersectsPlayer({ ...player, crouching: false }))) player.crouching = false;
@@ -70,7 +75,7 @@ export function stepPlayer(player, input = {}, world = null) {
   if (!input.jump) player.jumpCooldown = 0;
   const size = player.size ?? 1;
   const launchVelocity = input.jumpVelocity ?? MOVEMENT.jumpVelocity * size;
-  const takeoff = !flying && Boolean(input.jump) && launchVelocity > 0 && startedGrounded && player.jumpCooldown === 0;
+  const takeoff = !flying && !wet && Boolean(input.jump) && launchVelocity > 0 && startedGrounded && player.jumpCooldown === 0;
   const yaw = input.yaw || 0;
   const sinYaw = Math.sin(yaw);
   const cosYaw = Math.cos(yaw);
@@ -91,6 +96,10 @@ export function stepPlayer(player, input = {}, world = null) {
     }
   }
   if (flying) player.vy += (Number(Boolean(input.jump)) - Number(Boolean(input.crouch))) * MOVEMENT.flyingVerticalAcceleration * size;
+  if (wet) {
+    if (input.jump) player.vy += .04 * size * (launchVelocity / (MOVEMENT.jumpVelocity * size));
+    player.vx += medium.x * .014 * size; player.vy += medium.y * .014 * size; player.vz += medium.z * .014 * size;
+  }
 
   // 2. Normalize diagonals, preserving Java's small diagonal speed adjustment.
   const sneak = player.crouching && !flying ? 0.30 : 1;
@@ -101,7 +110,8 @@ export function stepPlayer(player, input = {}, world = null) {
   let acceleration = startedGrounded
     ? (player.sprinting ? MOVEMENT.groundSprintAcceleration : MOVEMENT.groundWalkAcceleration)
     : (player.sprinting ? MOVEMENT.airSprintAcceleration : MOVEMENT.airWalkAcceleration);
-  if (flying) {
+  if (wet) acceleration = .02 * (input.walkSpeedScale ?? size);
+  else if (flying) {
     // Flight is a separate ability speed, scaled by size. /speed continues to
     // control walking; the 0.98 input shaping gives 10.8889 blocks/s in flight.
     acceleration = (player.sprinting ? MOVEMENT.flyingSprintSpeed : MOVEMENT.flyingSpeed) * size;
@@ -116,7 +126,7 @@ export function stepPlayer(player, input = {}, world = null) {
   // 3. Move, resolve the floor, then apply drag using the PREVIOUS grounded state.
   if (world) {
     let requested = { x: player.vx, z: player.vz };
-    if (input.crouch && !flying && !takeoff && player.vy <= 0 && (startedGrounded || world.supportProbe(player))) {
+    if (input.crouch && !wet && !flying && !takeoff && player.vy <= 0 && (startedGrounded || world.supportProbe(player))) {
       requested = protectSneakingEdge(world, player, requested.x, requested.z);
     }
     const motion = world.movePlayer(player, { ...requested, y: player.vy }, 0.3 * size,
@@ -149,17 +159,17 @@ export function stepPlayer(player, input = {}, world = null) {
   }
   // Landing uses distance accumulated BEFORE the final collision-adjusted tick,
   // then resets. Airborne descent alone contributes; teleports reset via createPlayer.
-  if (!flying) {
+  if (!flying && !wet) {
     if (player.grounded) {
       if (!startedGrounded) player.landingFallDistance = player.fallDistance;
       player.fallDistance = 0;
     } else player.fallDistance += Math.max(0, previousY - player.y);
   }
   if (flying && player.grounded) player.flying = false;
-  const drag = !flying && startedGrounded ? MOVEMENT.groundDrag : MOVEMENT.airDrag;
+  const drag = wet ? .8 : !flying && startedGrounded ? MOVEMENT.groundDrag : MOVEMENT.airDrag;
   player.vx *= drag;
   player.vz *= drag;
-  player.vy = flying ? player.vy * MOVEMENT.flyingVerticalDrag : (player.vy - MOVEMENT.gravity * size) * MOVEMENT.verticalDrag;
+  player.vy = wet ? player.vy * .8 - .02 * size : flying ? player.vy * MOVEMENT.flyingVerticalDrag : (player.vy - MOVEMENT.gravity * size) * MOVEMENT.verticalDrag;
   if (player.grounded && player.vy < 0) player.vy = 0;
   const fovTarget = (player.sprinting ? MOVEMENT.sprintFovMultiplier : 1) * (player.flying ? MOVEMENT.flyingFovMultiplier : 1);
   player.fovMultiplier += (fovTarget - player.fovMultiplier) * 0.5;
@@ -327,9 +337,10 @@ export class MovementController {
   update(frameSeconds, input = {}) {
     const gameplay = input.gameplayEnabled !== false;
     if (!gameplay) this.clearHeldInputs();
-    // Simulate normal frames fully; cap long browser stalls. Focus loss pauses
-    // separately so returning to the tab never simulates unattended input.
-    this.accumulator += Math.max(0, Math.min(frameSeconds, 0.25));
+    // Keep every active game tick, including slow rendering frames: dropping
+    // elapsed time would silently discard fluid/furnace work. Focus loss and
+    // the Escape menu pause separately, without simulating unattended input.
+    this.accumulator += Number.isFinite(frameSeconds) ? Math.max(0, frameSeconds) : 0;
     // Sub-nanosecond rounding must not postpone a tick at a clock boundary.
     while (this.accumulator + 1e-9 >= MOVEMENT.fixedStep) {
       this.previous = snapshot(this.player);

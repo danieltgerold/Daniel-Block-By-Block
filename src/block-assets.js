@@ -72,6 +72,7 @@ export function getFaceMaterial(id) {
     // Binary cutouts discard clear pixels before depth writes. Front-side
     // culling avoids coplanar opposing leaf/mixed-block faces fighting.
     alphaTest: textureHasAlpha(id) ? .5 : 0, transparent: false, side: THREE.FrontSide,
+    ...(id === 'water' ? { transparent: true, opacity: .52, depthWrite: false, side: THREE.DoubleSide } : {}),
   }));
   return faceMaterials.get(id);
 }

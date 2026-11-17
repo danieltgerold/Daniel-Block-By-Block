@@ -3,17 +3,23 @@ import { BLOCK_TYPES, onBlockTypeRegistered } from './block-types.js';
 import { blockIcon, textureIcon } from './block-icons.js';
 import { CraftingSession, insertItemStacks } from './crafting.js';
 import { SMELTING, FUELS } from './smelting.js';
+import { registerBucketRecipe } from './recipes.js';
 export function registerItem(definition) {
   if (!definition.id || !Number.isSafeInteger(definition.maxStack) || definition.maxStack < 1) throw new Error('Invalid item definition');
   ITEMS.set(definition.id, Object.freeze({ ...definition }));
+  registerBucketRecipe(ITEMS);
 }
 const registerBlockItem = block => registerItem({ id: block.id, name: block.name,
   maxStack: block.maxStack, block: true, color: block.color, tags: block.tags, creativeCategory: block.creativeCategory,
   creativeKind: block.creativeKind, creativeMaterial: block.creativeMaterial, icon: blockIcon(block.id),
   ...(block.itemTexture ? { model: 'flat', display: block.itemModel, texture: block.itemTexture, spriteDepth: block.itemSpriteDepth } : {}) });
-for (const block of BLOCK_TYPES.values()) registerBlockItem(block);
-onBlockTypeRegistered(registerBlockItem);
+for (const block of BLOCK_TYPES.values()) if (block.inventoryItem !== false) registerBlockItem(block);
+onBlockTypeRegistered(block => { if (block.inventoryItem !== false) registerBlockItem(block); });
 registerItem({ id: 'stick', name: 'Stick', maxStack: 64, block: false, model: 'flat', display: 'handheld', texture: 'stick', color: '#ab8052', icon: textureIcon('stick') });
+for (const [id, name, maxStack] of [['bucket', 'Bucket', 16], ['water.bucket', 'Water Bucket', 1]]) registerItem({
+  id, name, maxStack, block: false, model: 'flat', display: 'item', texture: id, spriteDepth: 0, creativeCategory: 'functional',
+  creativeKind: 'bucket', creativeMaterial: id === 'bucket' ? 'empty' : 'water', icon: textureIcon(id),
+});
 export const HOTBAR = Array.from({ length: 9 }, (_, i) => i);
 export const MAIN = Array.from({ length: 27 }, (_, i) => i + 9);
 export const STORAGE = [...HOTBAR, ...MAIN];

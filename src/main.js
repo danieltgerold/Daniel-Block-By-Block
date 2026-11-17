@@ -200,6 +200,7 @@ function refreshWorldView() {
   syncEquipment(playerModel, controller.inventory);
   updateEmptyHand(emptyHand, position.animation, controller.inventory);
   updatePlayerCamera(camera, cameraMode, position, yaw, pitch, world);
+  document.body.classList.toggle('underwater', world.fluids.submerged(camera.position));
   const fov = baseFov * position.fovMultiplier;
   if (Math.abs(camera.fov - fov) > 1e-8) {
     camera.fov = fov;

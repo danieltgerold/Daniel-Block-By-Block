@@ -11,7 +11,7 @@ export function setItemAppearance(mesh, id = 'test.block') {
     if (!flatMaterials.has(item.texture)) flatMaterials.set(item.texture, new THREE.MeshBasicMaterial({
       map: getFaceTexture(item.texture), alphaTest: .5, side: THREE.DoubleSide, vertexColors: item.spriteDepth !== 0, depthWrite: true, depthTest: true,
     }));
-    const spriteSize = mesh.userData.displayContext === 'firstperson' ? 1 : size;
+    const spriteSize = mesh.userData.displayContext === 'firstperson' ? item.display === 'item' ? .6 : 1 : size;
     mesh.geometry = item.spriteDepth === 0 ? spritePlaneGeometry(spriteSize) : spriteGeometry(item.texture, spriteSize); mesh.material = flatMaterials.get(item.texture);
   } else { mesh.geometry = getItemGeometry(size, id); mesh.material = getItemMaterials(id, mesh.geometry); }
   mesh.userData.appearanceKey = key; mesh.userData.itemId = id; mesh.userData.blockId = item?.block ? id : null;

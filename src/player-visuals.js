@@ -165,6 +165,7 @@ export function createEmptyHand(aspect = 1) {
     forearm.matrix.makeTranslation(sign * .02, 0, -.13)
       .multiply(new THREE.Matrix4().makeRotationZ(sign * .25)).multiply(new THREE.Matrix4().makeRotationX(.12))
       .multiply(new THREE.Matrix4().makeTranslation(0, -16 * MODEL_SCALE, 0));
+    forearm.visible = false; // Door items hide their entire first-person arm.
     wrist.add(forearm); wrist.visible = false; scene.add(wrist); return wrist;
   });
   scene.add(hand.mainItem, hand.offhandItem);

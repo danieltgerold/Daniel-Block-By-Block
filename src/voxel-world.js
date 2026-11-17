@@ -3,6 +3,8 @@ export const PLAYER_HALF_WIDTH = 0.3;
 import { BLOCK_TYPES, blockDrops } from './block-types.js';
 import { worldBoxes, fullCube, blockOpaque, stairShapeAt, DIRECTIONS } from './block-shapes.js';
 import { FurnaceEntity } from './smelting.js';
+import { FluidSystem } from './fluid-system.js';
+import { isWaterSource, waterHeight } from './fluid-surface.js';
 export const BLOCK_REACH = 4.5;
 const EPSILON = 1e-7;
 const AXES = ['x', 'y', 'z'];
@@ -44,6 +46,7 @@ export class VoxelWorld {
     this.depth = depth; this.chunkEdits = new Map(); this.removedCount = 0;
     this.random = random; this.behaviorBlocks = new Map(); this.behaviorTime = 0; this.listeners = new Set();
     this.furnaces = new Map(); this.tickRemainder = 0; this.pendingDrops = []; this.changingDoors = false; this.loading = false;
+    this.fluids = new FluidSystem(this);
   }
   *edits() { for (const edits of this.chunkEdits.values()) yield* edits.values(); }
   blockIdAt(x, y, z) {
@@ -53,6 +56,7 @@ export class VoxelWorld {
       : y >= -this.depth && y < 0 ? 'test.block' : null;
   }
   hasBlock(x, y, z) { return this.blockIdAt(x, y, z) !== null; }
+  isReplaceable(x, y, z) { return !this.hasBlock(x, y, z) || this.blockIdAt(x, y, z) === 'water'; }
   isOpaqueSolid(x, y, z) {
     return blockOpaque(this.blockAt(x, y, z));
   }
@@ -103,6 +107,7 @@ export class VoxelWorld {
       if (!this.changingDoors && block?.definition.collisionShape === 'door') this.checkDoor(block);
     }
     if (!this.loading && !this.updatingStairs) this.updateStairs(x, y, z);
+    this.fluids.changed(x, y, z);
     return true;
   }
   updateStairs(x, y, z) {
@@ -140,6 +145,7 @@ export class VoxelWorld {
     const old = [...this.edits()];
     for (const entity of this.furnaces.values()) { entity.removed = true; entity.changed(); }
     this.depth = saved.depth ?? this.depth; this.chunkEdits.clear(); this.furnaces.clear(); this.behaviorBlocks.clear();
+    this.fluids = new FluidSystem(this);
     this.removedCount = 0; this.pendingDrops = []; this.tickRemainder = 0; this.loadEdits(saved.edits ?? saved);
     for (const at of old) for (const listener of this.listeners) listener({ x: at.x, y: at.y, z: at.z, id: this.blockIdAt(at.x, at.y, at.z) });
   }
@@ -187,6 +193,7 @@ export class VoxelWorld {
     this.tickRemainder += seconds * 20;
     while (this.tickRemainder + 1e-9 >= 1) {
       this.tickRemainder -= 1;
+      this.fluids.tick();
       for (const [key, entity] of this.furnaces) {
         entity.tick();
         const [x, y, z] = key.split(',').map(Number), block = this.blockAt(x, y, z);
@@ -231,10 +238,10 @@ export class VoxelWorld {
     }
     return best;
   }
-  chunkBounds(cx, cz) {
+  chunkBounds(cx, cz, includeWater = true) {
     let minY = -this.depth, maxY = 0;
     for (const edit of this.chunkEdits.get(chunkKey(cx, cz))?.values() || []) {
-      if (edit.solid) { minY = Math.min(minY, edit.y); maxY = Math.max(maxY, edit.y + 1); }
+      if (edit.solid || includeWater && edit.id === 'water') { minY = Math.min(minY, edit.y); maxY = Math.max(maxY, edit.y + 1); }
     }
     return { minY, maxY };
   }
@@ -271,21 +278,24 @@ export class VoxelWorld {
     return !players.some(player => { const { min, max } = playerBounds(player); return worldBoxes(block, 'collision', this).some(box => boxOverlap(min, max, box)); });
   }
   canPlaceBlock(x, y, z, players = [], id = 'test.block', state = {}) {
-    return [x, y, z].every(Number.isSafeInteger) && !this.hasBlock(x, y, z)
+    return [x, y, z].every(Number.isSafeInteger) && this.isReplaceable(x, y, z)
       && this.canFitBlock({ x, y, z, id, state, definition: BLOCK_TYPES.get(id) }, players);
   }
-  raycast(origin, direction, reach = BLOCK_REACH) {
-    const hit = this.raycastRaw(origin, direction, reach);
+  raycast(origin, direction, reach = BLOCK_REACH, options = {}) {
+    const hit = this.raycastRaw(origin, direction, reach, options);
     if (hit) { const length = Math.hypot(direction.x, direction.y, direction.z); hit.point = Object.fromEntries(AXES.map(a => [a, origin[a] + direction[a] / length * hit.distance])); }
     return hit;
   }
-  raycastRaw(origin, direction, reach = BLOCK_REACH) {
+  raycastRaw(origin, direction, reach = BLOCK_REACH, options = {}) {
     const length = Math.hypot(direction.x, direction.y, direction.z);
     if (!length || reach < 0) return null;
     const d = Object.fromEntries(AXES.map(a => [a, direction[a] / length]));
     let best = null;
-    for (const edit of this.edits()) if (edit.solid) {
-      for (const box of worldBoxes(this.blockAt(edit.x, edit.y, edit.z), 'selection', this)) {
+    for (const edit of this.edits()) if (edit.solid || options.waterSources && isWaterSource(this.blockAt(edit.x, edit.y, edit.z))) {
+      const block = this.blockAt(edit.x, edit.y, edit.z);
+      const boxes = edit.id === 'water' ? [{ min: { x: edit.x, y: edit.y, z: edit.z }, max: { x: edit.x + 1, y: edit.y + waterHeight(block), z: edit.z + 1 } }]
+        : worldBoxes(block, 'selection', this);
+      for (const box of boxes) {
         const hit = rayBox(origin, d, box.min, box.max, best?.distance ?? reach);
         if (hit && (!best || hit.distance < best.distance)) best = { ...hit, x: edit.x, y: edit.y, z: edit.z };
       }

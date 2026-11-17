@@ -8,7 +8,7 @@ import { faceUv, shapeQuads } from './shape-mesh.js';
 // Majority coverage intentionally drops sub-LOD details only in distant meshes.
 export function buildChunkMesh(world, cx, cz, level = 1) {
   if (![1, 2, 4].includes(level)) throw new Error('Unsupported voxel LOD');
-  const { minY, maxY } = world.chunkBounds(cx, cz);
+  const { minY, maxY } = world.chunkBounds(cx, cz, false);
   const dimensions = [CHUNK_SIZE / level, maxY - minY, CHUNK_SIZE / level];
   const scale = [level, 1, level];
   const originX = cx * CHUNK_SIZE;

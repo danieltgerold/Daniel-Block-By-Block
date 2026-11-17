@@ -69,6 +69,8 @@ export class DroppedItems {
       pile.count = lotCount(pile.lots, this.time);
       if (!pile.lots.length) continue;
       pile.previous = position(pile);
+      const medium = this.world?.fluids?.sample({ x: pile.x - .125, y: pile.y, z: pile.z - .125 }, { x: pile.x + .125, y: pile.y + .25, z: pile.z + .125 });
+      if (medium?.inWater) { pile.vx += medium.x * .014; pile.vy += medium.y * .014; pile.vz += medium.z * .014; }
       const oldVy = pile.vy;
       const motion = this.world?.movePlayer({ ...pile, size: 1 }, { x: pile.vx, y: pile.vy, z: pile.vz }, .125, .25)
         ?? { ...pile, blocked: {}, grounded: false };

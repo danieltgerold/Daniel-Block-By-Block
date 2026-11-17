@@ -510,9 +510,9 @@ irregular clear pixels across the whole tile. Shared binary-cutout textures serv
 world faces, icons, held items and drops; fancy neighboring leaf faces remain
 visible through gaps. Collision, persistence and leaf drop rules are unchanged.
 First-person Door items use a compact, angled 2D picture in the lower right/left,
-with a small part beyond the bottom edge. A shared wrist moves the picture and
-its visible grip arm together during equip/actions; the arm stays behind the
-face. Other held items and empty main hands retain their prior paths. Oak has
+with a small part beyond the bottom edge. A shared wrist preserves picture
+equip/action motion; the associated first-person arm is entirely hidden for Door
+items in either hand. Other held items and empty main hands retain their prior paths. Oak has
 wooden panels and Pine has horizontal bands, with no accidental holes. Third-person pictures
 attach their bottom grip directly to the animated arm's actual palm, with player
 render scale applied once. Stick, regular-block and equip/swing behavior remain.
@@ -559,6 +559,43 @@ items and furnaces ticking. Search typing cannot move, chat or change hotbar;
 number shortcuts still work over catalog templates. E closes outside text entry,
 Escape always closes, and carried stacks return through existing safe storage/
 overflow handling. Survival retains its existing crafting and inventory interface.
+
+## Buckets and legacy water
+
+`bucket` stacks to 16; `water.bucket` stacks to one. Both have original flat
+pixel sprites and appear in Creative, /give and autocomplete. Right-click with
+an empty main-hand bucket collects only a source, using a fresh eye/reach ray
+obstructed by solids. Ordinary block rays pass through water. Survival replaces
+one bucket, inserts the filled result when splitting a stack, and drops any
+inventory overflow. Placing one source returns an empty bucket. Creative keeps
+the held bucket unchanged when placing or collecting, matching the requested
+1.12 rules. Bucket attempts cannot fall through into a second block action.
+Offhand remains storage/display only. `BUCKET_RECIPE` holds the three-ingot V;
+registering a future `iron.ingot` item enables it, without adding iron now.
+
+Water is a non-solid voxel with source, level 1–7, and falling states. Sparse,
+deduplicated work runs five game ticks apart on the world's 20 Hz clock. Sources
+persist; downward flow takes priority, with a four-block search favoring equally
+short routes to drops. Ground flow reaches seven blocks; unsupported flows
+recede. Two adjacent sources can renew a cell over solid support or a source.
+Sources remain after support removal. Partial blocks exclude water from their
+cells; ordinary placements replace water and notify surrounding fluid cells.
+Save/load retains states and rebuilds active schedules. Settled water has no
+repeating update, and renderer frame budgets never discard simulation work.
+
+Chunk-batched water meshes use common world-space corner heights, smooth slopes
+and culled internal faces. One translucent blue material tests depth without
+writing it, preserving cutout glass/leaves and submerged blocks/items. Fluid
+geometry stays separate from full-cube terrain LOD, including tall waterfalls;
+only affected visible chunks rebuild. Diagonal border edits refresh shared corners.
+
+Pre-aquatic movement uses 0.02 water input acceleration, 0.8 retention, sinking
+gravity and Space ascent, scaled with player size/settings. Currents move players
+and dropped items; drops retain gravity, pickup/merge rules and original lifetime.
+Creative flight keeps its own movement in water. A camera-position surface query
+controls a subtle blue tint, including F5 views. Inventory leaves all simulation
+running; Escape still pauses. No waterlogging, modern swimming pose, oxygen,
+drowning, hunger, lava or other fluids are added.
 
 ## Furnaces
 

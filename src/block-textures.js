@@ -127,6 +127,16 @@ tile('stick', ['#00000000', '#765237', '#ab8052', '#c69b63'], r => {
   for (let n = 0; n < 12; n++) { r(2 + n, 12 - n, 2, 2, 1); r(2 + n, 12 - n, 1, 1, 2); }
   r(12, 1, 1, 1, 3); r(4, 10, 1, 1, 3); r(8, 6, 1, 1, 3);
 });
+for (const filled of [false, true]) tile(filled ? 'water.bucket' : 'bucket', ['#00000000', '#455463', '#c5d2dc', '#879ba9', '#385362', '#4899dc', '#80c3ef'], r => {
+  r(3, 5, 10, 3, 1); r(4, 8, 8, 5, 1); r(5, 13, 6, 1, 1);
+  r(4, 6, 8, 2, filled ? 5 : 4); r(5, 8, 6, 4, 3); r(6, 12, 4, 1, 3);
+  r(4, 5, 8, 1, 2); r(4, 7, 1, 3, 2); r(5, 10, 1, 2, 2); r(10, 8, 1, 3, 4);
+  r(4, 3, 1, 3, 1); r(11, 3, 1, 3, 1); r(5, 2, 6, 1, 1); r(5, 3, 1, 1, 2);
+  if (filled) { r(5, 6, 6, 1, 6); r(7, 7, 3, 1, 5); }
+});
+tile('water', ['#508fd4', '#5798dc', '#4787cc'], r => {
+  r(1, 3, 5, 1, 1); r(9, 1, 4, 1, 1); r(6, 7, 4, 1, 2); r(1, 12, 5, 1, 2); r(10, 13, 4, 1, 1);
+});
 export const paletteAlpha = color => color.length === 9 ? parseInt(color.slice(7), 16) : 255;
 export const textureHasAlpha = id => Boolean(BLOCK_TEXTURES.get(id)?.palette.some(color => paletteAlpha(color) < 255));
 export function texturePixels(id) {
