@@ -13,8 +13,8 @@ export function breakTargetBlock({ controller, world, yaw, pitch, feet = control
   onBreak(hit.x, hit.y, hit.z); return true;
 }
 export class BlockPlacement {
-  constructor({ controller, world, getAim, canInteract, onPlace = () => {} }) {
-    Object.assign(this, { controller, world, getAim, canInteract, onPlace });
+  constructor({ controller, world, getAim, canInteract, onPlace = () => {}, onUse = () => false }) {
+    Object.assign(this, { controller, world, getAim, canInteract, onPlace, onUse });
   }
 
   press() {
@@ -52,6 +52,11 @@ export class BlockPlacement {
     // Never cache a hit or use the third-person camera as the ray origin.
     // Tick callbacks use the actual post-collision feet, even in catch-up frames.
     const hit = this.controller.targetBlock(this.controller.player, yaw, pitch);
+    if (this.controller.miningHeld) return false;
+    const block = hit && this.world.blockAt(hit.x, hit.y, hit.z);
+    if (block?.definition.interaction && !this.controller.player.crouching && this.onUse(block)) {
+      this.release(true); return true;
+    }
     const stack = this.controller.inventory.mainHand;
     if (this.controller.miningHeld || !stack || !ITEMS.get(stack.id)?.block) return false;
     if (!hit || !Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return false;

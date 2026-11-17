@@ -61,7 +61,7 @@ export function setBlockAppearance(mesh, id = 'test.block') {
   if (mesh.userData.blockId === id) return;
   mesh.material = getBlockMaterials(id); mesh.userData.blockId = id;
 }
-export function createSharedBlock(size = .375, id = 'test.block') {
+export function getBlockGeometry(size = .375) {
   const { geometries } = getBlockAssets();
   if (!geometries.has(size)) {
     const geometry = new THREE.BoxGeometry(size, size, size), normals = geometry.getAttribute('normal'), colors = [];
@@ -73,8 +73,11 @@ export function createSharedBlock(size = .375, id = 'test.block') {
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
     geometries.set(size, geometry);
   }
-  const mesh = new THREE.Mesh(geometries.get(size), getBlockMaterials(id));
-  mesh.userData.blockId = id; return mesh;
+  return geometries.get(size);
+}
+export function createSharedBlock(size = .375, id = 'test.block') {
+  const mesh = new THREE.Mesh(getBlockGeometry(size), getBlockMaterials(id));
+  mesh.userData.blockId = id; mesh.userData.itemSize = size; return mesh;
 }
 const particleSources = new Map(), particleTextures = new WeakMap();
 export function registerParticleTexture(id, texture) { particleSources.set(id, texture); }

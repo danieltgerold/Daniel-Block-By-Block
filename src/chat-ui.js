@@ -100,9 +100,9 @@ export class ChatUI {
     this.resume();
   }
 
-  openInventory() {
+  openInventory(size = 2) {
     if (!this.inventoryUI || !['playing', 'ready'].includes(this.mode)) return;
-    this.setMode('inventory'); this.pointerLocked = false; this.requestUnlock(); this.inventoryUI.open();
+    this.setMode('inventory'); this.pointerLocked = false; this.requestUnlock(); this.inventoryUI.open(size);
   }
   closeInventory() {
     this.inventoryUI?.close(); this.setMode('ready'); this.resume();
@@ -165,6 +165,11 @@ export class ChatUI {
       event.preventDefault(); event.stopPropagation(); return;
     }
     if (this.mode === 'inventory') {
+      if (isTextEntry(event.target) && event.key !== 'Escape') {
+        event.stopPropagation();
+        if (event.code === 'F3' || event.code === 'F5') event.preventDefault();
+        return;
+      }
       event.preventDefault(); event.stopPropagation();
       if (!event.repeat && (event.code === 'KeyE' || event.key === 'Escape')) this.closeInventory();
       else this.inventoryUI?.handleKey(event);

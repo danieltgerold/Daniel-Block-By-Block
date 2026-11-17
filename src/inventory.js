@@ -1,6 +1,7 @@
 export const ITEMS = new Map();
 import { BLOCK_TYPES, onBlockTypeRegistered } from './block-types.js';
-import { blockIcon } from './block-icons.js';
+import { blockIcon, textureIcon } from './block-icons.js';
+import { CraftingSession } from './crafting.js';
 export function registerItem(definition) {
   if (!definition.id || !Number.isSafeInteger(definition.maxStack) || definition.maxStack < 1) throw new Error('Invalid item definition');
   ITEMS.set(definition.id, Object.freeze({ ...definition }));
@@ -9,27 +10,31 @@ const registerBlockItem = block => registerItem({ id: block.id, name: block.name
   maxStack: block.maxStack, block: true, color: block.color, tags: block.tags, icon: blockIcon(block.id) });
 for (const block of BLOCK_TYPES.values()) registerBlockItem(block);
 onBlockTypeRegistered(registerBlockItem);
+registerItem({ id: 'stick', name: 'Stick', maxStack: 64, block: false, model: 'flat', texture: 'stick', color: '#ab8052', icon: textureIcon('stick') });
 export const HOTBAR = Array.from({ length: 9 }, (_, i) => i);
 export const MAIN = Array.from({ length: 27 }, (_, i) => i + 9);
 export const STORAGE = [...HOTBAR, ...MAIN];
 export const ARMOR = ['head', 'chest', 'legs', 'feet'];
 export const OFFHAND = 40;
+export const CRAFT_START = 41, CRAFT_OUTPUT = 50;
 export const copyStack = stack => stack ? { ...stack } : null;
 export const quantity = count => typeof count === 'bigint' ? count : BigInt(count);
 
 export class PlayerInventory {
   constructor({ onDrop = () => {} } = {}) {
-    this.slots = Array(41).fill(null);
+    this.slots = Array(50).fill(null);
     this.cursor = null;
     this.selected = 0;
     this.onDrop = onDrop;
     this.listeners = new Set();
+    this.crafting = new CraftingSession(this, { items: ITEMS, storage: STORAGE, start: CRAFT_START });
   }
   subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
-  changed() { for (const fn of this.listeners) fn(); }
+  changed() { this.crafting.refresh(); for (const fn of this.listeners) fn(); }
+  isSlot(index) { return Number.isInteger(index) && index >= 0 && (index < 41 || this.crafting.active && this.crafting.indices.includes(index)); }
   accepts(index, id) {
     const item = ITEMS.get(id);
-    return Boolean(item && index >= 0 && index < 41 && (index < 36 || index === OFFHAND || item.armor === ARMOR[index - 36]));
+    return Boolean(item && this.isSlot(index) && (index < 36 || index === OFFHAND || index >= CRAFT_START || item.armor === ARMOR[index - 36]));
   }
   capacity(id, indices = STORAGE) {
     const item = ITEMS.get(id);
@@ -108,13 +113,13 @@ export class PlayerInventory {
     this.slots[index] = remaining ? { id: stack.id, count: Number(remaining) } : null;
     this.changed();
   }
-  shiftMatching(id, fromHotbar) {
-    for (const i of fromHotbar ? HOTBAR : MAIN) if (this.slots[i]?.id === id) this.shift(i);
+  shiftMatching(id, fromHotbar, fromCraft = false) {
+    for (const i of fromCraft ? this.crafting.indices : fromHotbar ? HOTBAR : MAIN) if (this.slots[i]?.id === id) this.shift(i);
   }
   collect(id = this.cursor?.id) {
     if (!id || (this.cursor && this.cursor.id !== id)) return;
     if (!this.cursor) this.cursor = { id, count: 0 };
-    for (const i of [...STORAGE, OFFHAND, 36, 37, 38, 39]) {
+    for (const i of [...STORAGE, OFFHAND, 36, 37, 38, 39, ...(this.crafting.active ? this.crafting.indices : [])]) {
       const stack = this.slots[i];
       if (stack?.id !== id) continue;
       const amount = Math.min(stack.count, ITEMS.get(id).maxStack - this.cursor.count);
@@ -125,6 +130,7 @@ export class PlayerInventory {
     this.changed();
   }
   swap(a, b) {
+    if (!this.isSlot(a) || !this.isSlot(b)) return false;
     const left = this.slots[a], right = this.slots[b];
     if ((left && !this.accepts(b, left.id)) || (right && !this.accepts(a, right.id))) return false;
     [this.slots[a], this.slots[b]] = [right, left]; this.changed(); return true;
@@ -146,6 +152,7 @@ export class PlayerInventory {
     this.changed();
   }
   close() {
+    this.crafting.end();
     if (this.cursor) {
       const { id, count } = this.cursor;
       const remainder = this.insert(id, count);

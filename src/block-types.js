@@ -51,4 +51,8 @@ for (const [id, name, color, extra = {}] of [
   ['glass', 'Glass', '#dceff4', { opaque: false, renderMode: 'glass', cullSameType: true, drops: [] }],
   ['oak.leaves', 'Oak Leaves', '#55a141', { opaque: false, renderMode: 'cutout',
     defaultState: { persistent: true, distance: 7 }, drops: [], tags: ['leaves', 'wood.oak'] }],
+  ['pine.log', 'Pine Log', '#635044', { faces: { top: 'pine.end', bottom: 'pine.end', side: 'pine.bark' }, particleTexture: 'pine.bark', tags: ['wood.logs', 'wood.pine'] }],
+  ['pine.planks', 'Pine Planks', '#80634c', { tags: ['wood.planks', 'wood.pine'] }],
+  ['pine.leaves', 'Pine Leaves', '#326b47', { opaque: false, renderMode: 'cutout', defaultState: { persistent: true, distance: 7 }, drops: [], tags: ['leaves', 'wood.pine'] }],
+  ['crafting.table', 'Crafting Table', '#b08450', { faces: { top: 'crafting.top', bottom: 'oak.planks', side: 'crafting.side' }, particleTexture: 'crafting.side', interaction: 'crafting.table' }],
 ]) registerBlockType({ id, name, color, ...extra });

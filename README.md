@@ -151,7 +151,7 @@ safe Number range. Tab completes the item ID and leaves a space for quantity.
 
 There are 27 main slots, nine shared HUD/inventory hotbar slots, four typed
 armor slots and one offhand slot. These blocks cannot enter armor slots. The
-reserved 2x2 crafting grid/output is visibly inactive. Item definitions and
+2x2 crafting grid/output is active, with the same stack controls. Item definitions and
 armor slot rules support future items. The separate preview uses the actual
 colored rig and equipment at size one; its limited mouse-follow pose never
 changes player aim. Offhand contents display in world and first-person views.
@@ -346,15 +346,17 @@ varies during each jump; the value below averages consecutive jumps.
 Commands provide Test Block (`test.block`), Stone (`stone`), Cobblestone
 (`cobblestone`), Dirt (`dirt`), Grass Block (`grass.block`), Sand (`sand`),
 Gravel (`gravel`), Oak Log (`oak.log`), Oak Planks (`oak.planks`), Glass (`glass`),
-and Oak Leaves (`oak.leaves`).
+Oak Leaves (`oak.leaves`), Pine Log (`pine.log`), Pine Planks (`pine.planks`),
+Pine Leaves (`pine.leaves`), and Crafting Table (`crafting.table`). Stick (`stick`)
+is a separate non-placeable item with a shared cutout sprite, rather than a cube.
 For example, `/give grass.block 64`; Tab completes all registered item IDs.
-There is no creative inventory, crafting, tool requirement, log rotation, or
+There is no creative inventory, tool requirement, log rotation, or
 falling Sand/Gravel behavior yet.
 
 Definitions share cube collision/placement/breaking code and specify names, IDs,
 face textures, stack sizes, solidity, opacity, collision shape, breaking time,
 optional behavior hooks and recipe tags. All current breaking times remain zero.
-Wood tags allow future recipes to accept a group or an exact block ID.
+Wood tags let recipes accept a group or an exact block ID.
 Sparse world edits retain the actual block ID; old boolean edits map to Test
 Block and untouched ground remains unchanged. `loadEdits` accepts both formats.
 Survival breaks normally drop the actual block item, with explicit rules for
@@ -388,7 +390,7 @@ internal faces; fancy-style Leaves retain their layered internal surfaces.
 Opposite-facing leaf interfaces use front-face culling to avoid coplanar fighting.
 The same rules apply to coarse LOD samples and neighboring chunks.
 
-Sparse edits also preserve per-block state. Oak Leaves default to
+Sparse edits also preserve per-block state. Oak and Pine Leaves default to
 `{ persistent: true, distance: 7 }`, so player placements remain until broken.
 Future natural generation may set persistent false and track log distance;
 there is no natural-leaf decay, tree generation or waterlogging system yet.
@@ -401,6 +403,56 @@ next round. Glass and Leaves are solid but nonopaque and do not count as covers
 in this simplified rule; it is not Minecraft's full lighting system.
 Uncovering Dirt does not instantly restore Grass. Inventory keeps
 this timer running, while the Escape menu pauses it.
+
+## Crafting and recipe book
+
+Pine has original 16x16 dark bark, lighter log ends, cooler planks and dark-green
+needle clusters with pixel gaps. Its log/plank/cutout-leaf behavior shares the
+existing block system, including persistent player placements and no leaf-block
+drop. The Crafting Table has workstation top/side textures, full cube collision,
+and drops itself in Survival. All five additions work with `/give` and Tab.
+
+Press E for the player 2x2 grid. Right-click a placed Crafting Table within reach
+for the 3x3 interface; crouch-right-click to place against it instead. Empty hands
+and held Sticks can use the table. Both screens retain the existing inventory
+controls and keep physics/item simulation running with gameplay inputs released.
+Opening them preserves airborne momentum. Escape closes crafting and resumes
+the existing mouse-capture flow; the separate Escape pause menu still pauses.
+
+The initial recipes, in either grid, are:
+
+| Ingredients | Output |
+| --- | --- |
+| One Oak Log, anywhere | Four Oak Planks |
+| One Pine Log, anywhere | Four Pine Planks |
+| Two Planks vertically | Four Sticks |
+| Four Planks in a 2x2 square | One Crafting Table |
+
+Each plank slot independently accepts Oak or Pine, including mixed recipes.
+An output is a preview until taken. Taking it creates the full batch and consumes
+only the matched inputs; a mismatched/full cursor cannot consume ingredients.
+Shift-click output crafts into main inventory/hotbar until the next complete batch
+cannot fit or the recipe changes. Closing returns all real grid/cursor items to
+storage and drops overflow; the preview and missing-ingredient ghosts own no items.
+Crafting consumes real ingredients in both Survival and Creative.
+
+The Recipe book button opens a side panel with output icons/names, search,
+categories and a Craftable only filter. All four implemented recipes are visible
+without unlocks, filtered by grid size. Click a recipe to fill one craft; Shift-click
+fills the maximum allowed by ingredients and each input stack's cap. This only
+moves ingredients; take the output to craft. Supplies come from main inventory,
+hotbar and existing grid inputs, never armor/offhand. A complete rearrangement is
+planned before mutation, so insufficient storage leaves everything unchanged.
+Missing ingredients appear in a separate, read-only recipe preview with red cells.
+Typing in search cannot activate movement, chat, hotbar or camera shortcuts.
+
+`recipes.js` owns definitions, exact/group ingredients, occupied-slot indexes,
+offset shaped matching, optional horizontal mirroring and shapeless assignment.
+`crafting.js` owns inventory transactions and capacity checks with no DOM access.
+The same registry drives both interfaces. Future plank definitions only need the
+`wood.planks` tag to join the `planks` group. Matching/craftability updates on
+relevant inventory changes; cached icons and unchanged slot nodes are reused.
+No tools, furnace, tree generation or creative inventory are added.
 
 ## Pickup and block particles
 

@@ -54,16 +54,27 @@
     <section id="inventory-screen" class="inventory-screen" aria-label="Player inventory" hidden>
       <div id="inventory-panel" class="inventory-panel">
         <div class="inventory-heading"><button id="inventory-close" type="button" aria-label="Close inventory">&#215;</button></div>
+        <div class="inventory-workspace">
+        <aside id="recipe-book" class="recipe-book" data-recipe-book hidden aria-label="Recipe book">
+          <input id="recipe-search" type="search" placeholder="Search recipes" aria-label="Search recipes" autocomplete="off" />
+          <select id="recipe-category" aria-label="Recipe category"><option value="all">All categories</option></select>
+          <label class="recipe-filter"><input id="recipe-craftable" type="checkbox" /> Craftable only</label>
+          <div id="recipe-list" class="recipe-list"></div>
+          <div id="recipe-ghost" class="recipe-ghost" hidden><span>Recipe preview</span><div id="recipe-ghost-grid" class="crafting-grid"></div></div>
+          <div id="recipe-status" class="recipe-status" role="status"></div>
+        </aside>
+        <div class="inventory-content">
         <div class="inventory-top">
           <div id="inventory-armor" class="armor-slots" aria-label="Armor"></div>
           <canvas id="inventory-preview" width="180" height="200" aria-label="Player appearance preview"></canvas>
           <div class="offhand-area"><div id="inventory-offhand"></div></div>
-          <div class="crafting-area"><div class="crafting-layout"><div class="crafting-grid">
-            <button class="inventory-slot" disabled></button><button class="inventory-slot" disabled></button><button class="inventory-slot" disabled></button><button class="inventory-slot" disabled></button>
-          </div><button class="inventory-slot" disabled aria-label="Crafting output (inactive)"></button></div></div>
+          <div class="crafting-area"><div class="crafting-layout"><div id="crafting-grid" class="crafting-grid" aria-label="Crafting inputs"></div>
+          <span class="crafting-arrow" aria-hidden="true">&#8594;</span><button id="crafting-output" class="inventory-slot" type="button" aria-label="Crafting output"></button></div>
+          <button id="recipe-book-toggle" type="button" aria-expanded="false" aria-controls="recipe-book">Recipe book</button></div>
         </div>
         <div id="inventory-main" class="slot-grid" aria-label="Main inventory"></div>
         <div id="inventory-hotbar" class="slot-grid inventory-hotbar" aria-label="Hotbar"></div>
+        </div></div>
       </div>
       <div id="cursor-stack" class="cursor-stack" hidden></div>
       <div id="inventory-tooltip" class="inventory-tooltip" role="tooltip" hidden></div>

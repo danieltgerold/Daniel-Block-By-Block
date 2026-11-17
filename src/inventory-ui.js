@@ -1,6 +1,10 @@
-import { ITEMS, MAIN, HOTBAR, ARMOR, OFFHAND } from './inventory.js';
+import { ITEMS, MAIN, HOTBAR, ARMOR, OFFHAND, CRAFT_START, CRAFT_OUTPUT } from './inventory.js';
+import { RecipeBookUI } from './recipe-book-ui.js';
 
 export function drawStack(document, element, stack, extra = 0) {
+  const signature = stack ? `${stack.id}:${stack.count + extra}` : '';
+  if (element.dataset.stack === signature) return;
+  element.dataset.stack = signature;
   element.replaceChildren();
   element.title = ''; // Names use the immediate in-game tooltip, not the browser delay.
   if (!stack) return;
@@ -38,6 +42,10 @@ export class InventoryUI {
     });
     ARMOR.forEach((name, n) => makeSlot(document.getElementById('inventory-armor'), 36 + n, name, this.slotViews));
     makeSlot(document.getElementById('inventory-offhand'), OFFHAND, 'Offhand', this.slotViews);
+    for (let i = 0; i < 9; i++) makeSlot(document.getElementById('crafting-grid'), CRAFT_START + i, `Crafting input ${i + 1}`, this.slotViews);
+    this.output = document.getElementById('crafting-output'); this.output.dataset.slot = CRAFT_OUTPUT;
+    this.slotViews.set(CRAFT_OUTPUT, this.output);
+    this.book = new RecipeBookUI({ document, crafting: inventory.crafting, drawStack });
     const listen = (target, name, fn) => { target.addEventListener(name, fn); this.removers.push(() => target.removeEventListener(name, fn)); };
     listen(this.root, 'contextmenu', e => e.preventDefault());
     listen(this.root, 'mousedown', e => this.mouseDown(e));
@@ -63,11 +71,18 @@ export class InventoryUI {
       this.render();
     });
     listen(document.getElementById('inventory-close'), 'click', onClose);
+    listen(document.getElementById('recipe-book-toggle'), 'click', () => {
+      this.book.root.hidden = !this.book.root.hidden; this.panel.classList.toggle('book-open', !this.book.root.hidden);
+      document.getElementById('recipe-book-toggle').setAttribute('aria-expanded', String(!this.book.root.hidden)); this.book.render(true);
+    });
     this.unsubscribe = inventory.subscribe(() => this.render());
     this.render();
   }
-  open() {
+  open(size = 2) {
     this.isOpen = true; this.root.hidden = false; this.hotbar.hidden = true;
+    this.root.classList.toggle('table-view', size === 3);
+    this.document.getElementById('crafting-grid').style.setProperty('--craft-size', size);
+    this.inventory.crafting.begin(size); this.book.reset();
     this.hovered = null; this.gesture = null; this.lastClick = null;
     this.document.activeElement?.blur(); this.preview?.reset(); this.render();
   }
@@ -79,7 +94,7 @@ export class InventoryUI {
     this.tooltip.hidden = true;
   }
   updateTooltip() {
-    const stack = this.hovered === null ? null : this.inventory.slots[this.hovered];
+    const stack = this.hovered === null ? null : this.stackAt(this.hovered);
     this.tooltip.hidden = !this.isOpen || !stack;
     if (this.tooltip.hidden) return;
     this.tooltip.textContent = ITEMS.get(stack.id).name;
@@ -89,6 +104,7 @@ export class InventoryUI {
   }
   mouseDown(event) {
     if (!this.isOpen || (event.button !== 0 && event.button !== 2)) return;
+    if (event.target.closest?.('[data-recipe-book], #recipe-book-toggle, input, select')) return;
     event.preventDefault();
     const slot = event.target.closest?.('[data-slot]');
     if (!slot) {
@@ -97,11 +113,16 @@ export class InventoryUI {
     }
     const i = Number(slot.dataset.slot), now = this.window.performance.now();
     this.hovered = i;
+    if (i === CRAFT_OUTPUT) {
+      this.gesture = null; this.lastClick = null;
+      this.inventory.crafting.take({ destination: event.shiftKey ? 'inventory' : 'cursor', repeat: event.shiftKey }); return;
+    }
+    if (!this.inventory.isSlot(i)) return;
     const id = this.inventory.slots[i]?.id ?? this.inventory.cursor?.id ?? this.lastClick?.id;
     const double = event.button === 0 && this.lastClick?.button === 0 && this.lastClick?.index === i && now - this.lastClick.time < 250
       && this.lastClick.shift === event.shiftKey && id === this.lastClick.id;
     if (event.shiftKey) {
-      if (double) this.inventory.shiftMatching(id, i < 9);
+      if (double) this.inventory.shiftMatching(id, i < 9, i >= CRAFT_START);
       else this.inventory.shift(i);
     } else if (double) this.inventory.collect(id);
     else if (this.inventory.cursor) {
@@ -120,6 +141,11 @@ export class InventoryUI {
     if (i === null || event.repeat) return;
     this.gesture = null;
     const digit = /^(?:Digit|Numpad)([1-9])$/.exec(event.code);
+    if (i === CRAFT_OUTPUT) {
+      if (digit || event.code === 'KeyF') this.inventory.crafting.take({ destination: 'slot', slot: digit ? Number(digit[1]) - 1 : OFFHAND });
+      else if (event.code === 'KeyQ') this.inventory.crafting.take({ destination: 'drop', repeat: event.ctrlKey });
+      return;
+    }
     if (digit) this.inventory.swap(i, Number(digit[1]) - 1);
     else if (event.code === 'KeyF') this.inventory.swap(i, OFFHAND);
     else if (event.code === 'KeyQ') this.inventory.drop(i, event.ctrlKey);
@@ -138,7 +164,11 @@ export class InventoryUI {
   render() {
     const plan = this.gesture ? this.inventory.dragPlan(this.gesture.indices, this.gesture.button) : new Map();
     for (const [index, button] of this.slotViews) {
-      const stack = this.inventory.slots[index], extra = plan.get(index) ?? 0;
+      if (index >= CRAFT_START && index < CRAFT_OUTPUT) {
+        button.hidden = index >= CRAFT_START + this.inventory.crafting.size ** 2;
+        button.disabled = !this.inventory.crafting.active;
+      }
+      const stack = this.stackAt(index), extra = plan.get(index) ?? 0;
       drawStack(this.document, button, stack ?? (extra ? { id: this.inventory.cursor.id, count: 0 } : null), extra);
       button.classList.toggle('drag-preview', extra > 0);
       button.classList.toggle('selected-slot', index === this.inventory.selected);
@@ -151,6 +181,8 @@ export class InventoryUI {
     drawStack(this.document, this.cursorView, remaining ? { id: this.inventory.cursor.id, count: remaining } : null);
     this.cursorView.hidden = !this.isOpen || remaining === 0;
     this.updateTooltip();
+    this.book.render();
   }
-  dispose() { this.unsubscribe(); for (const remove of this.removers) remove(); }
+  stackAt(index) { return index === CRAFT_OUTPUT ? this.inventory.crafting.output : this.inventory.slots[index]; }
+  dispose() { this.unsubscribe(); this.book.dispose(); for (const remove of this.removers) remove(); }
 }

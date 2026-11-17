@@ -2,6 +2,14 @@ import { BLOCK_TYPES, blockFaceTexture } from './block-types.js';
 import { BLOCK_TEXTURES, paletteAlpha } from './block-textures.js';
 import { TEST_BLOCK_ICON, shaded } from './block-appearance.js';
 const icons = new Map();
+export function textureIcon(id) {
+  const key = `flat:${id}`; if (icons.has(key)) return icons.get(key);
+  const tile = BLOCK_TEXTURES.get(id); if (!tile) return null;
+  const paths = tile.palette.map(() => '');
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) paths[tile.indices[y * 16 + x]] += `M${x} ${y}h1v1h-1z`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">${paths.map((d, i) => paletteAlpha(tile.palette[i]) ? `<path fill="${tile.palette[i]}" d="${d}"/>` : '').join('')}</svg>`;
+  const icon = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; icons.set(key, icon); return icon;
+}
 export function blockIcon(id) {
   if (id === 'test.block') return TEST_BLOCK_ICON;
   if (icons.has(id)) return icons.get(id);

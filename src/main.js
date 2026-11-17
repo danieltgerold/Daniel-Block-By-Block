@@ -73,6 +73,7 @@ function breakBlock(feet = controller.renderState()) {
   return breakTargetBlock({ controller, world, yaw, pitch, feet, onBreak: (x, y, z) => chunks.invalidateBlock(x, z, true) });
 }
 const placement = new BlockPlacement({ controller, world, getAim: () => ({ yaw, pitch }),
+  onUse: block => { if (block.definition.interaction !== 'crafting.table') return false; chatUI.openInventory(3); return true; },
   canInteract: () => active && document.pointerLockElement === canvas && document.hasFocus() && !document.hidden,
   onPlace: (x, y, z) => { chunks.invalidateBlock(x, z, true); controller.lowerMainHand(); } });
 bindPlacementInput(placement, canvas, document, window);
@@ -185,7 +186,7 @@ function animate(time) {
   const position = refreshWorldView();
   chatUI.updateVisibility();
   renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);
-  if (inventoryUI.isOpen) inventoryUI.preview.render();
+  if (inventoryUI.isOpen && controller.inventory.crafting.size === 2) inventoryUI.preview.render();
   hud.renderedFrame(time, position);
 }
 
