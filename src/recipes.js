@@ -96,3 +96,5 @@ for (const wood of ['oak', 'pine']) for (const [part, pattern, count] of [['slab
     output: { id: `${wood}.${part}`, count }, name: `${wood === 'oak' ? 'Oak' : 'Pine'} ${part[0].toUpperCase() + part.slice(1)}`, category: 'building', grids: [3] });
 }
 RECIPES.register({ id: 'furnace', type: 'shaped', pattern: ['CCC', 'C C', 'CCC'], key: { C: 'cobblestone' }, output: { id: 'furnace', count: 1 }, name: 'Furnace', category: 'building', grids: [3] });
+for (const wood of ['oak', 'pine']) RECIPES.register({ id: `${wood}.stairs`, type: 'shaped', pattern: ['P  ', 'PP ', 'PPP'], key: { P: `${wood}.planks` },
+  output: { id: `${wood}.stairs`, count: 4 }, name: `${wood === 'oak' ? 'Oak' : 'Pine'} Stairs`, category: 'building', grids: [3] });

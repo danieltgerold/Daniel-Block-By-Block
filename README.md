@@ -455,7 +455,8 @@ The same registry drives both interfaces. Future plank definitions only need the
 relevant inventory changes; cached icons and unchanged slot nodes are reused.
 The 3x3 book also offers matching-wood slabs (three planks in a row -> six), fences
 (two rows of plank/stick/plank -> three), doors (two columns of three planks ->
-three), and a Furnace (eight Cobblestone around an empty center -> one). These
+three), stairs (six planks in a three-row staircase -> four, including its mirror),
+and a Furnace (eight Cobblestone around an empty center -> one). These
 wood recipes require a single species, unlike the mixed-plank Stick/Table recipes.
 No tools, tree generation or creative inventory are added.
 
@@ -471,8 +472,10 @@ Log placement stores X/Y/Z axis from the actual clicked face. End grain appears
 at both axis ends and bark follows the long direction. Missing legacy axis state
 defaults to Y. Slabs use the clicked height/face to choose bottom/top, combine only
 matching exposed halves into a double slab, consume one item per placement, and
-drop one or two items accordingly. Slab step assist respects scaled step height
-and headroom without changing the earlier full-block wall behavior. Crouch support
+drop one or two items accordingly. General step assist checks obstacle tops above
+the current feet, up to 0.6 times player size, with swept headroom and horizontal
+collision. This allows slab-to-full-block and stair ascent without jumping; a
+one-block wall still stops a size-one player. Crouch support
 probes use the actual shape footprint. Fences have one-block visible/selection
 height and 1.5-block post/connection collision, preventing a normal flat-ground
 jump over them. All physical sweeps remain continuous at high configured speeds.
@@ -485,6 +488,22 @@ half or removing support removes the pair and drops exactly one item in Survival
 Creative drops none. Sneaking with a held block places against interactive blocks.
 No waterlogging or redstone is implemented.
 
+Oak/Pine Stairs (`oak.stairs`, `pine.stairs`) store facing, top/bottom half and
+straight/inner-left/inner-right/outer-left/outer-right shape. Same-half stairs of
+either wood connect using front/back perpendicular neighbors and Java's side
+continuation guards. Edits/removals and loading recalculate nearby shapes across
+chunk boundaries without dropping items. Cached boxes and box-union surface
+templates drive collision, rays, outlines and exact partial-block LOD rendering.
+
+Door items use separate original transparent 16px complete-door sprites in all
+slot/book icons, hands and dropped piles; placed two-cell doors are unchanged.
+Door and Stick sprites have shared 1/16-thick generated geometry with transparent
+holes and edge faces. Separate generated/handheld Java display transforms use
+model-unit translations and end-grip source alignment in both animated hands;
+ordinary block and first-person equip/action paths remain separate. The carried
+stack icon centers on viewport pointer coordinates with percentage transforms,
+keeping the count at lower right and pointer events disabled in every inventory.
+
 ## Furnaces
 
 Furnaces face their placing player and show a lit front while burning. Right-click
@@ -495,7 +514,7 @@ pickup reuse inventory controls. Closing leaves the three slots in that furnace.
 Missing-book previews are read-only; selecting Sand moves ingredients, not results.
 
 `smelting.js` separately registers Sand -> Glass (200 cooking ticks) and fuels:
-logs, planks, fences and Crafting Tables burn 300 ticks; doors 200, slabs 150,
+logs, planks, fences, stairs and Crafting Tables burn 300 ticks; doors 200, slabs 150,
 Sticks 100. Every active 20 Hz world tick burns fuel even with blocked/removed
 input. Fresh fuel starts only for a valid recipe with output capacity. Cooking
 consumes one Sand and creates one Glass after 200 ticks; unfueled unfinished

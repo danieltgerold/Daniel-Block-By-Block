@@ -9,9 +9,19 @@ export function faceUv(p, axis, block) {
   if (block.definition.collisionShape === 'door' && axis !== 1 && block.state.hinge === 'right') uv[0] = 1 - uv[0];
   return uv;
 }
+const stairTemplates = new Map();
 // Tessellate the UNION of a few authored boxes, removing internal intersections.
 // Ordinary cubes still use the existing chunk-wide greedy fast path.
 export function shapeQuads(block, world = null) {
+  if (block.definition.collisionShape === 'stairs' && world) {
+    const key = `${block.id}:${block.state.facing}:${block.state.half}:${block.state.shape}`;
+    if (!stairTemplates.has(key)) stairTemplates.set(key, shapeQuads(block));
+    return stairTemplates.get(key).filter(q => {
+      const p = q.corners[0]; if (Math.abs(p[q.axis]) > 1e-8 && Math.abs(p[q.axis] - 1) > 1e-8) return true;
+      const offset = [0, 0, 0]; offset[q.axis] = q.sign;
+      return !blockOpaque(world.blockAt(block.x + offset[0], block.y + offset[1], block.z + offset[2]));
+    });
+  }
   const boxes = blockBoxes(block, 'selection', world), coords = [0, 1, 2].map(a => [...new Set(boxes.flatMap(b => [b[a], b[a + 3]]))].sort((a, b) => a - b));
   const dimensions = coords.map(c => c.length - 1), quads = [];
   const solid = cell => {

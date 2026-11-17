@@ -25,6 +25,7 @@ export function blockIcon(id) {
   if (id === 'test.block') return TEST_BLOCK_ICON;
   if (icons.has(id)) return icons.get(id);
   if (!BLOCK_TYPES.has(id)) return null;
+  if (BLOCK_TYPES.get(id).itemTexture) return textureIcon(BLOCK_TYPES.get(id).itemTexture);
   if (BLOCK_TYPES.get(id).collisionShape !== 'cube') {
     const block = itemBlock(id), door = block.definition.collisionShape === 'door';
     const parts = door ? [block, { ...block, state: { ...block.state, half: 'upper' } }] : [block];

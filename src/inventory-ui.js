@@ -59,7 +59,7 @@ export class InventoryUI {
     listen(this.root, 'mouseleave', () => { this.hovered = null; this.updateTooltip(); });
     listen(window, 'mousemove', e => {
       if (!this.isOpen) return;
-      this.cursorView.style.left = `${e.clientX + 12}px`; this.cursorView.style.top = `${e.clientY + 12}px`;
+      this.cursorView.style.left = `${e.clientX}px`; this.cursorView.style.top = `${e.clientY}px`;
       this.pointer = { x: e.clientX, y: e.clientY }; this.updateTooltip();
       this.preview?.aim(e.clientX, e.clientY);
     });
@@ -196,6 +196,7 @@ export class InventoryUI {
     }
     const remaining = this.inventory.cursor ? this.inventory.cursor.count - [...plan.values()].reduce((a, b) => a + b, 0) : 0;
     drawStack(this.document, this.cursorView, remaining ? { id: this.inventory.cursor.id, count: remaining } : null);
+    this.cursorView.style.left = `${this.pointer.x}px`; this.cursorView.style.top = `${this.pointer.y}px`;
     this.cursorView.hidden = !this.isOpen || remaining === 0;
     this.updateTooltip();
     this.book.render();

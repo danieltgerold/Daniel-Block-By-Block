@@ -100,6 +100,7 @@ test('scaled hitbox rejects low-ceiling growth and prevents placing inside the l
   chat.submit('/size 2'); assert.equal(controller.size, 2);
   assert.equal(world.canPlaceBlock(1, 0, 0, [controller.player]), false);
   world.setBlock(2, 0, 0, true);
+  world.setBlock(2, 1, 0, true); // Higher than the scaled 1.2-block step height.
   near(world.movePlayer(controller.player, { x: 20, y: 0, z: 0 }).x, 1.4);
   const model = createPlayerModel();
   const animation = createPlayerAnimation();

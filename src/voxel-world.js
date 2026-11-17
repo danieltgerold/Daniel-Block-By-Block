@@ -1,7 +1,7 @@
 ﻿export const CHUNK_SIZE = 16;
 export const PLAYER_HALF_WIDTH = 0.3;
 import { BLOCK_TYPES, blockDrops } from './block-types.js';
-import { worldBoxes, fullCube, blockOpaque } from './block-shapes.js';
+import { worldBoxes, fullCube, blockOpaque, stairShapeAt, DIRECTIONS } from './block-shapes.js';
 import { FurnaceEntity } from './smelting.js';
 export const BLOCK_REACH = 4.5;
 const EPSILON = 1e-7;
@@ -102,7 +102,18 @@ export class VoxelWorld {
       block?.definition.behavior?.neighborChanged?.(this, block);
       if (!this.changingDoors && block?.definition.collisionShape === 'door') this.checkDoor(block);
     }
+    if (!this.loading && !this.updatingStairs) this.updateStairs(x, y, z);
     return true;
+  }
+  updateStairs(x, y, z) {
+    const guard = this.updatingStairs; this.updatingStairs = true;
+    for (const [dx, , dz] of [[0, 0, 0], ...Object.values(DIRECTIONS)]) {
+      const block = this.blockAt(x + dx, y, z + dz);
+      if (block?.definition.collisionShape !== 'stairs') continue;
+      const shape = stairShapeAt(block, this);
+      if (shape !== block.state.shape) this.setBlock(block.x, block.y, block.z, block.id, { ...block.state, shape });
+    }
+    this.updatingStairs = guard;
   }
   blockAt(x, y, z) {
     const id = this.blockIdAt(x, y, z);
@@ -120,6 +131,7 @@ export class VoxelWorld {
       }
     }
     this.changingDoors = changing; this.loading = false;
+    for (const edit of [...this.edits()]) if (this.blockAt(edit.x, edit.y, edit.z)?.definition.collisionShape === 'stairs') this.updateStairs(edit.x, edit.y, edit.z);
     this.updateArea();
     for (const edit of [...this.edits()]) if (this.blockAt(edit.x, edit.y, edit.z)?.definition.collisionShape === 'door') this.checkDoor(this.blockAt(edit.x, edit.y, edit.z));
   }
@@ -134,7 +146,8 @@ export class VoxelWorld {
   furnaceAt(x, y, z) { return this.furnaces.get(blockKey(x, y, z)); }
   emitDrop(stack, at) { if (this.onDrop) this.onDrop(stack, at); else this.pendingDrops.push({ stack: { ...stack }, at: { ...at } }); }
   *collisionBoxes() { for (const edit of this.edits()) if (edit.solid) yield* worldBoxes(this.blockAt(edit.x, edit.y, edit.z), 'collision', this); }
-  topSupport(x, y, z) { const block = this.blockAt(x, y, z); return fullCube(block) || block?.definition.collisionShape === 'slab' && block.state.type === 'top'; }
+  topSupport(x, y, z) { const block = this.blockAt(x, y, z); return fullCube(block) || block?.definition.collisionShape === 'slab' && block.state.type === 'top'
+    || block?.definition.collisionShape === 'stairs' && block.state.half === 'top'; }
   removeDoor(block) {
     const y = block.y - (block.state.half === 'upper' ? 1 : 0), guard = this.changingDoors;
     this.changingDoors = true;
@@ -385,12 +398,18 @@ export class VoxelWorld {
     const canStep = !player.flying && velocity.y <= 0 && (player.grounded || normal.grounded)
       && Math.abs(halfWidth - .3 * size) < 1e-8 && height >= 1.49 * size;
     if (!canStep || !normal.blocked.x && !normal.blocked.z) return normal;
-    // Add slab stepping without changing the existing full-cube wall behavior
-    // (notably high-speed, size-two movement). Rise only to an actual slab top.
+    // Step height is measured ABOVE THE FEET, independent of block type or
+    // total obstacle height. The same swept box handles headroom and walls.
     const footprint = playerBounds(normal, halfWidth, height);
-    const tops = [...this.collisionBoxes()].filter(box => box.block.definition.collisionShape === 'slab'
-      && box.block.state.type !== 'double' && box.max.y > player.y + EPSILON && box.max.y <= player.y + .6 * size + EPSILON
+    const tops = [...this.collisionBoxes()].filter(box => box.max.y > player.y + EPSILON && box.max.y <= player.y + .6 * size + EPSILON
       && ['x', 'z'].every(a => footprint.max[a] >= box.min[a] - EPSILON && footprint.min[a] <= box.max[a] + EPSILON)).map(box => box.max.y);
+    // Untouched base terrain has no stored boxes. Include its exposed layer
+    // tops too, e.g. stepping out of a bottom slab carved into the ground.
+    for (let y = -this.depth; y < 0; y++) if (y + 1 > player.y + EPSILON && y + 1 <= player.y + .6 * size + EPSILON) {
+      const min = { x: footprint.min.x - 2 * EPSILON, y, z: footprint.min.z - 2 * EPSILON };
+      const max = { x: footprint.max.x + 2 * EPSILON, y: y + 1, z: footprint.max.z + 2 * EPSILON };
+      if (this.baseSolidInBox(min, max)) tops.push(y + 1);
+    }
     if (!tops.length) return normal;
     const rise = this.moveRaw(player, { x: 0, y: Math.max(...tops) - player.y, z: 0 }, halfWidth, height);
     if (rise.moved.y <= 1e-7) return normal;

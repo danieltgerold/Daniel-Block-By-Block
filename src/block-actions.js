@@ -1,11 +1,16 @@
 import { BLOCK_TYPES } from './block-types.js';
-import { facingFromYaw, oppositeFacing, DIRECTIONS, fullCube } from './block-shapes.js';
+import { facingFromYaw, oppositeFacing, DIRECTIONS, fullCube, stairShapeAt } from './block-shapes.js';
 export function placeBlock(world, id, hit, yaw, players = []) {
   const definition = BLOCK_TYPES.get(id); if (!definition || !hit || !Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return false;
   const target = world.blockAt(hit.x, hit.y, hit.z), shape = definition.collisionShape;
   let x = hit.x + hit.normal.x, y = hit.y + hit.normal.y, z = hit.z + hit.normal.z, state = { ...definition.defaultState };
   if (definition.tags.includes('wood.logs')) state.axis = hit.normal.x ? 'x' : hit.normal.z ? 'z' : 'y';
   if (id === 'furnace') state.facing = oppositeFacing(facingFromYaw(yaw));
+  if (shape === 'stairs') {
+    state.facing = facingFromYaw(yaw);
+    state.half = hit.normal.y < 0 || !hit.normal.y && (hit.point?.y ?? hit.y) - hit.y > .5 ? 'top' : 'bottom';
+    state.shape = stairShapeAt({ x, y, z, id, definition, state }, world);
+  }
   if (shape === 'slab') {
     const mergeTarget = target?.id === id && target.state.type !== 'double'
       && (target.state.type === 'top' ? hit.normal.y < 0 : hit.normal.y > 0);

@@ -2,8 +2,39 @@ import { BLOCK_TYPES } from './block-types.js';
 export const CUBE = Object.freeze([[0, 0, 0, 1, 1, 1]]);
 export const DIRECTIONS = Object.freeze({ north: [0, 0, -1], east: [1, 0, 0], south: [0, 0, 1], west: [-1, 0, 0] });
 const turns = Object.keys(DIRECTIONS);
+export const turnFacing = (facing, amount) => turns[(turns.indexOf(facing) + amount + 4) % 4];
 export const facingFromYaw = yaw => turns[((Math.round(-yaw / (Math.PI / 2)) % 4) + 4) % 4];
 export const oppositeFacing = facing => turns[(turns.indexOf(facing) + 2) % 4];
+const stairBoxCache = new Map();
+export function stairShapeAt(block, world) {
+  const facing = block.state.facing ?? 'north', half = block.state.half ?? 'bottom';
+  const at = direction => { const [x, , z] = DIRECTIONS[direction]; return world.blockAt(block.x + x, block.y, block.z + z); };
+  const compatible = other => other?.definition.collisionShape === 'stairs' && (other.state.half ?? 'bottom') === half;
+  const guarded = direction => { const side = at(direction); return compatible(side) && side.state.facing === facing; };
+  const perpendicular = other => (DIRECTIONS[other.state.facing][0] !== 0) !== (DIRECTIONS[facing][0] !== 0);
+  const front = at(facing);
+  if (compatible(front) && perpendicular(front) && !guarded(oppositeFacing(front.state.facing))) {
+    return front.state.facing === turnFacing(facing, -1) ? 'outer-left' : 'outer-right';
+  }
+  const back = at(oppositeFacing(facing));
+  if (compatible(back) && perpendicular(back) && !guarded(back.state.facing)) {
+    return back.state.facing === turnFacing(facing, -1) ? 'inner-left' : 'inner-right';
+  }
+  return 'straight';
+}
+export function stairBoxes(state = {}) {
+  const facing = state.facing ?? 'north', half = state.half ?? 'bottom', shape = state.shape ?? 'straight';
+  const key = `${facing}:${half}:${shape}`; if (stairBoxCache.has(key)) return stairBoxCache.get(key);
+  const boxes = [half === 'top' ? [0, .5, 0, 1, 1, 1] : [0, 0, 0, 1, .5, 1]];
+  const inHalf = (direction, x, z) => direction === 'north' ? z === 0 : direction === 'south' ? z === 1 : direction === 'west' ? x === 0 : x === 1;
+  const side = turnFacing(facing, shape.endsWith('left') ? -1 : 1);
+  for (let x = 0; x < 2; x++) for (let z = 0; z < 2; z++) {
+    const front = inHalf(facing, x, z), lateral = inHalf(side, x, z);
+    const raised = shape.startsWith('outer') ? front && lateral : shape.startsWith('inner') ? front || lateral : front;
+    if (raised) boxes.push([x / 2, half === 'top' ? 0 : .5, z / 2, (x + 1) / 2, half === 'top' ? .5 : 1, (z + 1) / 2]);
+  }
+  boxes.forEach(Object.freeze); Object.freeze(boxes); stairBoxCache.set(key, boxes); return boxes;
+}
 export function fullCube(block) {
   return Boolean(block?.definition.solid && (block.definition.collisionShape === 'cube'
     || block.definition.collisionShape === 'slab' && block.state?.type === 'double'));
@@ -19,6 +50,7 @@ export function blockBoxes(block, kind = 'collision', world = null) {
   if (!block?.definition.solid) return [];
   const shape = block.definition.collisionShape, state = block.state ?? {};
   if (shape === 'slab') return state.type === 'double' ? CUBE : state.type === 'top' ? [[0, .5, 0, 1, 1, 1]] : [[0, 0, 0, 1, .5, 1]];
+  if (shape === 'stairs') return stairBoxes(state);
   if (shape === 'door') {
     let facing = state.facing ?? 'north';
     if (state.open) facing = turns[(turns.indexOf(facing) + (state.hinge === 'right' ? 3 : 1)) % 4];

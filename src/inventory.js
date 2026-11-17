@@ -8,10 +8,11 @@ export function registerItem(definition) {
   ITEMS.set(definition.id, Object.freeze({ ...definition }));
 }
 const registerBlockItem = block => registerItem({ id: block.id, name: block.name,
-  maxStack: block.maxStack, block: true, color: block.color, tags: block.tags, icon: blockIcon(block.id) });
+  maxStack: block.maxStack, block: true, color: block.color, tags: block.tags, icon: blockIcon(block.id),
+  ...(block.itemTexture ? { model: 'flat', display: block.itemModel, texture: block.itemTexture } : {}) });
 for (const block of BLOCK_TYPES.values()) registerBlockItem(block);
 onBlockTypeRegistered(registerBlockItem);
-registerItem({ id: 'stick', name: 'Stick', maxStack: 64, block: false, model: 'flat', texture: 'stick', color: '#ab8052', icon: textureIcon('stick') });
+registerItem({ id: 'stick', name: 'Stick', maxStack: 64, block: false, model: 'flat', display: 'handheld', texture: 'stick', color: '#ab8052', icon: textureIcon('stick') });
 export const HOTBAR = Array.from({ length: 9 }, (_, i) => i);
 export const MAIN = Array.from({ length: 27 }, (_, i) => i + 9);
 export const STORAGE = [...HOTBAR, ...MAIN];

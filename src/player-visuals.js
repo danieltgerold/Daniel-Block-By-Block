@@ -4,6 +4,7 @@ import { swingCurves } from './player-animation.js';
 import { ITEMS, ARMOR } from './inventory.js';
 import { createSharedBlock } from './block-assets.js';
 import { createItemMesh, setItemAppearance } from './item-assets.js';
+import { displayProfile, thirdPersonItemTransform, itemModelTransform, itemSourceAlignment } from './item-display.js';
 
 export const MODEL_SCALE = 0.9375 / 16;
 export const PLAYER_RENDER_SCALE = 0.9375;
@@ -25,20 +26,9 @@ function coloredBox(size, color) {
 
 function thirdPersonHeldBlock(handSign) {
   const item = createSharedBlock(1); // Centered unit cube; scale lives in the attachment matrix.
-  const basis = new THREE.Matrix4().makeScale(-1, -1, 1);
-  const mc = new THREE.Matrix4().makeRotationX(-Math.PI / 2)
-    .multiply(new THREE.Matrix4().makeRotationY(Math.PI))
-    .multiply(new THREE.Matrix4().makeTranslation(handSign / 16, 2 / 16, -10 / 16))
-    .multiply(new THREE.Matrix4().makeTranslation(0, 2.5 / 16, 0))
-    .multiply(new THREE.Matrix4().makeRotationX(75 * Math.PI / 180))
-    .multiply(new THREE.Matrix4().makeRotationY(handSign * Math.PI / 4))
-    .multiply(new THREE.Matrix4().makeScale(.375, .375, .375));
-  // C converts the MC shoulder/output frame into our Y-up rig. The block
-  // model itself is already Y-up, unlike the MC skeleton: do not conjugate
-  // its input frame with C again (that inverted grass tops and side edges).
   item.matrixAutoUpdate = false;
-  item.matrix.makeScale(PLAYER_RENDER_SCALE, PLAYER_RENDER_SCALE, PLAYER_RENDER_SCALE)
-    .multiply(basis).multiply(mc);
+  item.matrix.copy(thirdPersonItemTransform('block', handSign));
+  item.userData.handSign = handSign; item.userData.displayProfile = 'block';
   item.matrixWorldNeedsUpdate = true;
   return item;
 }
@@ -163,6 +153,7 @@ export function createEmptyHand(aspect = 1) {
   scene.add(rig);
   const hand = { scene, camera, rig, arm };
   hand.mainItem = createBlockItem(); hand.offhandItem = createBlockItem();
+  hand.mainItem.userData.displayContext = hand.offhandItem.userData.displayContext = 'firstperson';
   hand.mainItem.visible = hand.offhandItem.visible = false;
   hand.equipHeight = 1;
   scene.add(hand.mainItem, hand.offhandItem);
@@ -176,6 +167,19 @@ const fixedArmAlignment = new THREE.Matrix4().makeTranslation(-1, 3.6, 3.5)
   .multiply(new THREE.Matrix4().makeRotationY(-135 * Math.PI / 180))
   .multiply(new THREE.Matrix4().makeTranslation(5.6, 0, 0));
 const handRotation = new THREE.Matrix4();
+function spriteInFirstPerson(mesh, item, sign, pose, equipHeight) {
+  const p = pose.swingActive ? pose.swingProgress : 0, { inward: q, vertical: r, reach: a } = swingCurves(p, pose.swingActive);
+  const b = Math.sin(Math.PI * p * p), profile = displayProfile(item);
+  // The camera-space hand/swing/equip parent is separate from item model units.
+  // Sprite items sit a little farther forward to fit comfortably in the view.
+  mesh.matrixAutoUpdate = false; mesh.position.set(sign * (.44 - .4 * q), -.54 + .2 * r - .6 * (1 - equipHeight), -.9 - .2 * a);
+  mesh.matrix.makeTranslation(...mesh.position.toArray())
+    .multiply(handRotation.makeRotationY(sign * (45 - 20 * b) * Math.PI / 180))
+    .multiply(handRotation.makeRotationZ(-sign * 20 * q * Math.PI / 180))
+    .multiply(handRotation.makeRotationX(-80 * q * Math.PI / 180)).multiply(handRotation.makeRotationY(-sign * Math.PI / 4))
+    .multiply(itemModelTransform(profile, 'first', sign)).multiply(itemSourceAlignment(profile, 'first', sign));
+  mesh.matrixWorldNeedsUpdate = true;
+}
 export function updateEmptyHand(hand, pose, inventory = null) {
   const p = pose.swingActive ? pose.swingProgress : 0;
   const { inward: q, vertical: r, reach: a } = swingCurves(p, pose.swingActive);
@@ -193,7 +197,9 @@ export function updateEmptyHand(hand, pose, inventory = null) {
   hand.mainItem.visible = Boolean(main); hand.offhandItem.visible = Boolean(offhand);
   if (main) setItemAppearance(hand.mainItem, typeof main === 'string' ? main : main.id);
   if (offhand) setItemAppearance(hand.offhandItem, offhand.id);
-  if (main) {
+  const mainDefinition = ITEMS.get(typeof main === 'string' ? main : main?.id);
+  if (main && mainDefinition?.model === 'flat') spriteInFirstPerson(hand.mainItem, mainDefinition, 1, pose, equipHeight);
+  else if (main) {
     hand.mainItem.position.set(.56 - .4 * q, -.52 + .2 * r - .6 * (1 - equipHeight), -.72 - .2 * a);
     hand.mainItem.matrixAutoUpdate = false;
     hand.mainItem.matrix.makeTranslation(...hand.mainItem.position.toArray())
@@ -203,7 +209,8 @@ export function updateEmptyHand(hand, pose, inventory = null) {
       .multiply(handRotation.makeRotationY(-45 * Math.PI / 180));
     hand.mainItem.matrixWorldNeedsUpdate = true;
   }
-  if (offhand) { hand.offhandItem.position.set(-.56, -.52, -.72); hand.offhandItem.rotation.set(.12, -.35, 0); }
+  if (offhand && ITEMS.get(offhand.id)?.model === 'flat') spriteInFirstPerson(hand.offhandItem, ITEMS.get(offhand.id), -1, { swingActive: false }, 1);
+  else if (offhand) { hand.offhandItem.matrixAutoUpdate = true; hand.offhandItem.position.set(-.56, -.52, -.72); hand.offhandItem.rotation.set(.12, -.35, 0); }
 }
 
 export const createBlockItem = (size = .375, id = 'test.block') => createItemMesh(size, id);
@@ -214,6 +221,12 @@ export function syncEquipment(model, inventory) {
   equipment.leftItem.visible = Boolean(inventory.offhand);
   if (inventory.mainHand) setItemAppearance(equipment.rightItem, inventory.mainHand.id);
   if (inventory.offhand) setItemAppearance(equipment.leftItem, inventory.offhand.id);
+  for (const [mesh, stack] of [[equipment.rightItem, inventory.mainHand], [equipment.leftItem, inventory.offhand]]) if (stack) {
+    const profile = displayProfile(ITEMS.get(stack.id));
+    if (mesh.userData.displayProfile !== profile) {
+      mesh.matrix.copy(thirdPersonItemTransform(profile, mesh.userData.handSign)); mesh.userData.displayProfile = profile; mesh.matrixWorldNeedsUpdate = true;
+    }
+  }
   const groups = [['Head'], ['Chest', 'Left Arm', 'Right Arm'], ['Left Leg', 'Right Leg'], ['Left Leg', 'Right Leg']];
   for (let n = 0; n < ARMOR.length; n++) {
     const stack = inventory.slots[36 + n], item = ITEMS.get(stack?.id);

@@ -31,13 +31,14 @@ test('Pine/table definitions, give, cutout persistence, log faces and reusable f
   const table = getBlockMaterials('crafting.table'); assert.equal(table[2].map, getFaceTexture('crafting.top')); assert.equal(table[0].map, getFaceTexture('crafting.side'));
   assert.deepEqual(blockDrops({ definition: BLOCK_TYPES.get('crafting.table') }), [stack('crafting.table')]);
   const stick = createItemMesh(.375, 'stick'), other = createItemMesh(.375, 'stick');
-  assert.equal(ITEMS.get('stick').block, false); assert.equal(stick.geometry.type, 'PlaneGeometry');
+  assert.equal(ITEMS.get('stick').block, false); assert.equal(stick.geometry.type, 'BufferGeometry');
+  assert.equal(stick.geometry.boundingBox.max.z - stick.geometry.boundingBox.min.z, .375 / 16);
   assert.equal(stick.geometry, other.geometry); assert.equal(stick.material, other.material);
   assert.equal(stick.material.alphaTest, .5); assert.equal(stick.material.side, THREE.DoubleSide);
   setItemAppearance(stick, 'pine.log'); assert.equal(stick.geometry.type, 'BoxGeometry');
   const c = new MovementController(new VoxelWorld()), renderer = new DroppedItemRenderer(new THREE.Scene());
   const pile = c.drops.spawn('stick', 4, { x: 10, y: 1, z: 10 }); renderer.update(c.drops);
-  assert.equal(renderer.meshes.get(pile.id).children[0].geometry.type, 'PlaneGeometry');
+  assert.equal(renderer.meshes.get(pile.id).children[0].geometry.type, 'BufferGeometry');
 });
 
 test('initial recipes match either grid, all offsets, mixed planks and species-specific logs; rotations/extras are rejected', () => {

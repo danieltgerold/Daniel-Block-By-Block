@@ -6,7 +6,7 @@ export const registerSmelting = recipe => {
 export const registerFuel = (id, ticks) => { if (!Number.isSafeInteger(ticks) || ticks <= 0) throw new Error('Invalid fuel duration'); FUELS.set(id, ticks); };
 registerSmelting({ id: 'sand.glass', input: 'sand', output: 'glass', count: 1, ticks: 200, name: 'Glass' });
 for (const wood of ['oak', 'pine']) {
-  for (const part of ['log', 'planks', 'fence']) registerFuel(`${wood}.${part}`, 300);
+  for (const part of ['log', 'planks', 'fence', 'stairs']) registerFuel(`${wood}.${part}`, 300);
   registerFuel(`${wood}.door`, 200); registerFuel(`${wood}.slab`, 150);
 }
 registerFuel('crafting.table', 300); registerFuel('stick', 100);
