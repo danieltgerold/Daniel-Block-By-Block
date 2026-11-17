@@ -117,6 +117,7 @@ let profileStorage = null;
 try { profileStorage = window.localStorage; } catch { /* Session identity still works without browser storage. */ }
 const hud = new GameplayHUD(document, profileStorage);
 const inventoryUI = new InventoryUI({ inventory: controller.inventory, document, window,
+  getGameMode: () => controller.gameMode,
   onClose: () => chatUI.closeInventory(), onGameplayDrop: () => controller.requestSwing() });
 inventoryUI.preview = new InventoryPreview(document.getElementById('inventory-preview'), controller.inventory);
 const chatUI = new ChatUI({ document, window, controller, clearInput, requestCapture: captureMouse,
@@ -187,7 +188,8 @@ function animate(time) {
   const position = refreshWorldView();
   chatUI.updateVisibility();
   renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);
-  if (inventoryUI.isOpen && !controller.inventory.furnace && controller.inventory.crafting.size === 2) inventoryUI.preview.render();
+  if (inventoryUI.isOpen && !controller.inventory.furnace && (inventoryUI.creative.active
+    ? inventoryUI.creative.tab === 'inventory' : controller.inventory.crafting.size === 2)) inventoryUI.preview.render();
   hud.renderedFrame(time, position);
 }
 

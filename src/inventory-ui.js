@@ -1,5 +1,6 @@
 import { ITEMS, MAIN, HOTBAR, ARMOR, OFFHAND, CRAFT_START, CRAFT_OUTPUT, FURNACE_INPUT, FURNACE_FUEL, FURNACE_OUTPUT } from './inventory.js';
 import { RecipeBookUI } from './recipe-book-ui.js';
+import { CreativeInventoryUI } from './creative-inventory-ui.js';
 
 export function drawStack(document, element, stack, extra = 0) {
   const signature = stack ? `${stack.id}:${stack.count + extra}` : '';
@@ -19,8 +20,8 @@ export function drawStack(document, element, stack, extra = 0) {
 }
 
 export class InventoryUI {
-  constructor({ inventory, document, window, onClose = () => {}, onGameplayDrop = () => {} }) {
-    Object.assign(this, { inventory, document, window, onClose, onGameplayDrop });
+  constructor({ inventory, document, window, onClose = () => {}, onGameplayDrop = () => {}, getGameMode = () => 'survival' }) {
+    Object.assign(this, { inventory, document, window, onClose, onGameplayDrop, getGameMode });
     this.root = document.getElementById('inventory-screen');
     this.panel = document.getElementById('inventory-panel');
     this.cursorView = document.getElementById('cursor-stack');
@@ -46,6 +47,7 @@ export class InventoryUI {
     this.output = document.getElementById('crafting-output'); this.output.dataset.slot = CRAFT_OUTPUT;
     this.slotViews.set(CRAFT_OUTPUT, this.output);
     this.book = new RecipeBookUI({ document, crafting: inventory.crafting, drawStack });
+    this.creative = new CreativeInventoryUI(this, drawStack);
     for (const [id, index, label] of [['furnace-input', FURNACE_INPUT, 'Furnace input'], ['furnace-fuel', FURNACE_FUEL, 'Furnace fuel'], ['furnace-output', FURNACE_OUTPUT, 'Furnace output']]) makeSlot(document.getElementById(id), index, label, this.slotViews);
     const listen = (target, name, fn) => { target.addEventListener(name, fn); this.removers.push(() => target.removeEventListener(name, fn)); };
     listen(this.root, 'contextmenu', e => e.preventDefault());
@@ -53,10 +55,11 @@ export class InventoryUI {
     listen(this.root, 'mouseover', e => {
       const slot = e.target.closest?.('[data-slot]');
       this.hovered = slot ? Number(slot.dataset.slot) : null;
+      this.creative.hover(e.target);
       this.pointer = { x: e.clientX, y: e.clientY }; this.updateTooltip();
       if (this.gesture && slot) this.visit(this.hovered);
     });
-    listen(this.root, 'mouseleave', () => { this.hovered = null; this.updateTooltip(); });
+    listen(this.root, 'mouseleave', () => { this.hovered = null; this.creative.hovered = null; this.updateTooltip(); });
     listen(window, 'mousemove', e => {
       if (!this.isOpen) return;
       this.cursorView.style.left = `${e.clientX}px`; this.cursorView.style.top = `${e.clientY}px`;
@@ -67,7 +70,8 @@ export class InventoryUI {
       if (!this.gesture || e.button !== this.gesture.button) return;
       const { indices, button, start } = this.gesture;
       this.gesture = null;
-      if (indices.size > 1 || (indices.size === 1 && !indices.has(start))) { inventory.drag(indices, button); this.lastClick = null; }
+      if (button === 1 && this.creative.active) this.creative.model.fill(indices);
+      else if (indices.size > 1 || (indices.size === 1 && !indices.has(start))) { inventory.drag(indices, button); this.lastClick = null; }
       else inventory.click(start, button);
       this.render();
     });
@@ -84,13 +88,17 @@ export class InventoryUI {
   open(size = 2) {
     this.inventory.closeFurnace(); this.book.furnaceInventory = null; this.root.classList.remove('furnace-view');
     this.isOpen = true; this.root.hidden = false; this.hotbar.hidden = true;
+    this.creativeOpen = size === 2 && this.getGameMode() === 'creative';
     this.root.classList.toggle('table-view', size === 3);
     this.document.getElementById('crafting-grid').style.setProperty('--craft-size', size);
-    this.inventory.crafting.begin(size); this.book.reset();
+    if (this.creativeOpen) { this.inventory.crafting.end(); this.book.root.hidden = true; this.panel.classList.remove('book-open'); }
+    else { this.inventory.crafting.begin(size); this.book.reset(); }
     this.hovered = null; this.gesture = null; this.lastClick = null;
     this.document.activeElement?.blur(); this.preview?.reset(); this.render();
+    if (this.creativeOpen) this.creative.open();
   }
   close() {
+    this.creative.reset(); this.creativeOpen = false;
     this.furnaceUnsubscribe?.(); this.furnaceUnsubscribe = null; this.book.furnaceInventory = null;
     this.gesture = null; this.hovered = null; this.lastClick = null;
     this.inventory.close(); this.isOpen = false; this.root.hidden = true;
@@ -99,6 +107,7 @@ export class InventoryUI {
     this.tooltip.hidden = true;
   }
   openFurnace(entity) {
+    this.creativeOpen = false; this.creative.reset();
     this.isOpen = true; this.root.hidden = false; this.hotbar.hidden = true; this.root.classList.add('furnace-view');
     this.hovered = null; this.gesture = null; this.lastClick = null; this.document.activeElement?.blur();
     this.book.furnaceInventory = this.inventory; this.inventory.openFurnace(entity);
@@ -106,7 +115,7 @@ export class InventoryUI {
     this.book.reset(); this.render();
   }
   updateTooltip() {
-    const stack = this.hovered === null ? null : this.stackAt(this.hovered);
+    const stack = this.creative.catalog && this.creative.hovered ? { id: this.creative.hovered } : this.hovered === null ? null : this.stackAt(this.hovered);
     this.tooltip.hidden = !this.isOpen || !stack;
     if (this.tooltip.hidden) return;
     this.tooltip.textContent = ITEMS.get(stack.id).name;
@@ -115,12 +124,14 @@ export class InventoryUI {
     this.tooltip.style.top = `${Math.max(8, this.pointer.y - 30)}px`;
   }
   mouseDown(event) {
-    if (!this.isOpen || (event.button !== 0 && event.button !== 2)) return;
+    if (!this.isOpen) return;
+    if (this.creative.mouseDown(event)) return;
+    if (event.button !== 0 && event.button !== 2 && !(event.button === 1 && this.creative.active)) return;
     if (event.target.closest?.('[data-recipe-book], #recipe-book-toggle, #furnace-book-toggle, input, select')) return;
     event.preventDefault();
     const slot = event.target.closest?.('[data-slot]');
     if (!slot) {
-      if (!this.panel.contains(event.target)) this.inventory.dropCursor(event.button === 0);
+      if (event.button !== 1 && !this.panel.contains(event.target)) this.inventory.dropCursor(event.button === 0);
       return;
     }
     const i = Number(slot.dataset.slot), now = this.window.performance.now();
@@ -130,6 +141,13 @@ export class InventoryUI {
       this.inventory.crafting.take({ destination: event.shiftKey ? 'inventory' : 'cursor', repeat: event.shiftKey }); return;
     }
     if (!this.inventory.isSlot(i)) return;
+    if (this.creative.catalog && (i < 0 || i > 8)) return;
+    if (event.button === 1 && this.creative.active) {
+      if (!this.inventory.cursor) this.creative.model.clone(i);
+      else { this.gesture = { start: i, button: 1, indices: new Set() }; this.visit(i); }
+      this.lastClick = null; return;
+    }
+    if (event.shiftKey && this.creative.catalog) { this.creative.model.remove(i); this.lastClick = null; return; }
     const id = this.inventory.slots[i]?.id ?? this.inventory.cursor?.id ?? this.lastClick?.id;
     const double = event.button === 0 && this.lastClick?.button === 0 && this.lastClick?.index === i && now - this.lastClick.time < 250
       && this.lastClick.shift === event.shiftKey && id === this.lastClick.id;
@@ -146,13 +164,16 @@ export class InventoryUI {
     this.lastClick = double ? null : { index: i, time: now, id, shift: event.shiftKey, button: event.button };
   }
   visit(index) {
+    if (this.creative.catalog && (index < 0 || index > 8)) return;
     const cursor = this.inventory.cursor, stack = this.inventory.slots[index];
     if (!cursor || !this.inventory.accepts(index, cursor.id) || (stack && (stack.id !== cursor.id || stack.count === ITEMS.get(cursor.id).maxStack))) return;
     if (!this.gesture.indices.has(index)) { this.gesture.indices.add(index); this.render(); }
   }
   handleKey(event) {
+    if (this.creative.handleKey(event)) return;
     const i = this.hovered;
     if (i === null || event.repeat) return;
+    if (this.creative.catalog && (i < 0 || i > 8)) return;
     this.gesture = null;
     const digit = /^(?:Digit|Numpad)([1-9])$/.exec(event.code);
     if (i === CRAFT_OUTPUT) {
@@ -179,7 +200,9 @@ export class InventoryUI {
     return true;
   }
   render() {
-    const plan = this.gesture ? this.inventory.dragPlan(this.gesture.indices, this.gesture.button) : new Map();
+    this.creative.render();
+    const cloneDrag = this.gesture?.button === 1 && this.creative.active;
+    const plan = this.gesture ? cloneDrag ? this.creative.model.fillPlan(this.gesture.indices) : this.inventory.dragPlan(this.gesture.indices, this.gesture.button) : new Map();
     for (const [index, button] of this.slotViews) {
       if (index >= CRAFT_START && index < CRAFT_OUTPUT) {
         button.hidden = index >= CRAFT_START + this.inventory.crafting.size ** 2;
@@ -194,12 +217,12 @@ export class InventoryUI {
       drawStack(this.document, button, this.inventory.slots[index]);
       button.classList.toggle('selected-slot', index === this.inventory.selected);
     }
-    const remaining = this.inventory.cursor ? this.inventory.cursor.count - [...plan.values()].reduce((a, b) => a + b, 0) : 0;
+    const remaining = this.inventory.cursor ? this.inventory.cursor.count - (cloneDrag ? 0 : [...plan.values()].reduce((a, b) => a + b, 0)) : 0;
     drawStack(this.document, this.cursorView, remaining ? { id: this.inventory.cursor.id, count: remaining } : null);
     this.cursorView.style.left = `${this.pointer.x}px`; this.cursorView.style.top = `${this.pointer.y}px`;
     this.cursorView.hidden = !this.isOpen || remaining === 0;
     this.updateTooltip();
-    this.book.render();
+    if (!this.creative.active) this.book.render();
     const entity = this.inventory.furnace;
     this.document.getElementById('furnace-area').hidden = !entity;
     this.document.getElementById('furnace-flame').value = entity ? entity.burnTime / Math.max(1, entity.burnDuration) : 0;
@@ -209,5 +232,5 @@ export class InventoryUI {
     this.document.getElementById('furnace-progress').value = entity ? entity.cookTime / (entity.recipe?.ticks ?? 200) : 0;
   }
   stackAt(index) { return index === CRAFT_OUTPUT ? this.inventory.crafting.output : this.inventory.slots[index]; }
-  dispose() { this.furnaceUnsubscribe?.(); this.unsubscribe(); this.book.dispose(); for (const remove of this.removers) remove(); }
+  dispose() { this.furnaceUnsubscribe?.(); this.unsubscribe(); this.book.dispose(); this.creative.dispose(); for (const remove of this.removers) remove(); }
 }

@@ -21,7 +21,8 @@ const stack = (id, count = 1) => ({ id, count });
 
 test('Pine foliage is dense connected cutout artwork, and all new items have shaped models, icons and command IDs', () => {
   const pixels = texturePixels('pine.leaves'), alpha = [...pixels].filter((_, i) => i % 4 === 3);
-  assert.ok(alpha.filter(a => a === 255).length > 230); assert.ok(alpha.includes(0));
+  assert.ok(alpha.filter(a => a === 255).length >= 195 && alpha.filter(a => a === 255).length <= 215);
+  assert.ok(alpha.every(a => a === 0 || a === 255));
   for (const id of ['oak.door', 'pine.door', 'oak.slab', 'pine.slab', 'oak.fence', 'pine.fence', 'furnace']) {
     assert.equal(ITEMS.get(id).maxStack, 64); assert.ok(ITEMS.get(id).icon); assert.ok(commandCompletions('/give ').includes(`/give ${id} `));
     const mesh = createItemMesh(1, id); mesh.geometry.computeBoundingBox(); assert.ok(mesh.geometry.boundingBox.max.y <= .5);

@@ -67,6 +67,11 @@ test('both sprite profiles grip by their end, use model-unit TRS, and follow ani
       for (let n = 0; n < vertices.count; n++) projected.expandByPoint(new THREE.Vector3().fromBufferAttribute(vertices, n).applyMatrix4(mesh.matrixWorld).project(hand.camera));
       assert.ok(projected.max.x > -1 && projected.min.x < 1 && projected.max.y > -1 && projected.min.y < 1, 'resting sprite is in view');
       assert.ok(projected.getSize(new THREE.Vector3()).x < 1, 'not oversized across the screen');
+      if (profile === 'generated') {
+        assert.ok(projected.max.y < -.2, 'Door stays entirely in the lower view, clear of the crosshair');
+        assert.ok(projected.getSize(new THREE.Vector3()).y < .65, 'Door occupies less than a third of the screen height');
+        assert.ok(projected.getSize(new THREE.Vector3()).x < .35, 'Door is a compact held picture');
+      }
     }
     const rest = [...hand.mainItem.matrix.elements]; updateEmptyHand(hand, { ...base, swingActive: true, swingProgress: .35 }, inventory);
     assert.notDeepEqual(hand.mainItem.matrix.elements, rest); updateEmptyHand(hand, { ...base, equipHeight: .2 }, inventory);

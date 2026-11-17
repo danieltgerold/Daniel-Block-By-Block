@@ -62,7 +62,7 @@ test('held grass top/side UVs stay upright in both hands and all F5 views withou
 });
 
 test('glass and leaves have real binary alpha in shared textures, static icons, held/drop materials and particle samplers', () => {
-  for (const id of ['glass', 'oak.leaves']) {
+  for (const id of ['glass', 'oak.leaves', 'pine.leaves']) {
     const pixels = texturePixels(id), alpha = [...pixels].filter((_, i) => i % 4 === 3);
     assert.ok(alpha.includes(0) && alpha.includes(255)); assert.ok(alpha.every(a => a === 0 || a === 255));
     if (id === 'glass') assert.ok(alpha.filter(a => !a).length > 170, 'Glass is mostly clear');
@@ -86,6 +86,7 @@ test('opaque faces remain behind cutouts, same glass faces disappear, and fancy 
   const cases = [
     ['stone', 'glass', 1, 0], ['glass', 'stone', 0, 1], ['stone', 'oak.leaves', 1, 0],
     ['glass', 'glass', 0, 0], ['oak.leaves', 'oak.leaves', 1, 1], ['glass', 'oak.leaves', 1, 1],
+    ['pine.leaves', 'pine.leaves', 1, 1], ['pine.leaves', 'oak.leaves', 1, 1],
   ];
   for (const [a, b, plus, minus] of cases) {
     const w = new VoxelWorld({ depth: 0 }); w.setBlock(0, 0, 0, a); w.setBlock(1, 0, 0, b);
@@ -97,7 +98,7 @@ test('opaque faces remain behind cutouts, same glass faces disappear, and fancy 
       assert.equal(facesAt(left, 16, 1), plus); assert.equal(facesAt(right, 0, -1), minus);
       for (const mesh of [left, right]) for (const group of mesh.groups) {
         const material = getFaceMaterial(group.texture);
-        assert.equal(material.alphaTest > 0, ['glass', 'oak.leaves'].includes(group.texture));
+        assert.equal(material.alphaTest > 0, ['glass', 'oak.leaves', 'pine.leaves'].includes(group.texture));
       }
     }
   }

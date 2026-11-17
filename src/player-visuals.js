@@ -170,6 +170,18 @@ const handRotation = new THREE.Matrix4();
 function spriteInFirstPerson(mesh, item, sign, pose, equipHeight) {
   const p = pose.swingActive ? pose.swingProgress : 0, { inward: q, vertical: r, reach: a } = swingCurves(p, pose.swingActive);
   const b = Math.sin(Math.PI * p * p), profile = displayProfile(item);
+  if (profile === 'generated') {
+    // Door sprites are unit-sized, bottom-gripped pictures. The former full
+    // .68 display plus endpoint alignment lifted most of one above the hand.
+    // Use ONE compact camera-facing display, rather than stacking another
+    // Java hand/model alignment onto that already-adapted source origin.
+    mesh.matrixAutoUpdate = false;
+    mesh.position.set(sign * (.50 - .22 * q), -.57 + .12 * r - .6 * (1 - equipHeight), -.95 - .14 * a);
+    mesh.matrix.makeTranslation(...mesh.position.toArray())
+      .multiply(handRotation.makeRotationY(-sign * .15 * q)).multiply(handRotation.makeRotationZ(-sign * (.08 + .3 * q)))
+      .scale(new THREE.Vector3(.40, .40, .40)).multiply(handRotation.makeTranslation(0, .40625, 0));
+    mesh.matrixWorldNeedsUpdate = true; return;
+  }
   // The camera-space hand/swing/equip parent is separate from item model units.
   // Sprite items sit a little farther forward to fit comfortably in the view.
   mesh.matrixAutoUpdate = false; mesh.position.set(sign * (.44 - .4 * q), -.54 + .2 * r - .6 * (1 - equipHeight), -.9 - .2 * a);

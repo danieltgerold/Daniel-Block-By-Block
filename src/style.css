@@ -125,4 +125,15 @@ span.item-icon { background: var(--item-color, #d9dfcd); }
 #furnace-progress::-moz-progress-bar { background: #41654e; }
 .recipe-list { max-height: 300px; overflow-y: auto; }
 #furnace-book-toggle { width: auto; padding: 6px; font-size: 11px; }
+.creative-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 10px; }
+.creative-tabs button { width: auto; padding: 6px 9px; font-size: 11px; border-radius: 0; }
+.creative-tabs .active-tab { background: #819b60; border-color: #41654e; }
+.creative-catalog { display: grid; grid-template-columns: minmax(0, 1fr) 20px; gap: 8px; }
+.creative-search { grid-column: 1 / -1; width: 100%; padding: 7px; color: #263e35; background: #f3f7ec; border: 1px solid #8b9f8c; }
+.creative-grid { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; }
+.creative-scroll { writing-mode: vertical-lr; direction: rtl; width: 20px; height: 100%; margin: 0; accent-color: #41654e; }
+.creative-scroll:disabled { opacity: .35; }
+.creative-view .crafting-area, .creative-view #recipe-book { display: none; }
+.creative-catalog-view .inventory-top, .creative-catalog-view #inventory-main { display: none; }
+button.creative-destroy { margin-top: 10px; width: auto; padding: 6px 10px; height: 36px; color: #693b30; border-color: #9c6c60; }
 @media (max-width: 720px) { .inventory-panel.book-open .inventory-workspace { flex-direction: column; } .recipe-book { width: 100%; border-right: 0; padding-right: 0; } .recipe-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; } .recipe-ghost { display: inline-block; } }

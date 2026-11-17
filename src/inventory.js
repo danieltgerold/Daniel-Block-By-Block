@@ -8,7 +8,7 @@ export function registerItem(definition) {
   ITEMS.set(definition.id, Object.freeze({ ...definition }));
 }
 const registerBlockItem = block => registerItem({ id: block.id, name: block.name,
-  maxStack: block.maxStack, block: true, color: block.color, tags: block.tags, icon: blockIcon(block.id),
+  maxStack: block.maxStack, block: true, color: block.color, tags: block.tags, creativeCategory: block.creativeCategory, icon: blockIcon(block.id),
   ...(block.itemTexture ? { model: 'flat', display: block.itemModel, texture: block.itemTexture } : {}) });
 for (const block of BLOCK_TYPES.values()) registerBlockItem(block);
 onBlockTypeRegistered(registerBlockItem);

@@ -170,6 +170,7 @@ export class ChatUI {
     }
     if (this.mode === 'inventory') {
       if (isTextEntry(event.target) && event.key !== 'Escape') {
+        if (this.inventoryUI?.creative?.handleKey(event, true)) event.preventDefault();
         event.stopPropagation();
         if (event.code === 'F3' || event.code === 'F5') event.preventDefault();
         return;

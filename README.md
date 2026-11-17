@@ -352,7 +352,7 @@ Pine Leaves (`pine.leaves`), Crafting Table (`crafting.table`), Oak/Pine Slab
 (`oak.door`, `pine.door`), and Furnace (`furnace`). Stick (`stick`)
 is a separate non-placeable item with a shared cutout sprite, rather than a cube.
 For example, `/give grass.block 64`; Tab completes all registered item IDs.
-There is no creative inventory, tool requirement, or falling Sand/Gravel behavior yet.
+There is no tool requirement or falling Sand/Gravel behavior yet.
 
 Definitions share cube collision/placement/breaking code and specify names, IDs,
 face textures, stack sizes, solidity, opacity, collision shape, breaking time,
@@ -458,7 +458,7 @@ The 3x3 book also offers matching-wood slabs (three planks in a row -> six), fen
 three), stairs (six planks in a three-row staircase -> four, including its mirror),
 and a Furnace (eight Cobblestone around an empty center -> one). These
 wood recipes require a single species, unlike the mixed-plank Stick/Table recipes.
-No tools, tree generation or creative inventory are added.
+No tools or tree generation are added.
 
 ## Partial blocks and directional placement
 
@@ -503,6 +503,46 @@ model-unit translations and end-grip source alignment in both animated hands;
 ordinary block and first-person equip/action paths remain separate. The carried
 stack icon centers on viewport pointer coordinates with percentage transforms,
 keeping the count at lower right and pointer events disabled in every inventory.
+
+Pine Leaves retain a connected dark-green canopy with approximately 20% small,
+irregular clear pixels across the whole tile. Shared binary-cutout textures serve
+world faces, icons, held items and drops; fancy neighboring leaf faces remain
+visible through gaps. Collision, persistence and leaf drop rules are unchanged.
+First-person Door items use one compact camera-facing picture, bottom-gripped in
+the lower right/left, rather than lifting a full-size generated sprite through
+stacked alignments. Stick, regular-block, third-person and equip/swing paths stay
+separate. Internal projection checks keep resting Doors clear of the crosshair.
+
+## Creative inventory
+
+E in Creative opens a registry-backed 5x9 catalog above the **real** hotbar, with
+Building, Nature, Functional, Materials, Search and Player Inventory tabs. Only
+populated categories appear. Items can set `creativeCategory` (block definitions
+pass it to their item) or use the default classification. New templates appear on
+the next interface update. Search matches names/IDs without case sensitivity;
+T opens it, row scrolling resets on filtering, and the scrollbar disables when
+all items fit. Forty-five reusable cells and cached icons avoid per-frame rebuilds.
+
+Catalog left/right click takes one, Shift-click/middle-click takes a full stack.
+With a carried matching stack, left adds one, Shift fills it, right removes one.
+A different template clears the carried stack on left-click or removes one on
+right-click. Number keys replace the numbered hotbar slot with a full stack;
+Q/Ctrl+Q creates a thrown item/full stack. The catalog itself never loses items.
+Shift-clicking a real hotbar slot deletes it only in the catalog view.
+
+Player Inventory exposes the same main storage, hotbar, armor, offhand and preview,
+with crafting disabled. Normal real-slot interactions are reused, plus empty-cursor
+middle-click cloning and middle-drag filling compatible slots to their stack cap
+without consuming the cursor. Armor/offhand rules remain enforced. Destroy Item
+deletes the cursor; Shift-click clears all real storage/equipment without drops.
+These creative actions are mode-guarded and unavailable in Survival. No Saved
+Hotbars page or shortcuts exist. Mode changes never replace/grant real inventory.
+
+Inventory opening clears gameplay inputs and keeps airborne velocity, dropped
+items and furnaces ticking. Search typing cannot move, chat or change hotbar;
+number shortcuts still work over catalog templates. E closes outside text entry,
+Escape always closes, and carried stacks return through existing safe storage/
+overflow handling. Survival retains its existing crafting and inventory interface.
 
 ## Furnaces
 
