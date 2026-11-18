@@ -79,6 +79,7 @@ export class ChatUI {
   }
 
   openChat(prefix = '') {
+    if (this.controller.vitals?.dead) return;
     if (!['playing', 'ready'].includes(this.mode)) return;
     this.setMode('chat');
     this.pointerLocked = false;
@@ -101,6 +102,7 @@ export class ChatUI {
   }
 
   openInventory(size = 2) {
+    if (this.controller.vitals?.dead) return;
     if (!this.inventoryUI || !['playing', 'ready'].includes(this.mode)) return;
     this.setMode('inventory'); this.pointerLocked = false; this.requestUnlock(); this.inventoryUI.open(size);
   }
@@ -113,7 +115,7 @@ export class ChatUI {
   }
 
   resume() {
-    if (this.mode === 'chat' || this.mode === 'inventory') return;
+    if (this.mode === 'chat' || this.mode === 'inventory' || this.mode === 'death') return;
     // Capture may be denied after Escape's browser unlock gesture. In that case
     // stay ready, with a real click-to-resume button instead of opening the menu.
     Promise.resolve(this.requestCapture()).catch(() => {
@@ -124,7 +126,7 @@ export class ChatUI {
   onPointerLockChange(locked) {
     this.pointerLocked = locked;
     if (locked) {
-      if (this.mode === 'chat' || this.mode === 'inventory') { this.requestUnlock(); return; }
+      if (this.mode === 'chat' || this.mode === 'inventory' || this.mode === 'death') { this.requestUnlock(); return; }
       this.setMode('playing');
     } else if (this.mode === 'playing') {
       this.setMode('menu');
@@ -132,6 +134,7 @@ export class ChatUI {
   }
 
   pause() {
+    if (this.mode === 'death') { this.requestUnlock(); return; }
     if (this.mode === 'inventory') this.inventoryUI?.close();
     this.elements['chat-input'].value = '';
     this.elements['chat-input'].blur();
@@ -142,6 +145,10 @@ export class ChatUI {
   }
 
   handleKeyDown(event) {
+    if (this.mode === 'death') {
+      if (event.code === 'F3' || event.code === 'F5' || event.key === 'Escape') event.preventDefault();
+      event.stopPropagation(); return;
+    }
     if (this.mode === 'playing' && !isTextEntry(event.target)) {
       if (event.code === 'F3') {
         event.preventDefault(); event.stopPropagation();
@@ -240,6 +247,17 @@ export class ChatUI {
       this.renderCompletions(this.service.completions(field.value));
     } else this.renderCompletions(state.matches, state.index);
   }
+  showDeath() {
+    if (this.mode === 'death') return;
+    if (this.mode === 'inventory') this.inventoryUI?.close();
+    this.elements['chat-input'].value = ''; this.document.activeElement?.blur();
+    this.pointerLocked = false; this.setMode('death'); this.requestUnlock();
+    this.document.getElementById('respawn').focus({preventScroll:true});
+  }
+  respawn() {
+    if (this.mode !== 'death') return;
+    this.controller.respawn(); this.setMode('ready'); this.resume();
+  }
 
   renderCompletions(matches, selected = -1) {
     const list = this.elements['chat-completions'];
@@ -282,7 +300,7 @@ export class ChatUI {
     const age = time - this.lastMessageAt;
     const opacity = open ? 1 : Math.max(0, Math.min(1, 1 - (age - 10_000) / 1000));
     const panel = this.elements['chat-panel'];
-    panel.hidden = this.mode === 'menu' || (!open && (this.service.messages.length === 0 || opacity === 0));
+    panel.hidden = this.mode === 'menu' || this.mode === 'death' || (!open && (this.service.messages.length === 0 || opacity === 0));
     panel.style.opacity = String(opacity);
   }
 

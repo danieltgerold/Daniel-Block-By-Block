@@ -7,6 +7,7 @@ export function breakTargetBlock({ controller, world, yaw, pitch, feet = control
   const block = hit ? world.blockAt(hit.x, hit.y, hit.z) : null;
   if (!block || !world.destroyBlock(hit.x, hit.y, hit.z, { gameMode: controller.gameMode, tool: controller.inventory.mainHand, player: controller.player })) return false;
   controller.particles?.breakBlock(block);
+  if (controller.gameMode !== 'creative') controller.vitals?.exhaust(.005);
   onBreak(hit.x, hit.y, hit.z); return true;
 }
 export class BlockPlacement {
@@ -23,12 +24,14 @@ export class BlockPlacement {
 
   release(cancel = false) {
     this.controller.placementHeld = false;
+    this.controller.eating?.cancel();
     if (cancel) { this.controller.placementPresses = 0; this.controller.placementRepeat = 0; }
   }
 
   tick() {
     if (!this.canInteract()) { this.release(true); return false; }
     if (this.controller.placementRepeat > 0) this.controller.placementRepeat--;
+    if (this.controller.eating?.active) return this.controller.eating.tick(this.controller.placementHeld);
     const presses = this.controller.placementPresses;
     this.controller.placementPresses = 0;
     let placed = false;
@@ -40,6 +43,7 @@ export class BlockPlacement {
       placed = this.attempt() || placed;
       this.controller.placementRepeat = 4;
     }
+    if (this.controller.eating?.active) return this.controller.eating.tick(this.controller.placementHeld);
     return placed;
   }
 
@@ -64,6 +68,10 @@ export class BlockPlacement {
     }
     if (block?.definition.interaction && !secondary && this.onUse(block)) {
       this.release(true); return true;
+    }
+    if (ITEMS.get(stack?.id)?.food) {
+      if (this.controller.placementHeld) this.controller.eating?.start();
+      return false;
     }
     if (this.controller.miningHeld || !stack || !ITEMS.get(stack.id)?.block) return false;
     if (!hit || !Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return false;

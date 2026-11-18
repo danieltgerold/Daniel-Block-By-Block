@@ -7,7 +7,7 @@ export const lerpAngle = (from, to, alpha) => wrapAngle(from + angleDifference(f
 export function createPlayerAnimation(aimYaw = 0, aimPitch = 0) {
   return { amount: 0, phase: 0, aimYaw, aimPitch, torsoYaw: aimYaw,
     swingAge: -1, swingSerial: 0, swingStartedThisTick: false, crouch: 0,
-    equipInitialized: false, equippedItem: null, equipHeight: 1 };
+    equipInitialized: false, equippedItem: null, equipHeight: 1, eating: false, eatAge: 0 };
 }
 
 // Identity excludes stack count: dropping one from a stack only swings it.
@@ -63,6 +63,8 @@ export function interpolatePlayerAnimation(previous, current, alpha) {
     equipHeight: previous.equipHeight + (current.equipHeight - previous.equipHeight) * alpha,
     equippedItem: current.equippedItem,
     equipInitialized: current.equipInitialized,
+    eating: current.eating,
+    eatAge: current.eating ? (previous.eating ? previous.eatAge : 0) + (current.eatAge - (previous.eating ? previous.eatAge : 0)) * alpha : 0,
   };
   if (previous.swingAge >= 0) {
     // Finish the old cycle toward 1, including when a held click starts a new one.

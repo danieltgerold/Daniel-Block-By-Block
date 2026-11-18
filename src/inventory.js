@@ -16,6 +16,10 @@ const registerBlockItem = block => registerItem({ id: block.id, name: block.name
 for (const block of BLOCK_TYPES.values()) if (block.inventoryItem !== false) registerBlockItem(block);
 onBlockTypeRegistered(block => { if (block.inventoryItem !== false) registerBlockItem(block); });
 registerItem({ id: 'stick', name: 'Stick', maxStack: 64, block: false, model: 'flat', display: 'handheld', texture: 'stick', color: '#ab8052', icon: textureIcon('stick') });
+for (const [id,name,hunger,saturation,color] of [
+  ['raw.porkchop','Raw Porkchop',3,1.8,'#ee8f9c'], ['cooked.porkchop','Cooked Porkchop',8,12.8,'#a96b3e'],
+]) registerItem({ id,name,maxStack:64,block:false,model:'flat',display:'item',texture:id,spriteDepth:0,
+  color,icon:textureIcon(id),creativeCategory:'materials',creativeKind:'food',food:Object.freeze({hunger,saturation}) });
 for (const [id, name, maxStack] of [['bucket', 'Bucket', 16], ['water.bucket', 'Water Bucket', 1]]) registerItem({
   id, name, maxStack, block: false, model: 'flat', display: 'item', texture: id, spriteDepth: 0, creativeCategory: 'functional',
   creativeKind: 'bucket', creativeMaterial: id === 'bucket' ? 'empty' : 'water', icon: textureIcon(id),
@@ -185,6 +189,15 @@ export class PlayerInventory {
       this.cursor = null;
     }
     this.changed();
+  }
+  dropCarried(onDrop = this.onDrop) {
+    // Slot 50 is a computed crafting result; 51+ belong to the open furnace.
+    // Clear ownership before notifying listeners or emitting any world items.
+    const stacks = this.slots.slice(0,50).filter(Boolean).map(copyStack);
+    if (this.cursor) stacks.push(copyStack(this.cursor));
+    for (let i=0;i<50;i++) this.slots[i] = null;
+    this.cursor = null; this.changed();
+    for (const stack of stacks) onDrop(stack);
   }
   openFurnace(entity) {
     this.closeFurnace(); this.crafting.end(); this.furnace = entity;

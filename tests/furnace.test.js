@@ -11,7 +11,7 @@ const ticks = (entity, count) => { for (let n = 0; n < count; n++) entity.tick()
 function furnace(fuel = 'oak.planks', count = 1, sand = 2) { return new FurnaceEntity({ slots: [stack('sand', sand), stack(fuel, count), null] }); }
 
 test('smelting/fuel registries use exact tick values and a plank cooks once plus 100 ticks of the next Sand', () => {
-  assert.equal(SMELTING.size, 1); assert.equal(SMELTING.get('sand').ticks, 200);
+  assert.equal(SMELTING.size, 2); assert.equal(SMELTING.get('sand').ticks, 200);
   for (const wood of ['oak', 'pine']) for (const [part, duration] of [['log', 300], ['planks', 300], ['fence', 300], ['door', 200], ['slab', 150]]) assert.equal(FUELS.get(`${wood}.${part}`), duration);
   assert.equal(FUELS.get('crafting.table'), 300); assert.equal(FUELS.get('stick'), 100); assert.equal(FUELS.has('pine.leaves'), false);
   const f = furnace(); ticks(f, 199); assert.equal(f.slots[2], null); assert.equal(f.cookTime, 199);

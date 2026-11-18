@@ -37,6 +37,9 @@ test('furnace UI shift routes input/fuel, rejects invalid insertion/output place
   ui.onPointerLockChange(true); ui.openFurnace(f);
   mouse(view.slotViews.get(OUTPUT), 'mouseover'); key('Digit9'); assert.equal(i.slots[8].id, 'glass'); assert.equal(f.slots[2], null);
   document.getElementById('furnace-book-toggle').click(); const button = view.book.buttons.get('smelting:sand.glass'); assert.ok(button && !button.hidden);
+  const pork = view.book.buttons.get('smelting:porkchop.cooked'); assert.ok(pork && !pork.hidden);
+  i.slots[3] = stack('raw.porkchop',2); i.changed();
+  pork.dispatchEvent(new window.MouseEvent('click',{bubbles:true})); assert.equal(f.slots[0].id,'raw.porkchop'); assert.equal(f.slots[0].count,1);
   button.dispatchEvent(new window.MouseEvent('click', { shiftKey: true, bubbles: true })); assert.equal(f.slots[0].count, 4); assert.equal(f.slots[2], null);
   assert.ok(view.root.classList.contains('furnace-view'));
   const time = c.drops.time; ui.pause(); assert.equal(ui.mode, 'menu'); assert.equal(c.drops.time, time);

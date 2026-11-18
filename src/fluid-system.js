@@ -123,4 +123,27 @@ export class FluidSystem {
     return { inWater: count > 0, x: x / (count || 1), y: y / (count || 1), z: z / (count || 1) };
   }
   submerged(point) { return point.y < waterSurfaceAt(this.world, point); }
+  touchesPath(from, to, halfWidth, height) {
+    if (!this.cells.size) return false;
+    const min = {x:Math.min(from.x,to.x)-halfWidth,y:Math.min(from.y,to.y),z:Math.min(from.z,to.z)-halfWidth};
+    const max = {x:Math.max(from.x,to.x)+halfWidth,y:Math.max(from.y,to.y)+height,z:Math.max(from.z,to.z)+halfWidth};
+    const touches = at => {
+      const b=this.at(at.x,at.y,at.z); if(!isWater(b))return false;
+      const low={x:at.x-halfWidth,y:at.y-height,z:at.z-halfWidth};
+      const high={x:at.x+1+halfWidth,y:at.y+waterHeight(b),z:at.z+1+halfWidth};
+      let enter=0,exit=1;
+      for(const axis of ['x','y','z']) {
+        const delta=to[axis]-from[axis];
+        if(!delta) {if(from[axis]<=low[axis] || from[axis]>=high[axis])return false;}
+        else {const a=(low[axis]-from[axis])/delta,b=(high[axis]-from[axis])/delta;enter=Math.max(enter,Math.min(a,b));exit=Math.min(exit,Math.max(a,b));}
+      }
+      return exit>=enter;
+    };
+    const volume=(Math.ceil(max.x)-Math.floor(min.x))*(Math.ceil(max.y)-Math.floor(min.y))*(Math.ceil(max.z)-Math.floor(min.z));
+    if(volume<512) {
+      for(let x=Math.floor(min.x);x<max.x;x++)for(let y=Math.floor(min.y);y<max.y;y++)for(let z=Math.floor(min.z);z<max.z;z++)
+        if(this.cells.has(keyOf(x,y,z)) && touches({x,y,z}))return true;
+    } else for(const at of this.world.indexedEdits(this.chunks,min,max))if(touches(at))return true;
+    return false;
+  }
 }

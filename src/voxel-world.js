@@ -197,7 +197,11 @@ export class VoxelWorld {
     this.updateArea();
     for (const edit of [...this.edits()]) if (this.blockAt(edit.x, edit.y, edit.z)?.definition.collisionShape === 'door') this.checkDoor(this.blockAt(edit.x, edit.y, edit.z));
   }
-  save() { return { version: WORLD_VERSION, terrain: { baseY: this.baseY, layers: [...this.layers] }, falling: this.falling.save(), edits: [...this.edits()].map(e => ({ ...e, ...(e.furnace ? { furnace: e.furnace.toJSON() } : {}) })) }; }
+  save() {
+    const player = this.getPlayerData?.() ?? this.playerData;
+    return { version: WORLD_VERSION, terrain: { baseY: this.baseY, layers: [...this.layers] }, falling: this.falling.save(),
+      ...(player ? {player:{...player}} : {}), edits: [...this.edits()].map(e => ({ ...e, ...(e.furnace ? { furnace: e.furnace.toJSON() } : {}) })) };
+  }
   load(saved) {
     const migration = migrateWorldData(saved); saved = migration.world;
     const old = [...this.edits()];
@@ -209,6 +213,7 @@ export class VoxelWorld {
     this.solidChunks.clear(); this.removedChunks.clear(); this.sourceChunks.clear(); this.boundsCache.clear();
     this.removedCount = 0; this.pendingDrops = []; this.tickRemainder = 0; this.loadEdits(saved.edits ?? saved);
     if (saved.falling) this.falling.load(saved.falling);
+    this.playerData = migration.data.player ?? saved.player;
     for (const at of old) for (const listener of this.listeners) listener({ x: at.x, y: at.y, z: at.z, id: this.blockIdAt(at.x, at.y, at.z), previousId: at.id, previousState: at.state });
     this.onLoad?.(migration.data, migration.shiftY); return migration;
   }

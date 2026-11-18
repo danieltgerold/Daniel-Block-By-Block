@@ -103,10 +103,11 @@ function clearInput(options) { controller.pause(options); }
 function renderInputMode(mode) {
   active = mode === 'playing';
   intro.hidden = mode !== 'menu';
+  document.getElementById('death-screen').hidden = mode !== 'death';
   updateCrosshair(crosshair, mode, cameraMode);
   document.body.classList.toggle('is-playing', active);
   document.body.classList.toggle('world-view', mode !== 'menu');
-  hud.root.hidden = mode === 'menu';
+  hud.root.hidden = mode === 'menu' || mode === 'death';
   inventoryUI.hotbar.hidden = !['playing', 'ready', 'chat'].includes(mode);
   previousTime = null;
 }
@@ -128,9 +129,11 @@ controller.onTeleport = () => {
   previousTime = null;
   refreshWorldView();
 };
+controller.onDeath = () => chatUI.showDeath();
+document.getElementById('respawn').addEventListener('click', () => chatUI.respawn());
 
 async function captureMouse() {
-  if (chatUI.mode === 'chat' || chatUI.mode === 'inventory') return false;
+  if (chatUI.mode === 'chat' || chatUI.mode === 'inventory' || chatUI.mode === 'death') return false;
   if (isTextEntry(document.activeElement)) document.activeElement.blur();
   try {
     if (!canvas.requestPointerLock) throw new Error('Pointer lock unavailable');
@@ -177,11 +180,7 @@ function animate(time) {
   const dt = previousTime === null ? 0 : (time - previousTime) / 1000;
   previousTime = time;
   if (gameSimulationRunning(chatUI.mode)) {
-    const previousY = controller.player.y;
     controller.update(dt, { yaw, pitch, gameplayEnabled: active });
-    // Keep explicit teleports below the void boundary; respawn ordinary falls
-    // when they cross that boundary from above.
-    if (previousY >= -32 && controller.player.y < -32) controller.respawn(world.findSpawn(controller.size));
   }
   const position = refreshWorldView();
   chatUI.updateVisibility();
@@ -189,6 +188,7 @@ function animate(time) {
   if (inventoryUI.isOpen && !controller.inventory.furnace && (inventoryUI.creative.active
     ? inventoryUI.creative.tab === 'inventory' : controller.inventory.crafting.size === 2)) inventoryUI.preview.render();
   hud.renderedFrame(time, position);
+  hud.updateVitals(controller,chatUI.mode);
 }
 
 function refreshWorldView() {

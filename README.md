@@ -120,8 +120,8 @@ session, with argument autocomplete and a server confirmation. New loads start
 in Survival. Survival consumes one selected block per successful placement
 and breaking uses the block's drop rule. Creative preserves the selected stack
 and breaking creates no drop, but an empty main hand still cannot place. Mode
-changes preserve inventory and terrain and cancel active mining. They do
-not add health or hunger. Creative flight uses the controls described above.
+changes preserve inventory, terrain and vitals and cancel active mining/eating.
+Creative flight uses the controls described above.
 
 Flight uses the same interpolated 20 Hz controller and swept scaled hitbox.
 At size one its separate ability acceleration is 0.05 (0.10 while sprinting),
@@ -251,9 +251,9 @@ box intersects a solid voxel. Placement checks use the same scaled body.
 Swept collision against the actual unit blocks handles walls, floors, ceilings,
 placed blocks, and holes. Bedrock is a real, unbreakable Survival block, while
 Creative can remove it and open the void; there is no invisible floor below it.
-Falling across y=-32 respawns you at a supported
-column near the original spawn, with movement inputs cleared.
-An explicit teleport below that boundary stays at the requested destination.
+Below Y=-64, void damage removes four health points every ten ticks in both
+modes. Death opens a Respawn screen; respawn finds a safe supported column and
+clears movement inputs. There is no automatic Y=-32 respawn anymore.
 
 Jump peak is measured internally relative to the takeoff surface. The former
 Live Telemetry panel and block-unit label have been removed from the game UI.
@@ -286,6 +286,47 @@ world depth, and disappears when inactive,
 unbreakable or completed. Creative clicks break immediately, including Bedrock,
 without drops or a progress bar. Its existing held-repeat/swing behavior remains.
 Small hit particles and completion bursts use the existing particle system.
+
+## Health, hunger and food
+
+Survival starts with 20 health, 20 hunger, 5 saturation and zero exhaustion.
+Ten original pixel hearts and ten food icons above the hotbar show full, half
+and empty points. Creative hides these bars and preserves vitals without normal
+action exhaustion or fall damage; the void can still kill Creative players.
+Developer mode alone shows saturation beside the hunger bar.
+
+The fixed 20 Hz `PlayerVitals` clock charges actual ground sprint distance
+(0.1/block), swimming distance (0.01/block), normal/sprint takeoffs (0.05/0.2)
+and successful breaking (0.005). Walking, sneaking and blocked motion are free.
+Exhaustion above four spends saturation before hunger and preserves its remainder.
+Hunger at six or below disables Survival sprinting. Zero hunger never causes
+starvation damage. Fast regeneration runs every ten ticks at full hunger with
+saturation; slow regeneration runs every eighty ticks at hunger eighteen or more.
+Healing is fractional, capped at twenty, and charges normal exhaustion.
+
+`/give raw.porkchop` and `/give cooked.porkchop` provide original pink/brown sprite
+foods, also available in the Creative catalog. Hold right click for 32 ticks to
+eat while hungry: raw restores 3 hunger/1.8 saturation, cooked restores 8/12.8.
+Hunger fills first and caps saturation. Early release, changing the held stack,
+menus or focus loss cancel without consumption. Food uses the existing main-hand
+interaction path; doors and workstation interactions keep priority. Offhand stays
+storage/display only. The food and arm use a small repeated eating motion.
+Raw pork cooks into cooked pork in 200 furnace ticks using the existing fuels
+and recipe book. Both foods stack to 64.
+
+Fall damage uses `ceil(actual downward distance - 3)` on landing, including the
+last collision-adjusted tick and actual slab/stair height. It does not scale with
+player size. Contact with any source or flowing water clears the accumulated
+damage distance; a swept footprint catches shallow water and fast landing ticks.
+Teleports and Creative flight reset fall distance without resetting hunger/health.
+Only falls and the void cause damage. Death drops player-owned inventory,
+offhand, crafting inputs and cursor items once; it never duplicates the crafting
+output or takes the open furnace's slots. Respawn resets the four starting vitals.
+Inventory keeps vitals and world ticks running; Escape and the death screen pause.
+
+Programmatic world/player snapshots now carry health, hunger, saturation and
+exhaustion. Older player data gets starting defaults. These remain compatibility
+helpers: there is no automatic saving, save menu or persistent world store.
 
 ## Rendering and distance detail
 
@@ -685,13 +726,13 @@ and dropped items; drops retain gravity, pickup/merge rules and original lifetim
 Creative flight keeps its own movement in water. A camera-position surface query
 controls a subtle blue tint, including F5 views. Inventory leaves all simulation
 running; Escape still pauses. No waterlogging, modern swimming pose, oxygen,
-drowning, hunger, lava or other fluids are added.
+drowning, lava or other fluids are added.
 
 ## Furnaces
 
 Furnaces face their placing player and show a lit front while burning. Right-click
 to open input, registered-fuel and take-only output slots, a fuel flame, cooking
-arrow, player storage/hotbar, and a simple smelting book. Shift-click routes Sand
+arrow, player storage/hotbar, and a simple smelting book. Shift-click routes Sand, raw pork
 and fuels to the appropriate slot; splitting, dragging, hotbar swaps and output
 pickup reuse inventory controls. Closing leaves the three slots in that furnace.
 Missing-book previews are read-only; selecting Sand moves ingredients, not results.

@@ -37,7 +37,7 @@
           <div><span class="key-group"><kbd>F3</kbd><kbd>B</kbd></span><span>Toggle hitboxes</span></div>
           <div><span class="key-group"><kbd class="wide">SPACE</kbd></span><span>Jump / fly up</span></div>
           <div><span class="key-group"><kbd>2×</kbd><kbd class="wide">SPACE</kbd></span><span>Toggle flight (Creative)</span></div>
-          <div><span class="key-group"><kbd>LMB</kbd><kbd>RMB</kbd></span><span>Break / place block</span></div>
+          <div><span class="key-group"><kbd>LMB</kbd><kbd>RMB</kbd></span><span>Break / place / eat</span></div>
           <div><span class="key-group"><kbd>T</kbd><kbd>/</kbd></span><span>Chat / commands</span></div>
           <div><span class="key-group"><kbd>ESC</kbd></span><span>Release mouse</span></div>
         </div>
@@ -51,6 +51,15 @@
       <div id="fps">FPS: —</div>
     </div>
     <div id="hotbar" class="hotbar" aria-label="Hotbar" hidden></div>
+    <div id="survival-hud" class="survival-hud" hidden>
+      <div id="health-bar" class="vital-bar" role="img" aria-label="Health: 20 / 20"></div>
+      <div id="hunger-bar" class="vital-bar hunger-bar" role="img" aria-label="Hunger: 20 / 20"></div>
+      <span id="saturation-value" class="saturation-value" hidden></span>
+    </div>
+    <section id="death-screen" class="death-screen" aria-labelledby="death-title" hidden>
+      <h1 id="death-title">You died</h1>
+      <button id="respawn" type="button">Respawn</button>
+    </section>
     <section id="inventory-screen" class="inventory-screen" aria-label="Player inventory" hidden>
       <div id="inventory-panel" class="inventory-panel">
         <div class="inventory-heading"><button id="inventory-close" type="button" aria-label="Close inventory">&#215;</button></div>

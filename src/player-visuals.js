@@ -106,6 +106,10 @@ export function animatePlayerModel(model, feet, pose, cameraMode = 0, inventory 
   j['Right Arm'].position.set(5 * Math.cos(t) * MODEL_SCALE, (22 - 3.2 * c) * MODEL_SCALE, 5 * Math.sin(t) * MODEL_SCALE);
   j['Left Arm'].position.set(-5 * Math.cos(t) * MODEL_SCALE, (22 - 3.2 * c) * MODEL_SCALE, -5 * Math.sin(t) * MODEL_SCALE);
   j['Right Arm'].rotation.set(-(rightWalkMC + 0.4 * c - attack), -3 * t, -0.4 * Math.sin(Math.PI * p));
+  if (pose.eating) {
+    j['Right Arm'].rotation.x = 1.1 + .08 * Math.sin(pose.eatAge*Math.PI/2);
+    j['Right Arm'].rotation.y = -.25;
+  }
   j['Left Arm'].rotation.set(-(leftWalkMC + 0.4 * c + t), -t, 0);
   j['Right Leg'].position.set(2 * MODEL_SCALE, 12 * MODEL_SCALE, 4 * c * MODEL_SCALE);
   j['Left Leg'].position.set(-2 * MODEL_SCALE, 12 * MODEL_SCALE, 4 * c * MODEL_SCALE);
@@ -178,7 +182,7 @@ const fixedArmAlignment = new THREE.Matrix4().makeTranslation(-1, 3.6, 3.5)
   .multiply(new THREE.Matrix4().makeRotationX(200 * Math.PI / 180))
   .multiply(new THREE.Matrix4().makeRotationY(-135 * Math.PI / 180))
   .multiply(new THREE.Matrix4().makeTranslation(5.6, 0, 0));
-const handRotation = new THREE.Matrix4();
+const handRotation = new THREE.Matrix4(), eatingTransform = new THREE.Matrix4();
 function spriteInFirstPerson(mesh, item, sign, pose, equipHeight, wrist) {
   const p = pose.swingActive ? pose.swingProgress : 0, { inward: q, vertical: r, reach: a } = swingCurves(p, pose.swingActive);
   const b = Math.sin(Math.PI * p * p), profile = displayProfile(item);
@@ -242,6 +246,11 @@ export function updateEmptyHand(hand, pose, inventory = null) {
   }
   if (offhand && ITEMS.get(offhand.id)?.model === 'flat') spriteInFirstPerson(hand.offhandItem, ITEMS.get(offhand.id), -1, { swingActive: false }, 1, hand.doorHands[1]);
   else if (offhand) { hand.offhandItem.matrixAutoUpdate = true; hand.offhandItem.position.set(-.56, -.52, -.72); hand.offhandItem.rotation.set(.12, -.35, 0); }
+  if (pose.eating && mainDefinition?.food) {
+    const approach = Math.min(1,pose.eatAge/3), chew = Math.abs(Math.sin(pose.eatAge*Math.PI/4));
+    hand.mainItem.matrix.premultiply(eatingTransform.makeTranslation(-.23*approach,.28*approach+.045*chew,.20*approach));
+    hand.mainItem.matrixWorldNeedsUpdate = true;
+  }
 }
 
 export const createBlockItem = (size = .375, id = 'dirt') => createItemMesh(size, id);

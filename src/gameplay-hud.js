@@ -1,3 +1,4 @@
+import { vitalIcon } from './vital-icons.js';
 // Round halves away from zero consistently, without ever displaying "-0".
 export const roundCoordinate = value => Math.sign(value) * Math.round(Math.abs(value)) || 0;
 export const coordinateText = feet => ['x', 'y', 'z'].map(axis => `${axis.toUpperCase()}: ${roundCoordinate(feet[axis])}`).join('  ');
@@ -11,6 +12,15 @@ export class GameplayHUD {
     this.root = document.getElementById('world-hud');
     this.coordinates = document.getElementById('coordinates');
     this.fps = document.getElementById('fps');
+    this.survival = document.getElementById('survival-hud');
+    this.saturation = document.getElementById('saturation-value');
+    this.vitalRows = new Map();
+    for (const kind of ['health','hunger']) {
+      const row = document.getElementById(`${kind}-bar`);
+      row.replaceChildren();
+      const icons = Array.from({length:10},()=>{const icon=document.createElement('img');icon.alt='';icon.width=18;icon.height=18;row.append(icon);return icon;});
+      this.vitalRows.set(kind,{row,icons});
+    }
     this.listeners = [];
     for (const [name, output] of [['coordinates', this.coordinates], ['fps', this.fps]]) {
       const toggle = document.getElementById(`show-${name}`);
@@ -30,6 +40,19 @@ export class GameplayHUD {
   }
   resetFrames() { this.lastFrame = null; this.elapsed = 0; this.frames = 0; }
   updatePosition(feet) { this.coordinates.textContent = coordinateText(feet); }
+  updateVitals(controller, mode) {
+    const v = controller.vitals;
+    this.survival.hidden = controller.gameMode !== 'survival' || v.dead || !['playing','ready','chat'].includes(mode);
+    for (const [kind,{row,icons}] of this.vitalRows) {
+      const value = Math.ceil(v[kind]);
+      const label = `${kind === 'health' ? 'Health' : 'Hunger'}: ${v[kind]} / 20`;
+      if(row.getAttribute('aria-label') !== label)row.setAttribute('aria-label',label);
+      icons.forEach((icon,i)=>{const fill=Math.max(0,Math.min(2,value-i*2));if(icon.dataset.fill!==String(fill)){icon.src=vitalIcon(kind,fill);icon.dataset.fill=String(fill);}});
+    }
+    this.saturation.hidden = !controller.developerMode;
+    const text = `Saturation: ${v.saturation.toFixed(1)} / ${v.hunger}`;
+    if(this.saturation.textContent !== text)this.saturation.textContent = text;
+  }
   renderedFrame(time, feet) {
     this.updatePosition(feet);
     if (this.lastFrame !== null) {
