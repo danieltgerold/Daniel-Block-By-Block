@@ -263,7 +263,7 @@ Live Telemetry panel and block-unit label have been removed from the game UI.
 Holding primary click advances a separate 20 Hz breaking controller while the
 same reachable block remains targeted. Its animation clock does not decide
 when a block breaks. Release, menus/inventory, reach loss, a new target, or any
-target mutation cancels progress; switching faces on the same block does not.
+meaningful target mutation cancels progress; switching faces on the same block does not.
 A successful non-instant break starts a six-tick interval before continued
 holding can progress on the next block. Existing drops stay unchanged, including
 bare-hand Stone, Cobblestone and Furnace drops; a door removes both halves once.
@@ -273,12 +273,16 @@ Stone 150, Cobblestone 200, Glass 9, Leaves 6, wood logs/planks/slabs/stairs/fen
 60, wood doors 90, Crafting Table 75 and Furnace 350. Double slabs also take 60.
 Bedrock is unbreakable in Survival. Eyes underwater reduce per-tick progress to
 one fifth, and being airborne does so again, stacking to one twenty-fifth.
-These modifiers are sampled every tick. Preferred-tool/mining-rate hooks leave
-room for tools later, without adding tool requirements or new drop restrictions.
+These modifiers are sampled every tick. A shared calculation uses mining speed
+divided by hardness and by 30 (harvestable) or 100 (missing a required tool).
+Item definitions can later supply tool type, speed and level. Normal items use
+bare-hand speed. Harvest metadata affects timing independently of drops: Stone,
+Cobblestone and Furnace retain their current drops without adding tools today.
 
 A reused pair of contrasting planes displays the bar on the hit shape's actual
-face, including slabs and doors. The light rectangle fills left to right inside
-the dark background, tests normal world depth, and disappears when inactive,
+exposed face, including stair unions, slabs and doors. The light rectangle fills left to right inside
+the dark background, draws after opaque block materials while testing normal
+world depth, and disappears when inactive,
 unbreakable or completed. Creative clicks break immediately, including Bedrock,
 without drops or a progress bar. Its existing held-repeat/swing behavior remains.
 Small hit particles and completion bursts use the existing particle system.
@@ -379,7 +383,17 @@ Pine Leaves (`pine.leaves`), Crafting Table (`crafting.table`), Oak/Pine Slab
 (`oak.door`, `pine.door`), and Furnace (`furnace`). Stick (`stick`)
 is a separate non-placeable item with a shared cutout sprite, rather than a cube.
 For example, `/give grass.block 64`; Tab completes all registered item IDs.
-There is no tool requirement or falling Sand/Gravel behavior yet.
+No tools are added yet; the existing bare-hand drops remain available.
+
+Sand and Gravel schedule support checks two ticks after a nearby cell changes.
+Unsupported cells transfer into lightweight falling entities with 0.04 gravity,
+0.98 vertical retention and interpolated full-block visuals. Only scheduled cells
+and active entities update. They pass through water, replace water on landing,
+and notify the existing fluid/chunk systems. Partial obstacles or player overlap
+that prevent safe settling produce one matching item instead of overwriting a
+block or trapping the player. Stacks settle from the bottom upward. Inventory
+keeps these ticks running; the Escape menu pauses them. Programmatic world
+snapshots include pending checks and active falls, without adding persistence.
 
 Definitions share cube collision/placement/breaking code and specify names, IDs,
 face textures, stack sizes, solidity, opacity, collision shape, breaking time,

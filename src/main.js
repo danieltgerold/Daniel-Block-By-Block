@@ -8,6 +8,7 @@ import { GameplayHUD, gameSimulationRunning, updateCrosshair } from './gameplay-
 import { InventoryUI } from './inventory-ui.js';
 import { InventoryPreview } from './inventory-preview.js';
 import { DroppedItemRenderer } from './dropped-item-renderer.js';
+import { FallingBlockRenderer } from './falling-block-renderer.js';
 import { getBlockAssets } from './block-assets.js';
 import { BlockParticles } from './block-particles.js';
 import { BlockParticleRenderer } from './block-particle-renderer.js';
@@ -56,6 +57,7 @@ const emptyHand = createEmptyHand(camera.aspect);
 const material = getBlockAssets(renderer.capabilities.getMaxAnisotropy()).material;
 const chunks = new ChunkRenderer(world, scene, material);
 const droppedRenderer = new DroppedItemRenderer(scene);
+const fallingRenderer = new FallingBlockRenderer(scene);
 const visualQuality = new AdaptiveVisualQuality();
 controller.particles = new BlockParticles(world, { quality: visualQuality });
 const particleRenderer = new BlockParticleRenderer(scene);
@@ -204,6 +206,7 @@ function refreshWorldView() {
   }
   // Camera pose/FOV must be current before entity culling, including F5 changes.
   droppedRenderer.update(controller.drops, controller.accumulator / .05, camera, visualQuality);
+  fallingRenderer.update(world.falling, controller.accumulator / .05, camera);
   particleRenderer.update(controller.particles, controller.accumulator / .05, camera);
   chunks.update(camera);
   const target = active ? targetBlock() : null;

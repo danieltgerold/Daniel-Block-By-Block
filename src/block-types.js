@@ -59,7 +59,7 @@ for (const [id, name, color, extra = {}] of [
   ['stone', 'Stone', '#929da4'], ['cobblestone', 'Cobblestone', '#879198'],
   ['dirt', 'Dirt', '#a47145'],
   ['grass.block', 'Grass Block', '#74ba42', { faces: { top: 'grass.top', bottom: 'dirt', side: 'grass.side' }, particleTexture: 'grass.side', behavior: grassBehavior, drops: [{ id: 'dirt', count: 1 }] }],
-  ['sand', 'Sand', '#edda98'], ['gravel', 'Gravel', '#a0a09a'],
+  ['sand', 'Sand', '#edda98', { falling: true }], ['gravel', 'Gravel', '#a0a09a', { falling: true }],
   ['oak.log', 'Oak Log', '#997044', { defaultState: { axis: 'y' }, faces: { top: 'oak.end', bottom: 'oak.end', side: 'oak.bark' }, particleTexture: 'oak.bark', tags: ['wood.logs', 'wood.oak'] }],
   ['oak.planks', 'Oak Planks', '#c79456', { tags: ['wood.planks', 'wood.oak'] }],
   ['glass', 'Glass', '#dceff4', { opaque: false, renderMode: 'glass', cullSameType: true, drops: [] }],

@@ -7,5 +7,29 @@ const properties = new Map([
 for (const wood of ['oak', 'pine']) for (const kind of ['log', 'planks', 'slab', 'stairs', 'fence', 'door']) properties.set(`${wood}.${kind}`, [kind === 'door' ? 3 : 2, kind === 'door' ? 90 : 60]);
 export function breakingProperties(id) {
   const [hardness, breakTicks] = properties.get(id) ?? [0, 0];
-  return { hardness, breakTicks, breakTime: breakTicks / 20, unbreakable: hardness < 0, preferredTool: null };
+  const requiresTool = ['stone', 'cobblestone', 'furnace'].includes(id);
+  return { hardness, breakTicks, breakTime: breakTicks / 20, unbreakable: hardness < 0,
+    preferredTool: requiresTool ? 'pickaxe' : id === 'glass' ? null : id.includes('leaves') ? 'shears'
+      : ['dirt', 'grass.block', 'sand', 'gravel'].includes(id) ? 'shovel' : 'axe',
+    requiresTool, harvestLevel: 0 };
+}
+
+// Item definitions may later provide tool: { type, speed, level }. Ordinary
+// held blocks/items have no tool metadata and always use bare-hand speed.
+export function miningProgress(definition, item, { grounded = true, underwater = false } = {}) {
+  const { hardness, unbreakable, preferredTool, requiresTool, harvestLevel = 0 } = definition;
+  if (unbreakable || hardness < 0) return 0;
+  if (hardness === 0) return 1;
+  const tool = item?.tool, effective = Boolean(tool && tool.type === preferredTool);
+  const canHarvest = !requiresTool || effective && (tool.level ?? 0) >= harvestLevel;
+  let speed = effective ? tool.speed ?? 1 : 1;
+  if (underwater) speed /= 5;
+  if (!grounded) speed /= 5;
+  return speed / hardness / (canHarvest ? 30 : 100);
+}
+
+export function sameBreakingTarget(a, b) {
+  return Boolean(a && b && a.x === b.x && a.y === b.y && a.z === b.z && a.id === b.id
+    && Object.keys(a.state).length === Object.keys(b.state).length
+    && Object.keys(a.state).every(key => Object.is(a.state[key], b.state[key])));
 }

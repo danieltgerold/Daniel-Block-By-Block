@@ -4,6 +4,7 @@ import { BLOCK_TYPES, blockDrops } from './block-types.js';
 import { worldBoxes, fullCube, blockOpaque, stairShapeAt, DIRECTIONS } from './block-shapes.js';
 import { FurnaceEntity } from './smelting.js';
 import { FluidSystem } from './fluid-system.js';
+import { FallingBlocks } from './falling-blocks.js';
 import { waterHeight } from './fluid-surface.js';
 import { FLAT_LAYERS, WORLD_VERSION, canonicalBlockId, migrateWorldData } from './world-migration.js';
 export const BLOCK_REACH = 4.5;
@@ -50,6 +51,7 @@ export class VoxelWorld {
     this.random = random; this.behaviorBlocks = new Map(); this.behaviorTime = 0; this.listeners = new Set();
     this.furnaces = new Map(); this.tickRemainder = 0; this.pendingDrops = []; this.changingDoors = false; this.loading = false;
     this.fluids = new FluidSystem(this);
+    this.falling = new FallingBlocks(this);
     this.solidChunks = new Map(); this.removedChunks = new Map(); this.sourceChunks = new Map();
     this.boundsCache = new Map(); this.boxCaches = { collision: new WeakMap(), selection: new WeakMap() };
   }
@@ -153,6 +155,7 @@ export class VoxelWorld {
     if (!this.loading && !this.updatingStairs && (previous?.collisionShape === 'stairs' || definition?.collisionShape === 'stairs')) this.updateStairs(x, y, z);
     const fluidTopologyChanged = id === 'water' || previousId === 'water' || Boolean(id) !== Boolean(previousId) || solid !== Boolean(previous?.solid);
     if (fluidTopologyChanged && (id === 'water' || previousId === 'water' || this.fluids.affected(x, y, z))) this.fluids.changed(x, y, z);
+    this.falling.changed(x,y,z);
     if (!this.solidChunks.has(key) && !this.fluids.chunks.has(key)) this.boundsCache.delete(key);
     return true;
   }
@@ -194,7 +197,7 @@ export class VoxelWorld {
     this.updateArea();
     for (const edit of [...this.edits()]) if (this.blockAt(edit.x, edit.y, edit.z)?.definition.collisionShape === 'door') this.checkDoor(this.blockAt(edit.x, edit.y, edit.z));
   }
-  save() { return { version: WORLD_VERSION, terrain: { baseY: this.baseY, layers: [...this.layers] }, edits: [...this.edits()].map(e => ({ ...e, ...(e.furnace ? { furnace: e.furnace.toJSON() } : {}) })) }; }
+  save() { return { version: WORLD_VERSION, terrain: { baseY: this.baseY, layers: [...this.layers] }, falling: this.falling.save(), edits: [...this.edits()].map(e => ({ ...e, ...(e.furnace ? { furnace: e.furnace.toJSON() } : {}) })) }; }
   load(saved) {
     const migration = migrateWorldData(saved); saved = migration.world;
     const old = [...this.edits()];
@@ -202,8 +205,10 @@ export class VoxelWorld {
     this.layers = [...saved.terrain.layers]; this.baseY = saved.terrain.baseY; this.depth = this.layers.length; this.topY = this.baseY + this.depth;
     this.chunkEdits.clear(); this.furnaces.clear(); this.behaviorBlocks.clear();
     this.fluids = new FluidSystem(this);
+    this.falling = new FallingBlocks(this);
     this.solidChunks.clear(); this.removedChunks.clear(); this.sourceChunks.clear(); this.boundsCache.clear();
     this.removedCount = 0; this.pendingDrops = []; this.tickRemainder = 0; this.loadEdits(saved.edits ?? saved);
+    if (saved.falling) this.falling.load(saved.falling);
     for (const at of old) for (const listener of this.listeners) listener({ x: at.x, y: at.y, z: at.z, id: this.blockIdAt(at.x, at.y, at.z), previousId: at.id, previousState: at.state });
     this.onLoad?.(migration.data, migration.shiftY); return migration;
   }
@@ -252,6 +257,7 @@ export class VoxelWorld {
     while (this.tickRemainder + 1e-9 >= 1) {
       this.tickRemainder -= 1;
       this.fluids.tick();
+      this.falling.tick();
       for (const [key, entity] of this.furnaces) {
         entity.tick();
         const [x, y, z] = key.split(',').map(Number), block = this.blockAt(x, y, z);

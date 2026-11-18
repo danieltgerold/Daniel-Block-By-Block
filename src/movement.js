@@ -203,6 +203,7 @@ export class MovementController {
     if (world) {
       world.onDrop = (stack, at) => this.drops.spawn(stack.id, stack.count, at);
       world.getGameMode = () => this.gameMode;
+      world.getPlayers = () => [this.player];
       for (const drop of world.pendingDrops?.splice(0) ?? []) world.onDrop(drop.stack, drop.at);
     }
     this.swingQueued = false;
