@@ -18,7 +18,7 @@ function fixture(t, { captureSucceeds = false } = {}) {
     disableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   window.document.write(html);
   const document = window.document;
-  const controller = new MovementController(new VoxelWorld());
+  const controller = new MovementController(new VoxelWorld({ depth: 3 }));
   const calls = { capture: 0, unlock: 0, camera: 0, broadcast: [] };
   const ui = new ChatUI({ document, window, controller, storage: window.localStorage, createId: () => 'player-id-1',
     clearInput: () => controller.pause(), requestCapture: () => {

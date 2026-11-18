@@ -1,12 +1,12 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MovementController } from '../src/movement.js';
 import { VoxelWorld } from '../src/voxel-world.js';
 import { BlockPlacement, breakTargetBlock } from '../src/block-placement.js';
 function setup() {
-  const world = new VoxelWorld(), controller = new MovementController(world);
+  const world = new VoxelWorld({ depth: 3 }), controller = new MovementController(world);
   world.setBlock(0, 1, 0, true); controller.respawn({ x: 5.5, y: 0, z: .5 });
-  controller.inventory.insert('test.block', 10);
+  controller.inventory.insert('dirt', 10);
   const ticks = [], aim = { yaw: Math.PI / 2, pitch: 0 };
   let enabled = true, rays = 0, swings = 0;
   const raycast = controller.targetBlock.bind(controller), swing = controller.requestSwing.bind(controller);
@@ -46,8 +46,8 @@ test('each attempt reads current aim, reach and main-hand stack; successful bloc
   f.controller.teleport({ x: 1.5, y: 1, z: .5 });
   for (let i = 0; i < 15; i++) f.controller.update(.05);
   assert.equal(f.controller.inventory.mainHand.count, 10); assert.equal(f.controller.drops.total(), 0n);
-  f.controller.inventory.slots[9] = { id: 'test.block', count: 5 }; f.controller.inventory.select(2);
-  f.controller.inventory.pick('test.block'); assert.equal(f.controller.inventory.selected, 0);
-  f.controller.inventory.slots[0] = null; f.controller.inventory.pick('test.block');
+  f.controller.inventory.slots[9] = { id: 'dirt', count: 5 }; f.controller.inventory.select(2);
+  f.controller.inventory.pick('dirt'); assert.equal(f.controller.inventory.selected, 0);
+  f.controller.inventory.slots[0] = null; f.controller.inventory.pick('dirt');
   assert.equal(f.controller.inventory.mainHand.count, 5); assert.equal(f.controller.inventory.slots[9], null);
 });

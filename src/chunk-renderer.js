@@ -1,4 +1,4 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import { CHUNK_SIZE, chunkKey } from './voxel-world.js';
 import { buildChunkMesh, chooseLod } from './voxel-mesh.js';
 import { getFaceMaterial } from './block-assets.js';
@@ -77,7 +77,7 @@ export class ChunkRenderer {
     geometry.setIndex(data.indices);
     const materials = data.groups.map((group, index) => {
       geometry.addGroup(group.start, group.count, index);
-      return group.texture === 'test.block' ? this.material : getFaceMaterial(group.texture);
+      return group.texture === 'dirt' ? this.material : getFaceMaterial(group.texture);
     });
     geometry.computeBoundingSphere();
     const mesh = new THREE.Mesh(geometry, materials.length === 1 ? materials[0] : materials);

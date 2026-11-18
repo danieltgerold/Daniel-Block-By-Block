@@ -18,7 +18,7 @@ function inventory(size = 2) { const i = new PlayerInventory(); i.crafting.begin
 
 test('Pine/table definitions, give, cutout persistence, log faces and reusable flat Stick models integrate with existing items', () => {
   for (const id of ['pine.log', 'pine.planks', 'pine.leaves', 'crafting.table', 'stick']) {
-    const c = new MovementController(new VoxelWorld()), service = new ChatService({ controller: c, profile: new LocalPlayerProfile(null, () => 'craft-test') });
+    const c = new MovementController(new VoxelWorld({ depth: 3 })), service = new ChatService({ controller: c, profile: new LocalPlayerProfile(null, () => 'craft-test') });
     service.submit(`/give ${id} 130`); assert.deepEqual(c.inventory.slots.slice(0, 3).map(s => s.count), [64, 64, 2]);
     assert.ok(commandCompletions('/give ').includes(`/give ${id} `)); assert.ok(ITEMS.get(id).icon);
   }
@@ -36,7 +36,7 @@ test('Pine/table definitions, give, cutout persistence, log faces and reusable f
   assert.equal(stick.geometry, other.geometry); assert.equal(stick.material, other.material);
   assert.equal(stick.material.alphaTest, .5); assert.equal(stick.material.side, THREE.DoubleSide);
   setItemAppearance(stick, 'pine.log'); assert.equal(stick.geometry.type, 'BoxGeometry');
-  const c = new MovementController(new VoxelWorld()), renderer = new DroppedItemRenderer(new THREE.Scene());
+  const c = new MovementController(new VoxelWorld({ depth: 3 })), renderer = new DroppedItemRenderer(new THREE.Scene());
   const pile = c.drops.spawn('stick', 4, { x: 10, y: 1, z: 10 }); renderer.update(c.drops);
   assert.equal(renderer.meshes.get(pile.id).children[0].geometry.type, 'BufferGeometry');
 });
@@ -83,7 +83,7 @@ test('recipe definitions support holes, horizontal-only mirroring, opt-out mirro
 
 test('manual output is only a preview; full/mismatched cursors cannot consume, and complete batches consume exact inputs in either mode', () => {
   for (const mode of ['survival', 'creative']) {
-    const c = new MovementController(new VoxelWorld()); c.setGameMode(mode); const i = c.inventory; i.crafting.begin();
+    const c = new MovementController(new VoxelWorld({ depth: 3 })); c.setGameMode(mode); const i = c.inventory; i.crafting.begin();
     i.slots[C] = stack('pine.log', 2); i.changed(); assert.deepEqual(i.crafting.output, stack('pine.planks', 4));
     assert.equal(i.slots[50], undefined); i.cursor = stack('dirt'); const before = snapshot(i);
     assert.equal(i.crafting.take(), 0); assert.equal(snapshot(i), before);
@@ -95,7 +95,7 @@ test('manual output is only a preview; full/mismatched cursors cannot consume, a
 });
 
 test('shift-output stops before a partial batch and repeatedly crafts complete stacks when there is room', () => {
-  const i = inventory(); for (let s = 0; s < 36; s++) i.slots[s] = stack('test.block', 64);
+  const i = inventory(); for (let s = 0; s < 36; s++) i.slots[s] = stack('dirt', 64);
   i.slots[0] = stack('stick', 62); i.slots[C] = stack('oak.planks', 2); i.slots[C + 2] = stack('pine.planks', 2); i.changed();
   assert.equal(i.crafting.take({ destination: 'inventory', repeat: true }), 0); assert.equal(i.slots[C].count, 2);
   i.slots[0].count = 60; assert.equal(i.crafting.take({ destination: 'inventory', repeat: true }), 1);
@@ -124,12 +124,12 @@ test('book fills real mixed ingredients once or to the maximum, excludes armor/o
 });
 
 test('book rearrangement is atomic with a full inventory, can reuse existing inputs and frees space only when a safe plan exists', () => {
-  const i = inventory(); for (let s = 0; s < 36; s++) i.slots[s] = stack('test.block', 64);
+  const i = inventory(); for (let s = 0; s < 36; s++) i.slots[s] = stack('dirt', 64);
   i.slots[0] = stack('oak.log', 64); i.slots[C] = stack('dirt', 64); i.changed(); const before = snapshot(i);
   const failed = i.crafting.fill('oak.planks'); assert.equal(failed.ok, false); assert.match(failed.reason, /space/); assert.equal(snapshot(i), before);
   const full = i.crafting.fill('oak.planks', true); assert.equal(full.ok, true); assert.equal(full.crafts, 64);
   assert.deepEqual(i.slots[C], stack('oak.log', 64)); assert.deepEqual(i.slots[0], stack('dirt', 64));
-  i.slots[0] = stack('test.block', 64); assert.equal(i.crafting.fill('oak.planks', true).ok, true, 'Matching grid can be reused with no storage space');
+  i.slots[0] = stack('dirt', 64); assert.equal(i.crafting.fill('oak.planks', true).ok, true, 'Matching grid can be reused with no storage space');
 });
 
 test('closing either grid returns every real input/cursor item or drops overflow, never grants the preview', () => {

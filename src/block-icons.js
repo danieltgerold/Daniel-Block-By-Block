@@ -1,6 +1,6 @@
 import { BLOCK_TYPES, blockFaceTexture } from './block-types.js';
 import { BLOCK_TEXTURES, paletteAlpha } from './block-textures.js';
-import { TEST_BLOCK_ICON, shaded } from './block-appearance.js';
+import { shaded } from './block-appearance.js';
 import { itemBlock } from './block-shapes.js';
 import { faceUv, shapeQuads } from './shape-mesh.js';
 const icons = new Map();
@@ -22,7 +22,6 @@ export function textureIcon(id) {
   const icon = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; icons.set(key, icon); return icon;
 }
 export function blockIcon(id) {
-  if (id === 'test.block') return TEST_BLOCK_ICON;
   if (icons.has(id)) return icons.get(id);
   if (!BLOCK_TYPES.has(id)) return null;
   if (BLOCK_TYPES.get(id).itemTexture) return textureIcon(BLOCK_TYPES.get(id).itemTexture);

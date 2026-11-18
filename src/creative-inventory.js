@@ -5,7 +5,7 @@ export const CREATIVE_CATEGORIES = [
 ];
 // Explicit kind/material metadata wins; conventional <material>.<kind> IDs
 // supply useful defaults. Unknown kinds/items remain visible after known ones.
-export const CREATIVE_KIND_ORDER = ['test.block', 'stone', 'cobblestone', 'dirt', 'grass.block', 'sand', 'gravel',
+export const CREATIVE_KIND_ORDER = ['bedrock', 'stone', 'cobblestone', 'dirt', 'grass.block', 'sand', 'gravel',
   'planks', 'log', 'slab', 'stairs', 'fence', 'door', 'leaves', 'glass', 'crafting.table', 'furnace', 'stick'];
 export const CREATIVE_MATERIAL_ORDER = ['oak', 'pine'];
 export function creativeOrder(item) {

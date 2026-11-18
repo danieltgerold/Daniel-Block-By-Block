@@ -41,11 +41,11 @@ test('placed furnace faces its player, switches lit material, runs closed at dif
   assert.equal(blockFaceTexture('furnace', 0, 1, w.blockStateAt(1, 0, 0)), 'furnace.lit');
   let reference;
   for (const fps of [30, 144]) {
-    const world = new VoxelWorld(), c = new MovementController(world); world.setBlock(10, 0, 10, 'furnace');
+    const world = new VoxelWorld({ depth: 3 }), c = new MovementController(world); world.setBlock(10, 0, 10, 'furnace');
     const entity = world.furnaceAt(10, 0, 10); entity.slots = [stack('sand', 2), stack('oak.planks'), null];
     for (let frame = 0; frame < fps * 12.5; frame++) c.update(1 / fps, { gameplayEnabled: false });
     assert.equal(c.totalSteps, 250); if (reference) assert.deepEqual(entity.toJSON(), reference); reference = entity.toJSON();
-    const saved = JSON.parse(JSON.stringify(world.save())), restored = new VoxelWorld(); restored.load(saved);
+    const saved = JSON.parse(JSON.stringify(world.save())), restored = new VoxelWorld({ depth: 3 }); restored.load(saved);
     assert.deepEqual(restored.furnaceAt(10, 0, 10).toJSON(), entity.toJSON());
     for (let tick = 0; tick < 30; tick++) { world.step(.05); restored.step(.05); }
     assert.deepEqual(restored.furnaceAt(10, 0, 10).toJSON(), entity.toJSON());
@@ -54,7 +54,7 @@ test('placed furnace faces its player, switches lit material, runs closed at dif
 
 test('furnaces are independent and breaking drops actual slots exactly once, excluding the fuel already consumed', () => {
   for (const mode of ['survival', 'creative']) {
-    const w = new VoxelWorld(), c = new MovementController(w); c.setGameMode(mode);
+    const w = new VoxelWorld({ depth: 3 }), c = new MovementController(w); c.setGameMode(mode);
     w.setBlock(0, 0, 0, 'furnace'); w.setBlock(4, 0, 0, 'furnace');
     const first = w.furnaceAt(0, 0, 0), second = w.furnaceAt(4, 0, 0);
     first.slots = [stack('sand', 3), stack('oak.planks', 2), stack('glass', 2)]; second.slots = [stack('sand'), stack('stick'), null];

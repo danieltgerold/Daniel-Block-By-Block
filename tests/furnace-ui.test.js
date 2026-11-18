@@ -11,7 +11,7 @@ const stack = (id, count = 1) => ({ id, count });
 function fixture(t) {
   const window = new Window({ url: 'http://localhost:4173', settings: { disableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   const document = window.document; document.write(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
-  const c = new MovementController(new VoxelWorld()); c.world.setBlock(0, 0, 0, 'furnace');
+  const c = new MovementController(new VoxelWorld({ depth: 3 })); c.world.setBlock(0, 0, 0, 'furnace');
   const view = new InventoryUI({ inventory: c.inventory, document, window, onClose: () => ui.closeInventory() });
   const ui = new ChatUI({ document, window, controller: c, inventoryUI: view, clearInput: o => c.pause(o), requestCapture: () => {}, requestUnlock: () => {}, storage: window.localStorage });
   t.after(() => { view.dispose(); ui.dispose(); window.happyDOM.abort(); window.close(); });

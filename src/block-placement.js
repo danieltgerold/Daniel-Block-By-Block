@@ -3,8 +3,7 @@
 import { ITEMS } from './inventory.js';
 import { placeBlock } from './block-actions.js';
 import { useBucket } from './bucket-use.js';
-export function breakTargetBlock({ controller, world, yaw, pitch, feet = controller.player, onBreak = () => {} }) {
-  const hit = controller.targetBlock(feet, yaw, pitch);
+export function breakTargetBlock({ controller, world, yaw, pitch, feet = controller.player, hit = controller.targetBlock(feet, yaw, pitch), onBreak = () => {} }) {
   const block = hit ? world.blockAt(hit.x, hit.y, hit.z) : null;
   if (!block || !world.destroyBlock(hit.x, hit.y, hit.z, { gameMode: controller.gameMode, tool: controller.inventory.mainHand, player: controller.player })) return false;
   controller.particles?.breakBlock(block);

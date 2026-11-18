@@ -52,7 +52,7 @@ test('Java corner guards, mixed woods, halves and chunk-neighbor updates survive
     const shape = `${outer ? 'outer' : 'inner'}-${side === -1 ? 'left' : 'right'}`;
     assert.equal(w.blockStateAt(15, 0, 15).shape, shape);
     const saved = w.save(); saved.edits.forEach(e => { if (e.state) e.state = { ...e.state, shape: 'straight' }; });
-    const loaded = new VoxelWorld(); loaded.load(JSON.parse(JSON.stringify(saved)));
+    const loaded = new VoxelWorld({ depth: 3 }); loaded.load(JSON.parse(JSON.stringify(saved)));
     assert.equal(loaded.blockStateAt(15, 0, 15).shape, shape);
     const [gx, , gz] = DIRECTIONS[turnFacing(other, outer ? 2 : 0)];
     stair(w, 15 + gx, 0, 15 + gz, facing); assert.equal(w.blockStateAt(15, 0, 15).shape, 'straight');
@@ -78,14 +78,14 @@ test('stair collision, rays, outlines and chunk LOD meshes share the raised foot
 });
 
 test('general step-up climbs slab to full block, implicit ground and a staircase without jumping', () => {
-  const w = new VoxelWorld(); w.setBlock(0, 0, 0, 'oak.slab'); w.setBlock(1, 0, 0, 'stone');
+  const w = new VoxelWorld({ depth: 3 }); w.setBlock(0, 0, 0, 'oak.slab'); w.setBlock(1, 0, 0, 'stone');
   const p = { x: .5, y: .5, z: .5, grounded: true };
   const moved = w.movePlayer(p, { x: .6, y: 0, z: 0 }); near(moved.x, 1.1); near(moved.y, 1); assert.equal(moved.grounded, true);
-  const buried = new VoxelWorld(); buried.setBlock(0, -1, 0, 'oak.slab');
+  const buried = new VoxelWorld({ depth: 3 }); buried.setBlock(0, -1, 0, 'oak.slab');
   const out = buried.movePlayer({ ...p, y: -.5 }, { x: .6, y: 0, z: 0 }); near(out.y, 0); near(out.x, 1.1);
   const diagonal = w.movePlayer(p, { x: .6, y: 0, z: .1 }); near(diagonal.x, 1.1); near(diagonal.y, 1);
   for (const fps of [30, 144]) {
-    const world = new VoxelWorld(), c = new MovementController(world);
+    const world = new VoxelWorld({ depth: 3 }), c = new MovementController(world);
     for (let x = 0; x < 4; x++) { for (let y = 0; y < x; y++) world.setBlock(x, y, 0, 'stone'); stair(world, x, x, 0, 'east'); }
     c.teleport({ x: -.6, y: 0, z: .5 }); let peak = 0;
     for (let n = 0; n < fps * 1.3; n++) { c.update(1 / fps, { forward: true, yaw: -Math.PI / 2 }); peak = Math.max(peak, c.player.y); assert.ok(c.player.vy <= 0); }
@@ -94,7 +94,7 @@ test('general step-up climbs slab to full block, implicit ground and a staircase
 });
 
 test('step-up honors headroom, full walls, size, flight, and high-speed continuous blocking', () => {
-  const w = new VoxelWorld(); w.setBlock(1, 0, 0, 'stone');
+  const w = new VoxelWorld({ depth: 3 }); w.setBlock(1, 0, 0, 'stone');
   const p = { x: .5, y: 0, z: .5, grounded: true };
   near(w.movePlayer(p, { x: 100, y: 0, z: 0 }).x, .7);
   const large = w.movePlayer({ ...p, x: -1, size: 2 }, { x: 2, y: 0, z: 0 }); near(large.y, 1);

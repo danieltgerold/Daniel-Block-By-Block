@@ -1,4 +1,4 @@
-﻿import * as THREE from 'three';
+import * as THREE from 'three';
 import { MOVEMENT } from './movement.js';
 import { swingCurves } from './player-animation.js';
 import { ITEMS, ARMOR } from './inventory.js';
@@ -244,7 +244,7 @@ export function updateEmptyHand(hand, pose, inventory = null) {
   else if (offhand) { hand.offhandItem.matrixAutoUpdate = true; hand.offhandItem.position.set(-.56, -.52, -.72); hand.offhandItem.rotation.set(.12, -.35, 0); }
 }
 
-export const createBlockItem = (size = .375, id = 'test.block') => createItemMesh(size, id);
+export const createBlockItem = (size = .375, id = 'dirt') => createItemMesh(size, id);
 
 export function syncEquipment(model, inventory) {
   const equipment = model.userData.equipment;

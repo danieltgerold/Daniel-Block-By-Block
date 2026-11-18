@@ -10,7 +10,7 @@ import { LocalPlayerProfile, PROFILE_STORAGE_KEY, validateName } from '../src/ch
 function fixture(t) {
   const window = new Window({ url: 'http://localhost:4173', settings: { disableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   const document = window.document; document.write(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
-  const controller = new MovementController(new VoxelWorld());
+  const controller = new MovementController(new VoxelWorld({ depth: 3 }));
   const inventoryUI = new InventoryUI({ inventory: controller.inventory, document, window, onClose: () => ui.closeInventory() });
   const ui = new ChatUI({ document, window, controller, inventoryUI, clearInput: () => controller.pause(), requestCapture: () => {}, requestUnlock: () => {}, storage: window.localStorage });
   t.after(() => { inventoryUI.dispose(); ui.dispose(); window.happyDOM.abort(); window.close(); });
@@ -52,10 +52,10 @@ test('top overlays and inventory text are removed; hovering a block immediately 
   const f = fixture(t), panel = f.document.getElementById('inventory-panel');
   assert.equal(f.document.getElementById('playing-hint'), null); assert.equal(f.document.querySelector('.milestone'), null);
   assert.doesNotMatch(panel.textContent, /Inventory|Offhand|Crafting|Shift-click|Ctrl\+Q|Close/);
-  f.controller.inventory.slots[0] = { id: 'test.block', count: 1 }; f.controller.inventory.changed();
+  f.controller.inventory.slots[0] = { id: 'dirt', count: 1 }; f.controller.inventory.changed();
   f.ui.onPointerLockChange(true); f.ui.openInventory();
   const hover = index => f.inventoryUI.slotViews.get(index).dispatchEvent(new f.window.MouseEvent('mouseover', { clientX: 120, clientY: 100, bubbles: true }));
-  hover(0); assert.equal(f.inventoryUI.tooltip.hidden, false); assert.equal(f.inventoryUI.tooltip.textContent, 'Test Block');
+  hover(0); assert.equal(f.inventoryUI.tooltip.hidden, false); assert.equal(f.inventoryUI.tooltip.textContent, 'Dirt');
   hover(1); assert.equal(f.inventoryUI.tooltip.hidden, true);
   hover(0); f.controller.inventory.slots[0] = null; f.controller.inventory.changed(); assert.equal(f.inventoryUI.tooltip.hidden, true);
   f.ui.closeInventory(); assert.equal(f.inventoryUI.tooltip.hidden, true);

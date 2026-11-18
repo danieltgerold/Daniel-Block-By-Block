@@ -18,7 +18,7 @@ const stack = (id, count = 1) => ({ id, count });
 const source = (w, x, y = 0, z = 0) => w.setBlock(x, y, z, 'water');
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 function bucketFixture() {
-  const w = new VoxelWorld(), c = new MovementController(w); c.teleport({ x: .5, y: 0, z: 2.5 });
+  const w = new VoxelWorld({ depth: 3 }), c = new MovementController(w); c.teleport({ x: .5, y: 0, z: 2.5 });
   const p = new BlockPlacement({ controller: c, world: w, getAim: () => ({ yaw: 0, pitch: -.4 }), canInteract: () => true });
   // Aim directly down for exact source/ground targeting from the current eye.
   p.getAim = () => ({ yaw: 0, pitch: -Math.PI / 2 });
@@ -26,7 +26,7 @@ function bucketFixture() {
 }
 
 test('Door arms stay hidden through equip/swing in both hands; buckets use independent flat icons, stacks and item poses', () => {
-  const c = new MovementController(new VoxelWorld()), hand = createEmptyHand(), model = createPlayerModel();
+  const c = new MovementController(new VoxelWorld({ depth: 3 })), hand = createEmptyHand(), model = createPlayerModel();
   for (const id of ['oak.door', 'pine.door']) for (const p of [0, .35, .8]) {
     c.inventory.slots[0] = stack(id); c.inventory.slots[OFFHAND] = stack(id);
     const pose = { swingActive: p > 0, swingProgress: p, equipHeight: .4, phase: 0, amount: 0, crouch: 0, torsoYaw: 0, headYaw: 0, aimPitch: 0 };
@@ -66,33 +66,33 @@ test('bucket use exchanges exactly one item, drops full-inventory overflow, obey
 });
 
 test('water advances only every five ticks, reaches level seven, settles, recedes and resumes identically across frame rates', () => {
-  const w = new VoxelWorld(); source(w, 0); tick(w, 4); assert.equal(w.fluids.cells.size, 1); tick(w, 1); assert.equal(w.blockStateAt(1, 0, 0).level, 1);
+  const w = new VoxelWorld({ depth: 3 }); source(w, 0); tick(w, 4); assert.equal(w.fluids.cells.size, 1); tick(w, 1); assert.equal(w.blockStateAt(1, 0, 0).level, 1);
   tick(w, 75); assert.equal(w.blockStateAt(7, 0, 0).level, 7); assert.equal(w.blockIdAt(8, 0, 0), null); assert.equal(w.fluids.pending.size, 0);
   assert.equal(w.fluids.cells.size, 113);
-  const restored = new VoxelWorld(); restored.load(JSON.parse(JSON.stringify(w.save()))); assert.deepEqual(restored.blockStateAt(7, 0, 0), w.blockStateAt(7, 0, 0));
+  const restored = new VoxelWorld({ depth: 3 }); restored.load(JSON.parse(JSON.stringify(w.save()))); assert.deepEqual(restored.blockStateAt(7, 0, 0), w.blockStateAt(7, 0, 0));
   w.setBlock(0, 0, 0, false); tick(w, 150); assert.equal(w.fluids.cells.size, 0); assert.equal(w.fluids.pending.size, 0);
   const snapshots = [];
-  for (const fps of [2, 30, 144]) { const world = new VoxelWorld(), controller = new MovementController(world); source(world, 0); for (let f = 0; f < fps * 3; f++) controller.update(1 / fps, { gameplayEnabled: false }); snapshots.push(JSON.stringify([...world.edits()].map(e => [e.x, e.y, e.z, e.state]).sort())); assert.equal(controller.totalSteps, 60); }
+  for (const fps of [2, 30, 144]) { const world = new VoxelWorld({ depth: 3 }), controller = new MovementController(world); source(world, 0); for (let f = 0; f < fps * 3; f++) controller.update(1 / fps, { gameplayEnabled: false }); snapshots.push(JSON.stringify([...world.edits()].map(e => [e.x, e.y, e.z, e.state]).sort())); assert.equal(controller.totalSteps, 60); }
   assert.equal(snapshots[0], snapshots[1]); assert.equal(snapshots[1], snapshots[2]);
 });
 
 test('water favors a nearby drop, falls before spreading, renews trenches/pools, and cannot occupy partial blocks', () => {
-  const w = new VoxelWorld(); w.setBlock(2, -1, 0, false); source(w, 0); tick(w);
+  const w = new VoxelWorld({ depth: 3 }); w.setBlock(2, -1, 0, false); source(w, 0); tick(w);
   assert.equal(w.blockIdAt(1, 0, 0), 'water'); assert.equal(w.blockIdAt(-1, 0, 0), null); tick(w, 20); assert.equal(w.blockStateAt(2, -1, 0).falling, true);
   const falls = new VoxelWorld({ depth: 0 }); falls.setBlock(0, -1, 0, 'stone'); source(falls, 0, 2); tick(falls); assert.equal(falls.blockStateAt(0, 1, 0).falling, true); assert.equal(falls.blockIdAt(1, 2, 0), null);
   tick(falls, 10); assert.equal(falls.blockIdAt(1, 0, 0), 'water');
-  const trench = new VoxelWorld(); source(trench, 0); source(trench, 2); tick(trench, 10); assert.ok(isWaterSource(trench.blockAt(1, 0, 0)));
+  const trench = new VoxelWorld({ depth: 3 }); source(trench, 0); source(trench, 2); tick(trench, 10); assert.ok(isWaterSource(trench.blockAt(1, 0, 0)));
   trench.setBlock(1, -1, 0, false); tick(trench); assert.ok(isWaterSource(trench.blockAt(1, 0, 0)), 'renewed source persists without support');
-  const pool = new VoxelWorld(); source(pool, 0, 0, 0); source(pool, 1, 0, 1); tick(pool, 10); assert.ok(isWaterSource(pool.blockAt(1, 0, 0))); assert.ok(isWaterSource(pool.blockAt(0, 0, 1)));
-  for (const id of ['oak.slab', 'oak.stairs', 'oak.fence']) { const world = new VoxelWorld(); world.setBlock(1, 0, 0, id); source(world, 0); tick(world, 45); assert.equal(world.blockIdAt(1, 0, 0), id); }
+  const pool = new VoxelWorld({ depth: 3 }); source(pool, 0, 0, 0); source(pool, 1, 0, 1); tick(pool, 10); assert.ok(isWaterSource(pool.blockAt(1, 0, 0))); assert.ok(isWaterSource(pool.blockAt(0, 0, 1)));
+  for (const id of ['oak.slab', 'oak.stairs', 'oak.fence']) { const world = new VoxelWorld({ depth: 3 }); world.setBlock(1, 0, 0, id); source(world, 0); tick(world, 45); assert.equal(world.blockIdAt(1, 0, 0), id); }
 });
 
 test('water chunk surfaces connect, cull internal faces and preserve transparent depth; players/items sink, swim and follow currents', () => {
-  const w = new VoxelWorld(); source(w, 15); w.setBlock(16, 0, 0, 'water', { level: 1 });
+  const w = new VoxelWorld({ depth: 3 }); source(w, 15); w.setBlock(16, 0, 0, 'water', { level: 1 });
   const corner = waterCorner(w, 16, 0, 0), a = buildWaterMesh(w, 0, 0), b = buildWaterMesh(w, 1, 0);
   assert.ok(a.positions.some((v, i) => i % 3 === 1 && Math.abs(v - corner) < 1e-8)); assert.ok(b.positions.some((v, i) => i % 3 === 1 && Math.abs(v - corner) < 1e-8));
   const water = getFaceMaterial('water'); assert.equal(water.transparent, true); assert.equal(water.depthWrite, false); assert.equal(water.depthTest, true);
-  const renderer = new ChunkRenderer(w, new THREE.Scene(), getFaceMaterial('test.block'));
+  const renderer = new ChunkRenderer(w, new THREE.Scene(), getFaceMaterial('dirt'));
   const chunk = renderer.rebuild(0, 0, 1); assert.equal(chunk.waterMesh.material, water); assert.equal(chunk.waterMesh.renderOrder, 2); renderer.dispose();
   const pool = new VoxelWorld({ depth: 0 });
   for (let x = -2; x < 3; x++) for (let z = -2; z < 3; z++) for (let y = -3; y < 2; y++) source(pool, x, y, z);

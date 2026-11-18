@@ -12,10 +12,10 @@ import { AdaptiveVisualQuality, VISUAL_QUALITY } from '../src/visual-quality.js'
 import { DroppedItemRenderer } from '../src/dropped-item-renderer.js';
 import { breakTargetBlock } from '../src/block-placement.js';
 const near = (a, b, eps = 1e-8) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b}`);
-const block = (x = 0, y = 0, z = 0) => ({ x, y, z, definition: BLOCK_TYPES.get('test.block') });
+const block = (x = 0, y = 0, z = 0) => ({ x, y, z, definition: BLOCK_TYPES.get('dirt') });
 const values = system => system.active.map(id => system.pool[id]);
 const quality = level => ({ settings: VISUAL_QUALITY[level] });
-function setup(world = new VoxelWorld(), options) {
+function setup(world = new VoxelWorld({ depth: 3 }), options) {
   const c = new MovementController(world); c.respawn({ x: .5, y: 0, z: .5 });
   c.particles = new BlockParticles(world, { random: () => .5, ...options }); return c;
 }
@@ -24,12 +24,12 @@ test('pickup expands the current scaled/crouching box by fixed 1/0.5 world block
   const bounds = pickupBounds({ x: 0, y: 2, z: 0, size: 2, crouching: true });
   assert.deepEqual(bounds, { min: { x: -1.6, y: 1.5, z: -1.6 }, max: { x: 1.6, y: 5.5, z: 1.6 } });
   const c = setup(); c.world.setBlock(1, 1, 0, true);
-  c.drops.spawn('test.block', 1, { x: 1.8, y: .2, z: .5 }, { velocity: { y: 0 } });
-  c.drops.spawn('test.block', 2, { x: .5, y: .2, z: 1.8 }, { velocity: { y: 0 } });
+  c.drops.spawn('dirt', 1, { x: 1.8, y: .2, z: .5 }, { velocity: { y: 0 } });
+  c.drops.spawn('dirt', 2, { x: .5, y: .2, z: 1.8 }, { velocity: { y: 0 } });
   c.update(.05); assert.equal(c.inventory.mainHand.count, 3, 'Expanded box picks up through the sight-blocking wall and near corners');
   const low = setup(); low.player.crouching = true;
   const crouch = pickupBounds(low.player); near(crouch.max.y, 2); near(crouch.min.y, -.5);
-  low.drops.spawn('test.block', 5, { x: .5, y: 2.1, z: .5 }, { velocity: { y: 0 } });
+  low.drops.spawn('dirt', 5, { x: .5, y: 2.1, z: .5 }, { velocity: { y: 0 } });
   low.update(.05, { crouch: true }); assert.equal(low.inventory.mainHand, null);
 });
 
@@ -43,7 +43,7 @@ test('terrain initializer, quarter crops, lifetime, tint, collision and the reus
   near(p.y, .1); near(p.vx, .1 * .98 * .7); near(p.vy, 0); assert.deepEqual([p.u, p.v], uv);
   for (let i = 0; i < 6; i++) c.particles.step(); assert.equal(c.particles.active.length, 0);
   assert.equal(c.particles.spawn(block(), { x: 0, y: 2, z: 0 }, { x: 0, y: 0, z: 0 }), p, 'Expired particle record is reused');
-  const capped = setup(new VoxelWorld(), { capacity: 16 });
+  const capped = setup(new VoxelWorld({ depth: 3 }), { capacity: 16 });
   capped.particles.breakBlock(block()); capped.particles.breakBlock(block()); assert.equal(capped.particles.active.length, 16); assert.equal(capped.particles.pool.length, 16);
 });
 
@@ -52,7 +52,7 @@ test('instant breaks capture the actual block before removal, create exactly 64 
   for (const mode of ['survival', 'creative']) {
     const c = setup(new VoxelWorld({ depth: 0 })); c.setGameMode(mode); c.teleport({ x: 3.5, y: 0, z: .5 });
     c.world.setBlock(0, 1, 0, true); c.world.blockAt = (x, y, z) => c.world.hasBlock(x, y, z) ? { x, y, z, definition } : null;
-    c.inventory.insert('test.block', 10);
+    c.inventory.insert('dirt', 10);
     assert.equal(breakTargetBlock({ controller: c, world: c.world, yaw: Math.PI / 2, pitch: 0 }), true);
     const particles = values(c.particles); assert.equal(particles.length, 64);
     assert.equal(new Set(particles.map(p => `${p.x},${p.y},${p.z}`)).size, 64);
@@ -69,7 +69,7 @@ test('sprint effects use the supporting block and scaled width, permit nearby ai
   const world = new VoxelWorld({ depth: 0 }); world.setBlock(0, -1, 0, true); const c = setup(world);
   const player = { ...c.player, size: 2, x: 1.3, y: .1, z: .5, sprinting: true, grounded: false, vx: .2, vz: -.3 };
   c.particles.playerEffects(player); assert.equal(c.particles.active.length, 1);
-  const p = values(c.particles)[0]; assert.equal(p.kind, 'sprint'); near(p.y, .2); assert.equal(p.texture, 'test.block');
+  const p = values(c.particles)[0]; assert.equal(p.kind, 'sprint'); near(p.y, .2); assert.equal(p.texture, 'dirt');
   c.particles.playerEffects({ ...player, sprinting: false }); c.particles.playerEffects({ ...player, crouching: true });
   c.particles.playerEffects({ ...player, y: 4 }); c.particles.playerEffects({ ...player, flying: true }); assert.equal(c.particles.active.length, 1);
   assert.ok(p.x >= player.x - .6 && p.x <= player.x + .6);
@@ -93,11 +93,11 @@ test('nearest-filter particle textures and per-texture billboard batches are sha
   const c = setup(), renderer = new BlockParticleRenderer(new THREE.Scene());
   const particleMap = getParticleTexture(); assert.equal(particleMap, getParticleTexture());
   assert.equal(particleMap.image, getBlockAssets().texture.image); assert.equal(particleMap.magFilter, THREE.NearestFilter); assert.equal(particleMap.minFilter, THREE.NearestFilter);
-  assert.equal(getBlockAssets().texture.minFilter, THREE.LinearMipmapLinearFilter);
+  assert.equal(getBlockAssets().texture.minFilter, THREE.NearestMipmapNearestFilter);
   const p = c.particles.spawn(block(), { x: 0, y: 1, z: -3 }, { x: 0, y: 0, z: 0 }); p.x = 1;
   c.particles.spawn(block(), { x: 0, y: 1, z: 3 }, { x: 0, y: 0, z: 0 });
   const camera = new THREE.PerspectiveCamera(75, 1, .05, 100); camera.position.y = 1;
-  renderer.update(c.particles, .5, camera); const batch = renderer.batches.get('test.block');
+  renderer.update(c.particles, .5, camera); const batch = renderer.batches.get('dirt');
   assert.equal(renderer.batches.size, 1); assert.equal(batch.geometry.instanceCount, 1); near(batch.attributes.particleCenter.getX(0), .5);
   assert.equal(batch.geometry.isInstancedBufferGeometry, true); near(batch.attributes.particleSize.getX(0), .075);
   const geometry = batch.geometry, material = batch.material; camera.rotation.y = Math.PI; renderer.update(c.particles, .5, camera);
@@ -117,15 +117,15 @@ test('adaptive quality has sustained thresholds, gradual recovery, ignores inact
 
 test('reduced/low effects thin single events, spread bursts, cap the pool and skip only cosmetic merge visuals', () => {
   for (const level of [0, 1, 2]) {
-    const c = setup(new VoxelWorld(), { quality: quality(level) }); c.particles.breakBlock(block());
+    const c = setup(new VoxelWorld({ depth: 3 }), { quality: quality(level) }); c.particles.breakBlock(block());
     assert.equal(c.particles.active.length, 64 * VISUAL_QUALITY[level].particleFraction);
     for (const axis of ['x', 'y', 'z']) { const positions = values(c.particles).map(p => p[axis]); assert.ok(Math.min(...positions) < .25 && Math.max(...positions) > .75); }
-    const single = setup(new VoxelWorld(), { quality: quality(level) });
+    const single = setup(new VoxelWorld({ depth: 3 }), { quality: quality(level) });
     for (let i = 0; i < 4; i++) single.particles.playerEffects({ ...single.player, sprinting: true });
     assert.equal(single.particles.active.length, 4 * VISUAL_QUALITY[level].particleFraction);
   }
   const c = setup(); c.player.x = 100; c.player.z = 100;
-  c.drops.spawn('test.block', 1, { x: 0, y: 0, z: -4 }); c.drops.spawn('test.block', 20, { x: .5, y: 0, z: -4 });
+  c.drops.spawn('dirt', 1, { x: 0, y: 0, z: -4 }); c.drops.spawn('dirt', 20, { x: .5, y: 0, z: -4 });
   const renderer = new DroppedItemRenderer(new THREE.Scene()), source = c.drops.transitions[0].id;
   renderer.update(c.drops, 0, null, quality(0)); assert.equal(renderer.meshes.has(source), true);
   const total = c.drops.total(), expiry = c.drops.piles[0].lots.map(l => l.expires);
@@ -136,12 +136,12 @@ test('reduced/low effects thin single events, spread bursts, cap the pool and sk
 test('particle quality does not change gameplay, and muted inventory ticks still simulate particles and expanded pickup', () => {
   const results = [];
   for (const level of [0, 2]) {
-    const c = setup(new VoxelWorld(), { quality: quality(level) }); c.throwItem({ id: 'test.block', count: 1 }, () => .5);
+    const c = setup(new VoxelWorld({ depth: 3 }), { quality: quality(level) }); c.throwItem({ id: 'dirt', count: 1 }, () => .5);
     for (let i = 0; i < 80; i++) c.update(.05, { forward: 1, sprint: true, jump: true });
     results.push({ player: c.player, quantity: c.drops.total(), lots: c.drops.piles.flatMap(p => p.lots).map(l => [l.count, l.expires, l.pickup]) });
   }
   assert.deepEqual(results[0], results[1]);
   const c = setup(); const p = c.particles.spawn(block(), { x: .5, y: 2, z: .5 }, { x: 0, y: 0, z: 0 });
-  c.drops.spawn('test.block', 2, { x: 1.75, y: .2, z: 1.75 });
+  c.drops.spawn('dirt', 2, { x: 1.75, y: .2, z: 1.75 });
   c.update(.05, { gameplayEnabled: false, forward: 1, jump: true }); assert.equal(p.age, 1); near(c.player.x, .5); near(c.player.y, 0); assert.equal(c.inventory.mainHand.count, 2);
 });

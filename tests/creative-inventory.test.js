@@ -13,7 +13,7 @@ const stack = (id = 'stone', count = 1) => ({ id, count });
 function fixture(t) {
   const window = new Window({ url: 'http://localhost:4173', settings: { disableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   const document = window.document; document.write(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
-  const c = new MovementController(new VoxelWorld()); c.setGameMode('creative');
+  const c = new MovementController(new VoxelWorld({ depth: 3 })); c.setGameMode('creative');
   const inventoryUI = new InventoryUI({ inventory: c.inventory, document, window, getGameMode: () => c.gameMode, onClose: () => ui.closeInventory() });
   const ui = new ChatUI({ document, window, controller: c, inventoryUI, clearInput: options => c.pause(options), requestCapture: () => {}, requestUnlock: () => {}, storage: window.localStorage });
   t.after(() => { inventoryUI.dispose(); ui.dispose(); window.happyDOM.abort(); window.close(); });

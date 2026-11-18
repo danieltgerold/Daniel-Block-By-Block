@@ -27,7 +27,7 @@ const facesAt = (data, x, sign) => {
 };
 
 test('held grass top/side UVs stay upright in both hands and all F5 views without moving or resizing the attachment', () => {
-  const c = new MovementController(new VoxelWorld()), model = createPlayerModel(), hand = createEmptyHand();
+  const c = new MovementController(new VoxelWorld({ depth: 3 })), model = createPlayerModel(), hand = createEmptyHand();
   c.inventory.slots[0] = stack('grass.block'); c.inventory.slots[40] = stack('grass.block');
   for (const size of [1, 2]) for (const view of [1, 2]) {
     animatePlayerModel(model, { x: 0, y: 0, z: 0, size }, rest, view, c.inventory); syncEquipment(model, c.inventory); model.updateMatrixWorld(true);
@@ -72,7 +72,7 @@ test('glass and leaves have real binary alpha in shared textures, static icons, 
     assert.equal(material.transparent, false); assert.equal(material.depthTest, true); assert.equal(material.depthWrite, true);
     assert.equal(material.side, THREE.FrontSide); assert.equal(getBlockMaterials(id), material);
     assert.equal(getParticleTexture(id).image, texture.image);
-    const c = new MovementController(new VoxelWorld()), drops = new DroppedItemRenderer(new THREE.Scene());
+    const c = new MovementController(new VoxelWorld({ depth: 3 })), drops = new DroppedItemRenderer(new THREE.Scene());
     const pile = c.drops.spawn(id, 3, { x: 10, y: 1, z: 10 }); drops.update(c.drops);
     assert.equal(drops.meshes.get(pile.id).children[0].material, material);
     const svg = decodeURIComponent(blockIcon(id).split(',')[1]);
@@ -107,10 +107,10 @@ test('opaque faces remain behind cutouts, same glass faces disappear, and fancy 
 test('new IDs give/autocomplete/place normally, target through clear pixels, collide as full cubes and preserve leaf state', () => {
   for (const id of ['glass', 'oak.leaves']) {
     assert.ok(commandCompletions('/give ').includes(`/give ${id} `));
-    const w = new VoxelWorld(), c = new MovementController(w);
+    const w = new VoxelWorld({ depth: 3 }), c = new MovementController(w);
     const service = new ChatService({ controller: c, profile: new LocalPlayerProfile(null, () => 'cutouts') });
     service.submit(`/give ${id} 130`); assert.deepEqual(c.inventory.slots.slice(0, 3).map(s => s.count), [64, 64, 2]);
-    w.setBlock(0, 1, 0, 'test.block'); c.teleport({ x: 3.5, y: 0, z: .5 });
+    w.setBlock(0, 1, 0, 'dirt'); c.teleport({ x: 3.5, y: 0, z: .5 });
     const placement = new BlockPlacement({ controller: c, world: w, getAim: () => ({ yaw: Math.PI / 2, pitch: 0 }), canInteract: () => true });
     assert.equal(placement.attempt(), true); assert.equal(w.blockIdAt(1, 1, 0), id); assert.equal(c.inventory.mainHand.count, 63);
     const hit = w.raycast({ x: 4, y: 1.5, z: .5 }, { x: -1, y: 0, z: 0 }); assert.equal(hit.x, 1);
@@ -123,23 +123,23 @@ test('new IDs give/autocomplete/place normally, target through clear pixels, col
     if (id === 'oak.leaves') {
       assert.equal(w.blockAt(1, 1, 0).state.persistent, true); w.step(300); assert.equal(w.blockIdAt(1, 1, 0), id);
       w.setBlock(1, 1, 0, id, { persistent: false, distance: 6 });
-      const restored = new VoxelWorld(); restored.loadEdits([...w.edits()]);
+      const restored = new VoxelWorld({ depth: 3 }); restored.loadEdits([...w.edits()]);
       assert.deepEqual(restored.blockAt(1, 1, 0).state, { persistent: false, distance: 6 });
-      assert.equal(restored.blockAt(0, 1, 0).id, 'test.block');
+      assert.equal(restored.blockAt(0, 1, 0).id, 'dirt');
     }
   }
 });
 
 test('placed/grown grass drops dirt, glass/leaves drop no blocks, and Creative never drops any of them', () => {
   for (const mode of ['survival', 'creative']) for (const id of ['grass.block', 'glass', 'oak.leaves']) {
-    const w = new VoxelWorld(), c = new MovementController(w); c.setGameMode(mode); c.teleport({ x: 3.5, y: 0, z: .5 });
+    const w = new VoxelWorld({ depth: 3 }), c = new MovementController(w); c.setGameMode(mode); c.teleport({ x: 3.5, y: 0, z: .5 });
     w.setBlock(0, 1, 0, id); c.particles = new BlockParticles(w, { random: () => .5 });
     assert.equal(breakTargetBlock({ controller: c, world: w, yaw: Math.PI / 2, pitch: 0 }), true);
     assert.equal(c.particles.active.length, 64); assert.ok(c.particles.pool.every(p => p.texture === BLOCK_TYPES.get(id).particleTexture));
     assert.equal(c.drops.total(), mode === 'survival' && id === 'grass.block' ? 1n : 0n);
     if (c.drops.piles.length) assert.equal(c.drops.piles[0].item, 'dirt');
   }
-  const w = new VoxelWorld({ random: () => .99 }), c = new MovementController(w); c.teleport({ x: 3.5, y: 0, z: .5 });
+  const w = new VoxelWorld({ depth: 3, random: () => .99 }), c = new MovementController(w); c.teleport({ x: 3.5, y: 0, z: .5 });
   w.setBlock(-1, 0, -1, 'grass.block'); w.setBlock(0, 1, 0, 'dirt'); w.step(1);
   assert.equal(w.blockIdAt(0, 1, 0), 'grass.block');
   c.drops.spawn('dirt', 2, { x: .5, y: 1.25, z: .5 });

@@ -10,13 +10,13 @@ const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 const source = (w, x, y = 0, z = 0) => w.setBlock(x, y, z, 'water');
 
 test('4096 distant water cells never enter local terrain/collision/targeting scans; sparse developer sweeps remain bounded', () => {
-  const w = new VoxelWorld(); w.setBlock(2, 0, 2, 'oak.slab');
+  const w = new VoxelWorld({ depth: 3 }); w.setBlock(2, 0, 2, 'oak.slab');
   for (let x = 128; x < 192; x++) for (let z = 128; z < 192; z++) source(w, x, 0, z);
   w.edits = function* () { throw new Error('local operation scanned every world edit'); };
   assert.ok(buildChunkMesh(w, 0, 0).quads > 0);
   const p = { x: .5, y: 0, z: .5, grounded: true };
   near(w.movePlayer(p, { x: .2, y: -.08, z: .1 }).y, 0); assert.equal(w.isSupported(p), true);
-  assert.equal(w.supportingBlock(p).id, 'test.block'); assert.equal(w.supportedPath(p, 3, 0), true);
+  assert.equal(w.supportingBlock(p).id, 'dirt'); assert.equal(w.supportedPath(p, 3, 0), true);
   assert.equal(w.raycast({ x: .5, y: 2, z: .5 }, { x: 0, y: -1, z: 0 }).y, -1);
   assert.equal(w.raycast({ x: .5, y: 2, z: .5 }, { x: 0, y: -1, z: 0 }, 5, { waterSources: true }).y, -1);
   const bounded = w.sweepBox({ x: .5, y: 2, z: .5 }, { x: 1e12, y: -4, z: 1e12 }, .1);
@@ -26,7 +26,7 @@ test('4096 distant water cells never enter local terrain/collision/targeting sca
 });
 
 test('terrain and water invalidation stay separate, boundary corners update, and deferred replacement retains and disposes old buffers', () => {
-  const w = new VoxelWorld(), scene = new THREE.Scene(), renderer = new ChunkRenderer(w, scene, new THREE.MeshBasicMaterial(), { viewDistance: 40, buildsPerFrame: 100, waterBuildsPerFrame: 1 });
+  const w = new VoxelWorld({ depth: 3 }), scene = new THREE.Scene(), renderer = new ChunkRenderer(w, scene, new THREE.MeshBasicMaterial(), { viewDistance: 40, buildsPerFrame: 100, waterBuildsPerFrame: 1 });
   for (const x of [15, 16]) for (const z of [15, 16]) source(w, x, 0, z);
   source(w, 136, 0, 136);
   const entries = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([x,z]) => renderer.rebuild(x,z,1));
@@ -50,14 +50,14 @@ test('terrain and water invalidation stay separate, boundary corners update, and
 });
 
 test('cached/merged water retains shared corners, slopes and repeating UVs; nearby openings wake settled water and indexes survive load', () => {
-  const w = new VoxelWorld();
+  const w = new VoxelWorld({ depth: 3 });
   for (let x = 0; x < 32; x++) for (let z = 0; z < 16; z++) source(w,x,0,z);
   const mesh = buildWaterMesh(w,0,0); assert.ok(mesh.indices.length / 6 < 150, 'flat compatible tops are merged'); assert.ok(Math.max(...mesh.uvs) > 1, 'merged top repeats the existing texture');
   const old = waterCorner(w,16,0,8); w.setBlock(16,0,8,'water',{level:5}); const changed = waterCorner(w,16,0,8); assert.notEqual(changed,old);
   for (const cx of [0,1]) { const data = buildWaterMesh(w,cx,0); assert.ok(data.positions.some((value,i) => i%3===1 && Math.abs(value-changed)<1e-8)); }
-  const saved = w.save(), restored = new VoxelWorld(); restored.load(JSON.parse(JSON.stringify(saved)));
+  const saved = w.save(), restored = new VoxelWorld({ depth: 3 }); restored.load(JSON.parse(JSON.stringify(saved)));
   assert.deepEqual(restored.save(), saved); assert.equal(restored.sourceChunks.size, w.sourceChunks.size); assert.deepEqual(buildWaterMesh(restored,0,0), buildWaterMesh(w,0,0));
-  const flow = new VoxelWorld(); flow.setBlock(1,0,0,'stone'); source(flow,0); for(let i=0;i<80;i++) flow.step(.05);
+  const flow = new VoxelWorld({ depth: 3 }); flow.setBlock(1,0,0,'stone'); source(flow,0); for(let i=0;i<80;i++) flow.step(.05);
   assert.equal(flow.fluids.pending.size,0); flow.setBlock(1,0,0,false); assert.ok(flow.fluids.pending.size>0);
   for(let i=0;i<5;i++)flow.step(.05); assert.equal(flow.blockIdAt(1,0,0),'water');
 });

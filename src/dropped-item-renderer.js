@@ -60,7 +60,7 @@ export class DroppedItemRenderer {
         const i = mesh.children.length, cube = this.prototype.clone();
         cube.position.fromArray(PILE_OFFSETS[i]); cube.rotation.y = i * .37; mesh.add(cube);
       }
-      mesh.children.forEach((cube, i) => { cube.visible = i < desired; setItemAppearance(cube, pile.item ?? 'test.block'); });
+      mesh.children.forEach((cube, i) => { cube.visible = i < desired; setItemAppearance(cube, pile.item ?? 'dirt'); });
       const ageTicks = (drops.time - pile.born) * 20 + alpha;
       const bob = Math.sin(ageTicks / 10 + pile.phase) * .1 + .1;
       mesh.position.set(at.x, at.y + .2 + bob + bobDelta, at.z);

@@ -16,7 +16,7 @@ function fixture(t) {
   window.document.write(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
   const document = window.document, storage = window.localStorage;
   storage.setItem('block-by-block.first-person-body', 'true');
-  const controller = new MovementController(new VoxelWorld());
+  const controller = new MovementController(new VoxelWorld({ depth: 3 }));
   const ui = new ChatUI({ document, window, controller, clearInput: () => controller.pause(), requestCapture: () => {}, requestUnlock: () => {}, storage });
   const hud = new GameplayHUD(document, storage);
   t.after(() => { hud.dispose(); ui.dispose(); window.happyDOM.abort(); window.close(); });

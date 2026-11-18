@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BLOCK_COLOR, BLOCK_GRID_COLOR, blockShade } from './block-appearance.js';
+import { blockShade } from './block-appearance.js';
 import { BLOCK_TYPES, blockFaceTexture } from './block-types.js';
 import { texturePixels, textureHasAlpha } from './block-textures.js';
 import { itemBlock } from './block-shapes.js';
@@ -7,18 +7,7 @@ import { faceUv, shapeQuads } from './shape-mesh.js';
 let assets;
 export function getBlockAssets(anisotropy = 1) {
   if (!assets) {
-    const size = 128, pixels = new Uint8Array(size * size * 4);
-    const rgb = hex => hex.slice(1).match(/../g).map(c => parseInt(c, 16));
-    const fill = rgb(BLOCK_COLOR), line = rgb(BLOCK_GRID_COLOR);
-    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-      pixels.set([...(x === 0 || y === 0 || x === size - 1 || y === size - 1 ? line : fill), 255], (y * size + x) * 4);
-    }
-    const texture = new THREE.DataTexture(pixels, size, size);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    texture.minFilter = THREE.LinearMipmapLinearFilter; texture.magFilter = THREE.LinearFilter;
-    texture.generateMipmaps = true; texture.needsUpdate = true;
-    assets = { texture, material: new THREE.MeshBasicMaterial({ map: texture, vertexColors: true, depthTest: true, depthWrite: true }), geometries: new Map() };
+    assets = { texture: getFaceTexture('dirt'), material: getBlockMaterials('dirt'), geometries: new Map() };
   }
   if (anisotropy > assets.texture.anisotropy) { assets.texture.anisotropy = anisotropy; assets.texture.needsUpdate = true; }
   return assets;
@@ -51,7 +40,6 @@ export function getItemMaterials(id, geometry) {
   return BLOCK_TYPES.get(id)?.collisionShape === 'door' ? geometry.userData.textures.map(getFaceMaterial) : getBlockMaterials(id);
 }
 export function getFaceTexture(id) {
-  if (id === 'test.block') return getBlockAssets().texture; // Preserve the legacy fine grid exactly.
   if (!faceTextures.has(id)) {
     const pixels = texturePixels(id); if (!pixels) return null;
     const flipped = new Uint8Array(pixels.length);
@@ -66,7 +54,6 @@ export function getFaceTexture(id) {
   return faceTextures.get(id);
 }
 export function getFaceMaterial(id) {
-  if (id === 'test.block') return getBlockAssets().material;
   if (!faceMaterials.has(id)) faceMaterials.set(id, new THREE.MeshBasicMaterial({
     map: getFaceTexture(id), vertexColors: true, depthTest: true, depthWrite: true, fog: true,
     // Binary cutouts discard clear pixels before depth writes. Front-side
@@ -76,8 +63,8 @@ export function getFaceMaterial(id) {
   }));
   return faceMaterials.get(id);
 }
-export function getBlockMaterials(id = 'test.block') {
-  if (!BLOCK_TYPES.has(id)) id = 'test.block';
+export function getBlockMaterials(id = 'dirt') {
+  if (!BLOCK_TYPES.has(id)) id = 'dirt';
   if (!blockMaterials.has(id)) {
     // BoxGeometry groups: +X, -X, +Y, -Y, +Z, -Z.
     const materials = [[0, 1], [0, -1], [1, 1], [1, -1], [2, 1], [2, -1]]
@@ -86,7 +73,7 @@ export function getBlockMaterials(id = 'test.block') {
   }
   return blockMaterials.get(id);
 }
-export function setBlockAppearance(mesh, id = 'test.block') {
+export function setBlockAppearance(mesh, id = 'dirt') {
   if (mesh.userData.blockId === id) return;
   mesh.material = getBlockMaterials(id); mesh.userData.blockId = id;
 }
@@ -104,13 +91,13 @@ export function getBlockGeometry(size = .375) {
   }
   return geometries.get(size);
 }
-export function createSharedBlock(size = .375, id = 'test.block') {
+export function createSharedBlock(size = .375, id = 'dirt') {
   const mesh = new THREE.Mesh(getBlockGeometry(size), getBlockMaterials(id));
   mesh.userData.blockId = id; mesh.userData.itemSize = size; return mesh;
 }
 const particleSources = new Map(), particleTextures = new WeakMap();
 export function registerParticleTexture(id, texture) { particleSources.set(id, texture); }
-export function getParticleTexture(id = 'test.block') {
+export function getParticleTexture(id = 'dirt') {
   const source = particleSources.get(id) ?? getFaceTexture(id);
   if (!source) return null;
   if (!particleTextures.has(source)) {

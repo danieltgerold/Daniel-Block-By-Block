@@ -185,6 +185,7 @@ export class MovementController {
   constructor(world = null) {
     this.world = world;
     this.player = createPlayer();
+    if (world?.topY) Object.assign(this.player, world.findSpawn());
     this.accumulator = 0;
     this.previous = snapshot(this.player);
     this.totalSteps = 0;
@@ -222,6 +223,7 @@ export class MovementController {
     if (!['survival', 'creative'].includes(mode)) return false;
     if (!this.configure('reach', mode === 'creative' ? 5 : DEFAULT_SETTINGS.reach).ok) return false;
     this.gameMode = mode;
+    this.breaking?.cancel();
     this.lastSpacePressTick = -Infinity; this.flightToggles = 0;
     if (mode !== 'creative') this.player.flying = false;
     return true;
@@ -266,7 +268,7 @@ export class MovementController {
     return this.world?.raycast(ray.origin, ray.direction, ray.reach) ?? null;
   }
 
-  setMining(held) { this.miningHeld = held; }
+  setMining(held) { this.miningHeld = held; if (!held) this.breaking?.cancel(); }
   requestSwing() { this.swingQueued = true; }
   lowerMainHand() { this.player.animation.equipHeight = 0; }
   giveItem(id, count) {
@@ -288,6 +290,7 @@ export class MovementController {
     return block ? this.inventory.pick(block.definition.id, { creative: this.gameMode === 'creative' }) : false;
   }
   clearHeldInputs() {
+    this.breaking?.cancel();
     this.heldKeys.clear(); this.lastForwardPressTick = this.lastSpacePressTick = -Infinity;
     this.flightToggles = 0; this.sprintRequested = false; this.miningHeld = false;
     this.placementHeld = false; this.placementPresses = this.placementRepeat = 0; this.swingQueued = false;
@@ -400,6 +403,7 @@ export class MovementController {
   }
 
   pause({ preserveMomentum = false } = {}) {
+    this.breaking?.cancel();
     if (preserveMomentum) {
       // Inventory releases controls; it does not cancel carried velocity or
       // reset interpolation. Air drag, gravity and collisions keep running.

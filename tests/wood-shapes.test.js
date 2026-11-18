@@ -39,7 +39,7 @@ test('real placement face determines both log axes, end textures and saved state
     const ray = w.raycast(origin, direction); assert.ok(placeBlock(w, id, ray, 0));
     const placed = w.blockAt(n.x, n.y, n.z); assert.equal(placed.state.axis, 'xyz'[axis]);
     for (let face = 0; face < 3; face++) assert.equal(blockFaceTexture(id, face, 1, placed.state), `${id.split('.')[0]}.${face === axis ? 'end' : 'bark'}`);
-    const saved = JSON.parse(JSON.stringify(w.save())), restored = new VoxelWorld(); restored.load(saved);
+    const saved = JSON.parse(JSON.stringify(w.save())), restored = new VoxelWorld({ depth: 3 }); restored.load(saved);
     assert.equal(restored.blockAt(n.x, n.y, n.z).state.axis, 'xyz'[axis]);
   }
   const old = new VoxelWorld({ depth: 0 }); old.loadEdits([{ x: 0, y: 0, z: 0, id: 'pine.log', solid: true, state: {} }]);
@@ -51,7 +51,7 @@ test('slabs use top/bottom hit positions, combine only matching halves, consume 
     const id = `${wood}.slab`, w = new VoxelWorld({ depth: 0 }); w.setBlock(0, 0, 0, true);
     assert.ok(placeBlock(w, id, hit(0, 0, 0, { x: 1, y: 0, z: 0 }, { x: 1, y: .75, z: .5 }), 0)); assert.equal(w.blockStateAt(1, 0, 0).type, 'top');
     assert.ok(placeBlock(w, id, hit(0, 0, 0, { x: 0, y: -1, z: 0 }), 0)); assert.equal(w.blockStateAt(0, -1, 0).type, 'top');
-    const world = new VoxelWorld(), c = new MovementController(world); world.setBlock(0, 0, 0, id); c.teleport({ x: .5, y: 2, z: .5 }); c.inventory.slots[0] = stack(id, 3);
+    const world = new VoxelWorld({ depth: 3 }), c = new MovementController(world); world.setBlock(0, 0, 0, id); c.teleport({ x: .5, y: 2, z: .5 }); c.inventory.slots[0] = stack(id, 3);
     const p = new BlockPlacement({ controller: c, world, getAim: () => ({ yaw: 0, pitch: -Math.PI / 2 }), canInteract: () => true });
     assert.equal(p.attempt(), true); assert.equal(world.blockStateAt(0, 0, 0).type, 'double'); assert.equal(c.inventory.mainHand.count, 2);
     world.destroyBlock(0, 0, 0, { gameMode: 'survival' }); assert.equal(c.drops.total(), 2n); assert.equal(c.drops.piles[0].item, id);
@@ -73,7 +73,7 @@ test('partial slabs drive collision, rays, outlines, camera, LOD and proportiona
     const mesh = buildChunkMesh(w, 0, 0, level), ys = mesh.positions.filter((_, i) => i % 3 === 1); near(Math.max(...ys), .5); near(Math.min(...ys), 0);
   }
   for (const size of [1, 2]) {
-    const world = new VoxelWorld(), c = new MovementController(world); c.configure('size', size); c.teleport({ x: -1, y: 0, z: .5 });
+    const world = new VoxelWorld({ depth: 3 }), c = new MovementController(world); c.configure('size', size); c.teleport({ x: -1, y: 0, z: .5 });
     for (let x = 0; x < 8; x++) world.setBlock(x, 0, 0, 'oak.slab');
     let stepped = false; for (let tick = 0; tick < 12; tick++) { c.update(.05, { forward: true, yaw: -Math.PI / 2 }); stepped ||= c.player.y >= .5 - 1e-7 && c.player.grounded; }
     assert.equal(stepped, true);
@@ -87,7 +87,7 @@ test('partial slabs drive collision, rays, outlines, camera, LOD and proportiona
 });
 
 test('fences connect across wood types/chunk boundaries, use 1m selection/1.5m collision, and block a normal jump', () => {
-  const w = new VoxelWorld(); w.setBlock(15, 0, 0, 'oak.fence'); w.setBlock(16, 0, 0, 'pine.fence');
+  const w = new VoxelWorld({ depth: 3 }); w.setBlock(15, 0, 0, 'oak.fence'); w.setBlock(16, 0, 0, 'pine.fence');
   assert.equal(fenceConnections(w.blockAt(15, 0, 0), w).east, true); assert.equal(fenceConnections(w.blockAt(16, 0, 0), w).west, true);
   w.setBlock(14, 0, 0, 'stone'); assert.equal(fenceConnections(w.blockAt(15, 0, 0), w).west, true);
   assert.equal(Math.max(...blockBoxes(w.blockAt(15, 0, 0), 'selection', w).map(b => b[4])), 1);
@@ -98,14 +98,14 @@ test('fences connect across wood types/chunk boundaries, use 1m selection/1.5m c
   for (const size of [1, 2]) {
     const stopped = empty.movePlayer({ x: -5, y: 0, z: .5, size }, { x: 100, y: 0, z: 0 }); near(stopped.x, .375 - .3 * size);
   }
-  const c = new MovementController(new VoxelWorld()); for (let x = -3; x <= 3; x++) c.world.setBlock(x, 0, 0, 'oak.fence');
+  const c = new MovementController(new VoxelWorld({ depth: 3 })); for (let x = -3; x <= 3; x++) c.world.setBlock(x, 0, 0, 'oak.fence');
   c.teleport({ x: .5, y: 0, z: 2 }); let nearest = 2;
   for (let tick = 0; tick < 35; tick++) { c.update(.05, { forward: true, jump: tick === 0, yaw: 0 }); nearest = Math.min(nearest, c.player.z); }
   assert.ok(nearest >= .925 - 1e-7, `jump crossed fence: ${nearest}`);
 });
 
 test('doors place both halves atomically, pair hinges, toggle separately, change passability, and remove/drop exactly once', () => {
-  const w = new VoxelWorld(), c = new MovementController(w); c.teleport({ x: 10, y: 0, z: 10 });
+  const w = new VoxelWorld({ depth: 3 }), c = new MovementController(w); c.teleport({ x: 10, y: 0, z: 10 });
   assert.ok(placeBlock(w, 'oak.door', hit(0, -1, 0, undefined, { x: .2, y: 0, z: .5 }), 0));
   assert.ok(placeBlock(w, 'pine.door', hit(1, -1, 0), 0));
   assert.equal(w.blockStateAt(0, 0, 0).hinge, 'left'); assert.equal(w.blockStateAt(1, 0, 0).hinge, 'right');

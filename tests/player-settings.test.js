@@ -13,7 +13,7 @@ import { VoxelWorld } from '../src/voxel-world.js';
 import { updatePlayerCamera, createPlayerModel, animatePlayerModel } from '../src/player-visuals.js';
 import { createPlayerAnimation, interpolatePlayerAnimation } from '../src/player-animation.js';
 const near = (a, b, eps = 1e-8) => assert.ok(Math.abs(a - b) < eps, `Expected ${b}, got ${a}`);
-function service(world = new VoxelWorld()) {
+function service(world = new VoxelWorld({ depth: 3 })) {
   const controller = new MovementController(world);
   controller.respawn({ x: 0.5, y: 0, z: 0.5 });
   const profile = new LocalPlayerProfile(null, () => 'test-player');

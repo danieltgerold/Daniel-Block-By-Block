@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { Window } from 'happy-dom';
@@ -18,7 +18,7 @@ function uiFixture(t) {
   const window = new Window({ url: 'http://localhost:4173', settings: { disableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   window.document.write(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
   const document = window.document;
-  const controller = new MovementController(new VoxelWorld());
+  const controller = new MovementController(new VoxelWorld({ depth: 3 }));
   const ui = new ChatUI({ document, window, controller, clearInput: () => controller.pause(), requestCapture: () => {}, requestUnlock: () => {}, storage: window.localStorage,
     now: () => time, onHitboxToggle: () => { hitboxes = !hitboxes; } });
   const key = (code, repeat = false, up = false) => {
@@ -48,7 +48,7 @@ test('help is one compact multiline server reply, /default resets the four setti
 });
 
 test('both F5 cameras scale to 2/8/4 blocks, sweep a larger camera box at size two, and restore distance', () => {
-  const controller = new MovementController(new VoxelWorld());
+  const controller = new MovementController(new VoxelWorld({ depth: 3 }));
   controller.respawn({ x: 0.5, y: 0, z: 0.5 });
   for (const size of [0.5, 2, 1]) {
     assert.equal(controller.configure('size', size).ok, true);
@@ -90,7 +90,7 @@ test('legs keep a non-overlapping seam and pure hip X swings through standing, w
 });
 
 test('one swing clock rejects early restarts, accepts tick three, and drives the arm forward in avatar space', () => {
-  const controller = new MovementController(new VoxelWorld());
+  const controller = new MovementController(new VoxelWorld({ depth: 3 }));
   controller.requestSwing(); tick(controller);
   assert.equal(controller.player.animation.swingSerial, 1);
   controller.requestSwing(); tick(controller); // Age 1: ignored.
@@ -124,7 +124,7 @@ test('one swing clock rejects early restarts, accepts tick three, and drives the
 
 for (const size of [1, 2]) {
   test(`size ${size}: crouch speed, low-ceiling release, eye easing, and diagonal ledge overhang`, () => {
-    const controller = new MovementController(new VoxelWorld());
+    const controller = new MovementController(new VoxelWorld({ depth: 3 }));
     controller.configure('size', size);
     controller.respawn({ x: 0.5 * size, y: 0, z: 0.5 * size });
     controller.keyDown('ShiftLeft'); controller.keyDown('KeyW');
@@ -136,7 +136,7 @@ for (const size of [1, 2]) {
     near((start - controller.player.z) / 5, 1.2951541850220268 * size);
     controller.keyDown('KeyR'); tick(controller);
     assert.equal(controller.player.sprinting, false, 'Cannot initiate a sprint while crouched');
-    const low = new MovementController(new VoxelWorld());
+    const low = new MovementController(new VoxelWorld({ depth: 3 }));
     low.configure('size', size); low.respawn({ x: 0.5, y: 0, z: 0.5 });
     low.world.setBlock(0, size === 1 ? 2 : 3, 0, true);
     low.keyDown('ShiftLeft'); low.keyDown('Space'); tick(low); low.keyUp('Space');

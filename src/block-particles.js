@@ -104,6 +104,10 @@ export class BlockParticles {
       this.spawn(block, { x: block.x + x, y: block.y + y, z: block.z + z }, { x: x - .5, y: y - .5, z: z - .5 }, false, 'break');
     }
   }
+  hitBlock(block, hit) {
+    this.spawn(block, { x: hit.point.x + hit.normal.x * .02, y: hit.point.y + hit.normal.y * .02, z: hit.point.z + hit.normal.z * .02 },
+      { x: hit.normal.x * .1, y: hit.normal.y * .1, z: hit.normal.z * .1 }, true, 'hit');
+  }
   gaussian() { return Math.sqrt(-2 * Math.log(Math.max(1e-9, this.random()))) * Math.cos(2 * Math.PI * this.random()); }
   landing(player, block, distance) {
     const count = this.eventCount(landingParticleCount(distance), player), { min, max } = playerBounds(player);

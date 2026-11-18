@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MovementController, MOVEMENT, createPlayer, stepPlayer } from '../src/movement.js';
 import { VoxelWorld } from '../src/voxel-world.js';
@@ -19,7 +19,7 @@ function advance(controller, seconds, pattern = [1 / 60], input = {}) {
 const tick = (controller, input = {}) => controller.update(MOVEMENT.fixedStep, input);
 
 function movingController(mode) {
-  const controller = new MovementController(new VoxelWorld());
+  const controller = new MovementController(new VoxelWorld({ depth: 3 }));
   controller.keyDown('KeyW');
   if (mode !== 'walk') controller.keyDown('KeyR');
   if (mode === 'sprintJump') controller.keyDown('Space');

@@ -18,7 +18,7 @@ import { createEmptyHand, updateEmptyHand, createPlayerModel, syncEquipment } fr
 import { DroppedItemRenderer } from '../src/dropped-item-renderer.js';
 import { ChatService, LocalPlayerProfile } from '../src/chat.js';
 import { commandCompletions } from '../src/chat-commands.js';
-const ids = ['test.block', 'stone', 'cobblestone', 'dirt', 'grass.block', 'sand', 'gravel', 'oak.log', 'oak.planks'];
+const ids = ['pine.planks', 'stone', 'cobblestone', 'dirt', 'grass.block', 'sand', 'gravel', 'oak.log', 'oak.planks'];
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 const stack = (id, count = 1) => ({ id, count });
 const total = c => c.inventory.slots.reduce((n, s) => n + BigInt(s?.count ?? 0), 0n) + c.drops.total();
@@ -47,11 +47,11 @@ test('new 16x16 pixel faces, repeated world UVs, cached shaded icons and all 3D 
     assert.equal(texture.image.width, 16); assert.equal(texture.image.height, 16);
     assert.equal(texture.magFilter, THREE.NearestFilter); assert.equal(texture.wrapS, THREE.RepeatWrapping);
     assert.equal(getFaceTexture(id), texture); assert.equal(texturePixels(id), texturePixels(id));
-    assert.ok(tile.palette.length <= 5);
+    assert.ok(tile.palette.length <= 8);
     // Logical top row maps to v=1 in world/held textures.
     assert.deepEqual([...texture.image.data.slice(-64)], [...texturePixels(id).slice(0, 64)]);
   }
-  assert.equal(getBlockAssets().texture.image.width, 128, 'Legacy Test Block fine grid stays unchanged');
+  assert.equal(getBlockAssets().texture.image.width, 16, 'Fallback uses the existing Dirt pixel texture');
   const window = new Window(); t.after(() => { window.happyDOM.abort(); window.close(); });
   for (const id of ids) {
     const element = window.document.createElement('button'); drawStack(window.document, element, stack(id, 2));
@@ -69,17 +69,17 @@ test('new 16x16 pixel faces, repeated world UVs, cached shaded icons and all 3D 
 });
 
 test('typed storage and legacy occupancy migration preserve ground, identity, collision and restoring sparse edits', () => {
-  const w = new VoxelWorld();
+  const w = new VoxelWorld({ depth: 3 });
   w.loadEdits([{ x: -1, y: 1, z: -1, solid: true }, { x: 2, y: -1, z: 2, solid: false }, { x: 3, y: -1, z: 3, id: 'stone' }]);
-  assert.equal(w.blockAt(-1, 1, -1).id, 'test.block'); assert.equal(w.hasBlock(2, -1, 2), false);
+  assert.equal(w.blockAt(-1, 1, -1).id, 'dirt'); assert.equal(w.hasBlock(2, -1, 2), false);
   assert.equal(w.blockAt(3, -1, 3).definition.id, 'stone'); assert.equal(w.removedCount, 1);
   w.setBlock(3, -1, 3, 'dirt'); assert.equal(w.removedCount, 1);
   w.setBlock(3, -1, 3, false); assert.equal(w.removedCount, 2);
   w.setBlock(3, -1, 3, true); assert.equal(w.removedCount, 1);
-  assert.equal(w.blockIdAt(0, -2, 0), 'test.block');
+  assert.equal(w.blockIdAt(0, -2, 0), 'dirt');
   const old = new VoxelWorld({ depth: 0 });
   old.chunkEdits.set(chunkKey(0, 0), new Map([['0,0,0', { x: 0, y: 0, z: 0, solid: true }]]));
-  assert.equal(old.blockAt(0, 0, 0).id, 'test.block');
+  assert.equal(old.blockAt(0, 0, 0).id, 'dirt');
   for (const id of ids) {
     const world = new VoxelWorld({ depth: 0 }); world.setBlock(0, 0, 0, id);
     const motion = world.movePlayer({ x: 2, y: 0, z: .5 }, { x: -50, y: 0, z: 0 });
@@ -91,7 +91,7 @@ test('typed storage and legacy occupancy migration preserve ground, identity, co
 
 test('all block kinds place/consume, break/drop their own item, retain Creative rules and use actual particle/pick identity', () => {
   for (const mode of ['survival', 'creative']) for (const id of ids) {
-    const world = new VoxelWorld(), c = new MovementController(world);
+    const world = new VoxelWorld({ depth: 3 }), c = new MovementController(world);
     world.setBlock(0, 1, 0, id); c.teleport({ x: 3.5, y: 0, z: .5 }); c.setGameMode(mode);
     c.particles = new BlockParticles(world, { random: () => .5 });
     c.inventory.slots[0] = stack(id, 2);
@@ -118,7 +118,7 @@ test('mixed faces mesh by texture, keep hidden faces culled and repeat pixel til
   assert.equal(mesh.quads, 10, 'The two contacting opaque faces are omitted');
   assert.equal(mesh.groups.reduce((n, g) => n + g.count, 0), mesh.indices.length);
   for (const level of [1, 2, 4]) {
-    const floor = new VoxelWorld();
+    const floor = new VoxelWorld({ depth: 3 });
     for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) floor.setBlock(x, -1, z, 'stone');
     const data = buildChunkMesh(floor, 0, 0, level); const group = data.groups.find(g => g.texture === 'stone');
     const uv = data.indices.slice(group.start, group.start + group.count).map(i => data.uvs[i * 2]);
@@ -160,7 +160,7 @@ test('give/autocomplete includes every ID, splits 130, rejects errors, and prese
   for (const id of ids) {
     assert.ok(commandCompletions('/give ').includes(`/give ${id} `));
     assert.deepEqual(commandCompletions(`/give ${id} `), []);
-    const c = new MovementController(new VoxelWorld()), service = new ChatService({ controller: c, profile: new LocalPlayerProfile(null, () => 'blocks') });
+    const c = new MovementController(new VoxelWorld({ depth: 3 })), service = new ChatService({ controller: c, profile: new LocalPlayerProfile(null, () => 'blocks') });
     service.submit(`/give ${id} 130`); assert.deepEqual(c.inventory.slots.slice(0, 3).map(s => s.count), [64, 64, 2]);
     assert.ok(c.inventory.slots.slice(0, 3).every(s => s.id === id));
     for (const text of ['/give unknown 1', `/give ${id} -2`, `/give ${id} 1.5`]) { service.submit(text); assert.equal(total(c), 130n); }
@@ -171,7 +171,7 @@ test('give/autocomplete includes every ID, splits 130, rejects errors, and prese
 });
 
 test('different dropped block kinds never merge; matching kinds merge once and keep the correct hand/offhand/ghost textures', () => {
-  const c = new MovementController(new VoxelWorld()); c.teleport({ x: 100, y: 0, z: 100 });
+  const c = new MovementController(new VoxelWorld({ depth: 3 })); c.teleport({ x: 100, y: 0, z: 100 });
   const renderer = new DroppedItemRenderer(new THREE.Scene());
   for (const id of ids) c.drops.spawn(id, 2, { x: 0, y: 3, z: 0 });
   c.update(.05); assert.equal(c.drops.piles.length, ids.length); assert.equal(c.drops.total(), 18n);

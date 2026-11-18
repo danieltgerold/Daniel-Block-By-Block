@@ -30,7 +30,7 @@ test('Door uses a complete flat picture with a filled interior in every item con
     assert.equal(createItemMesh(1, id).geometry, mesh.geometry);
     assert.equal(mesh.material.alphaTest, .5); assert.equal(mesh.material.side, THREE.DoubleSide);
     const drop = createItemMesh(.25, id); near(drop.geometry.boundingBox.max.z - drop.geometry.boundingBox.min.z, 0);
-    const w = new VoxelWorld(); placeBlock(w, id, { x: 0, y: -1, z: 0, normal: { x: 0, y: 1, z: 0 }, point: { x: .5, y: 0, z: .5 } }, 0);
+    const w = new VoxelWorld({ depth: 3 }); placeBlock(w, id, { x: 0, y: -1, z: 0, normal: { x: 0, y: 1, z: 0 }, point: { x: .5, y: 0, z: .5 } }, 0);
     assert.deepEqual(blockBoxes(w.blockAt(0, 0, 0)), [[0, 0, .8125, 1, 1, 1]]);
     assert.deepEqual(blockBoxes(w.blockAt(0, 1, 0)), [[0, 0, .8125, 1, 1, 1]]);
   }

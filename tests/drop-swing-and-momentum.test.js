@@ -12,11 +12,11 @@ import { DroppedItemRenderer } from '../src/dropped-item-renderer.js';
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 const tick = c => c.update(.05);
-const block = count => ({ id: 'test.block', count });
+const block = count => ({ id: 'dirt', count });
 function fixture(t) {
   const window = new Window({ url: 'http://localhost:4173', settings: { disableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   const document = window.document; document.write(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
-  const c = new MovementController(new VoxelWorld());
+  const c = new MovementController(new VoxelWorld({ depth: 3 }));
   let requests = 0;
   const inventoryUI = new InventoryUI({ inventory: c.inventory, document, window,
     onClose: () => ui.closeInventory(), onGameplayDrop: () => { requests++; c.requestSwing(); } });
@@ -30,7 +30,7 @@ function fixture(t) {
 
 test('opening/closing real inventory preserves airborne velocity/interpolation and matches released-key drag at different render rates', t => {
   for (const fps of [30, 144]) {
-    const f = fixture(t), baseline = new MovementController(new VoxelWorld());
+    const f = fixture(t), baseline = new MovementController(new VoxelWorld({ depth: 3 }));
     for (const c of [f.c, baseline]) {
       c.keyDown('KeyW'); c.update(.25, { jump: true }); c.update(.025);
       c.placementHeld = true; c.placementPresses = 1;
@@ -110,17 +110,17 @@ test('drop swing uses the existing forward shoulder pose and attached block in b
 });
 
 test('first-tick thrown-item merge keeps a brief cosmetic launch, transfers once, and preserves pickup/expiry through chained merges', () => {
-  const c = new MovementController(new VoxelWorld()), renderer = new DroppedItemRenderer(new THREE.Scene());
+  const c = new MovementController(new VoxelWorld({ depth: 3 })), renderer = new DroppedItemRenderer(new THREE.Scene());
   c.teleport({ x: 100, y: 0, z: 100 });
-  c.drops.spawn('test.block', 100, { x: 10, y: 2, z: 10 }, { velocity: { y: 0 } });
-  const thrown = c.drops.spawn('test.block', 1, { x: 10, y: 2, z: 10 }, { thrown: true, velocity: { z: -.3, y: .1 } });
+  c.drops.spawn('dirt', 100, { x: 10, y: 2, z: 10 }, { velocity: { y: 0 } });
+  const thrown = c.drops.spawn('dirt', 1, { x: 10, y: 2, z: 10 }, { thrown: true, velocity: { z: -.3, y: .1 } });
   const lot = thrown.lots[0]; tick(c);
   assert.equal(c.drops.piles.length, 1); assert.equal(c.drops.total(), 101n);
   const effect = c.drops.transitions.find(e => e.id === thrown.id); assert.ok(effect.flight);
   renderer.update(c.drops); const launch = renderer.meshes.get(thrown.id).position.clone();
   tick(c); renderer.update(c.drops); assert.ok(renderer.meshes.get(thrown.id).position.z < launch.z);
   assert.equal(lot.pickup, 2); assert.equal(lot.expires, 300);
-  c.drops.spawn('test.block', 200, { x: 10, y: 2, z: 10 });
+  c.drops.spawn('dirt', 200, { x: 10, y: 2, z: 10 });
   assert.equal(c.drops.total(), 301n); assert.equal(c.drops.piles[0].lots.filter(l => l === lot).length, 1);
   for (let i = 0; i < 10; i++) { tick(c); renderer.update(c.drops); }
   assert.equal(renderer.meshes.has(thrown.id), false); assert.equal(c.drops.total(), 301n);

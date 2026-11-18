@@ -11,7 +11,7 @@ import { InventoryUI } from '../src/inventory-ui.js';
 const near = (a, b, eps = 1e-8) => assert.ok(Math.abs(a - b) < eps, `${a} != ${b}`);
 const tick = (c, input = {}) => c.update(.05, input);
 function controller(size = 1) {
-  const c = new MovementController(new VoxelWorld());
+  const c = new MovementController(new VoxelWorld({ depth: 3 }));
   c.setGameMode('creative'); c.configure('size', size); c.teleport({ x: .5, y: 100, z: .5 }); return c;
 }
 function toggle(c) { c.keyDown('Space'); c.keyUp('Space'); c.keyDown('Space'); tick(c); c.keyUp('Space'); }
@@ -29,7 +29,7 @@ test('two distinct Space presses within seven ticks toggle Creative flight; repe
   c.keyDown('Space'); tick(c); c.keyUp('Space'); assert.equal(c.player.flying, true);
   toggle(c); assert.equal(c.player.flying, false); const oldVy = c.player.vy; tick(c); assert.ok(c.player.vy < oldVy);
   c.setGameMode('survival'); toggle(c); assert.equal(c.player.flying, false);
-  const ground = new MovementController(new VoxelWorld()); ground.setGameMode('creative'); ground.keyDown('Space'); tick(ground);
+  const ground = new MovementController(new VoxelWorld({ depth: 3 })); ground.setGameMode('creative'); ground.keyDown('Space'); tick(ground);
   near(ground.player.y, .42); assert.equal(ground.player.flying, false); assert.equal(ground.player.jumpCount, 1);
 });
 

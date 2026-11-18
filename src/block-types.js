@@ -1,4 +1,5 @@
 import { grassBehavior } from './block-behaviors.js';
+import { breakingProperties } from './breaking-properties.js';
 // Definitions describe identity; world storage, inventory and cubes share them.
 export const BLOCK_TYPES = new Map();
 const listeners = new Set();
@@ -9,7 +10,7 @@ export function registerBlockType(definition) {
     collisionShape: 'cube', breakTime: 0, behavior: null, tags: [],
     renderMode: 'opaque', cullSameType: false, defaultState: {}, drops: 'self',
     faces: { all: definition.id }, particleTexture: definition.id,
-    particles: true, particleTint: [1, 1, 1], ...definition,
+    particles: true, particleTint: [1, 1, 1], ...breakingProperties(definition.id), ...definition,
     defaultState: Object.freeze({ ...definition.defaultState }) });
   if (BLOCK_TYPES.has(block.id)) throw new Error(`Duplicate block ID: ${block.id}`);
   BLOCK_TYPES.set(block.id, block);
@@ -30,7 +31,7 @@ export function blockFaceTexture(id, axis, sign, state = BLOCK_TYPES.get(id)?.de
     const face = axis === 0 ? sign > 0 ? 'east' : 'west' : sign > 0 ? 'south' : 'north';
     return face === (state.facing ?? 'north') ? state.lit ? 'furnace.lit' : 'furnace.front' : 'furnace.side';
   }
-  const faces = BLOCK_TYPES.get(id)?.faces ?? { all: 'test.block' };
+  const faces = BLOCK_TYPES.get(id)?.faces ?? { all: 'dirt' };
   if (typeof faces === 'string') return faces;
   return faces[`${sign > 0 ? 'p' : 'n'}${'xyz'[axis]}`]
     ?? faces[axis === 1 ? (sign > 0 ? 'top' : 'bottom') : 'side'] ?? faces.all ?? id;
@@ -54,7 +55,7 @@ export function blockDrops(block, context = {}) {
 export const blockMatches = (id, ingredient) => typeof ingredient === 'string' ? id === ingredient
   : Boolean(ingredient?.tag && BLOCK_TYPES.get(id)?.tags.includes(ingredient.tag));
 for (const [id, name, color, extra = {}] of [
-  ['test.block', 'Test Block', '#d9dfcd'],
+  ['bedrock', 'Bedrock', '#41474b'],
   ['stone', 'Stone', '#929da4'], ['cobblestone', 'Cobblestone', '#879198'],
   ['dirt', 'Dirt', '#a47145'],
   ['grass.block', 'Grass Block', '#74ba42', { faces: { top: 'grass.top', bottom: 'dirt', side: 'grass.side' }, particleTexture: 'grass.side', behavior: grassBehavior, drops: [{ id: 'dirt', count: 1 }] }],

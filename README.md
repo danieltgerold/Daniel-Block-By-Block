@@ -120,7 +120,7 @@ session, with argument autocomplete and a server confirmation. New loads start
 in Survival. Survival consumes one selected block per successful placement
 and breaking uses the block's drop rule. Creative preserves the selected stack
 and breaking creates no drop, but an empty main hand still cannot place. Mode
-changes preserve inventory and terrain, movement and breaking timing. They do
+changes preserve inventory and terrain and cancel active mining. They do
 not add health or hunger. Creative flight uses the controls described above.
 
 Flight uses the same interpolated 20 Hz controller and swept scaled hitbox.
@@ -135,8 +135,8 @@ The camera smoothly combines the 1.1 flying multiplier with sprint FOV.
 
 Registered blocks stack to 64 and have cached, static three-face isometric icons
 shared across inventory, hotbar and cursor slots. World, held and dropped blocks
-use the corresponding block's face textures. Test Block retains its original
-palette and filtered fine grid. Third-person blocks use Java's ordered hand/block-model
+use the corresponding block's face textures. Dirt is the fallback block item.
+Third-person blocks use Java's ordered hand/block-model
 transforms, converting only the shoulder/output frame with the rig's X/Y-flipped
 basis: block geometry already uses Y-up, so flipping its input frame as well
 would invert Grass Block faces. A single 0.9375 render scale gives a side length
@@ -228,8 +228,9 @@ button when recapture is denied.
 
 ## Blocks and collision
 
-Every block is **1 m x 1 m x 1 m**. The ground contains exactly **three layers**:
-voxel y=-1, -2, and -3, with the initial walking surface at y=0. The world extends
+Every block is **1 m x 1 m x 1 m**. New flat worlds contain **four layers**:
+Bedrock at Y=0, Dirt at Y=1 and Y=2, and Grass Block at Y=3. The walking surface
+and safe default feet position are Y=4. The world extends
 horizontally as you travel; only edits are stored. Edits remain while traveling
 away and back, but are currently session-only and reset on page reload.
 
@@ -248,13 +249,39 @@ vertical movement and gravity still determine actual floor contact.
 The world model scales uniformly about the feet. Growth is rejected if the new
 box intersects a solid voxel. Placement checks use the same scaled body.
 Swept collision against the actual unit blocks handles walls, floors, ceilings,
-placed blocks, and holes. Digging all three layers opens the void; there is no
-invisible floor below them. Falling across y=-32 respawns you at a supported
+placed blocks, and holes. Bedrock is a real, unbreakable Survival block, while
+Creative can remove it and open the void; there is no invisible floor below it.
+Falling across y=-32 respawns you at a supported
 column near the original spawn, with movement inputs cleared.
 An explicit teleport below that boundary stays at the requested destination.
 
 Jump peak is measured internally relative to the takeoff surface. The former
 Live Telemetry panel and block-unit label have been removed from the game UI.
+
+## Survival block breaking
+
+Holding primary click advances a separate 20 Hz breaking controller while the
+same reachable block remains targeted. Its animation clock does not decide
+when a block breaks. Release, menus/inventory, reach loss, a new target, or any
+target mutation cancels progress; switching faces on the same block does not.
+A successful non-instant break starts a six-tick interval before continued
+holding can progress on the next block. Existing drops stay unchanged, including
+bare-hand Stone, Cobblestone and Furnace drops; a door removes both halves once.
+
+The central bare-hand durations are Dirt/Sand 15 ticks, Grass/Gravel 18,
+Stone 150, Cobblestone 200, Glass 9, Leaves 6, wood logs/planks/slabs/stairs/fences
+60, wood doors 90, Crafting Table 75 and Furnace 350. Double slabs also take 60.
+Bedrock is unbreakable in Survival. Eyes underwater reduce per-tick progress to
+one fifth, and being airborne does so again, stacking to one twenty-fifth.
+These modifiers are sampled every tick. Preferred-tool/mining-rate hooks leave
+room for tools later, without adding tool requirements or new drop restrictions.
+
+A reused pair of contrasting planes displays the bar on the hit shape's actual
+face, including slabs and doors. The light rectangle fills left to right inside
+the dark background, tests normal world depth, and disappears when inactive,
+unbreakable or completed. Creative clicks break immediately, including Bedrock,
+without drops or a progress bar. Its existing held-repeat/swing behavior remains.
+Small hit particles and completion bursts use the existing particle system.
 
 ## Rendering and distance detail
 
@@ -343,7 +370,7 @@ varies during each jump; the value below averages consecutive jumps.
 
 ## Block definitions and basic blocks
 
-Commands provide Test Block (`test.block`), Stone (`stone`), Cobblestone
+Commands provide Bedrock (`bedrock`), Stone (`stone`), Cobblestone
 (`cobblestone`), Dirt (`dirt`), Grass Block (`grass.block`), Sand (`sand`),
 Gravel (`gravel`), Oak Log (`oak.log`), Oak Planks (`oak.planks`), Glass (`glass`),
 Oak Leaves (`oak.leaves`), Pine Log (`pine.log`), Pine Planks (`pine.planks`),
@@ -356,10 +383,16 @@ There is no tool requirement or falling Sand/Gravel behavior yet.
 
 Definitions share cube collision/placement/breaking code and specify names, IDs,
 face textures, stack sizes, solidity, opacity, collision shape, breaking time,
-optional behavior hooks and recipe tags. All current breaking times remain zero.
+optional behavior hooks and recipe tags. Breaking properties are centralized in
+`breaking-properties.js`, with explicit hardness/ticks and future tool hooks.
 Wood tags let recipes accept a group or an exact block ID.
-Sparse world edits retain the actual block ID; old boolean edits map to Test
-Block and untouched ground remains unchanged. `loadEdits` accepts both formats.
+Sparse world edits retain the actual block ID; legacy Test Block data maps to
+Dirt. `loadEdits` remains a low-level coordinate import. Version-3 world-data
+helpers migrate older snapshots once: the old surface moves from 0 to 4, builds
+and holes shift by four blocks, and existing blocks take precedence over the new
+bedrock layer. Optional player/item data is cloned and migrated as well. These
+are compatibility helpers only: the game remains session-based, without saving
+UI or persistence. Controlled tests use an explicit zero-surface Dirt fixture.
 Survival breaks normally drop the actual block item, with explicit rules for
 Grass (one Dirt), Glass (none), and Leaves (no leaf block). Creative breaking
 always drops nothing. Drop rules may be data or functions of a tool/context,
@@ -368,8 +401,8 @@ Creative pick-block provides the actual targeted type, while Survival still
 requires an existing matching stack.
 
 The basic blocks use original, low-noise 16x16 pixel face artwork with
-nearest magnification and shared mipmaps. Test Block deliberately keeps its
-legacy 128-pixel fine-grid sampler to preserve its appearance. Cached SVG icons
+nearest magnification and shared mipmaps. Bedrock has original irregular dark-gray
+pixel patches. Cached SVG icons
 project the same pixel artwork onto three shaded cube faces; no slot needs a
 live renderer. Grass has distinct top/side/bottom faces and logs have bark/end
 faces. Held blocks, drop clusters, merge ghosts and particles use their own
@@ -574,8 +607,8 @@ storage and are reconstructed on load. Local meshing, collision, support,
 targeting and camera sweeps avoid all-world edit scans. Very large queries fall
 back to occupied index entries or removal-boundary events, rather than looping
 through enormous empty coordinate ranges. Chunk bounds and immutable collision
-boxes are cached; dynamic fence connections remain live. The saved format stays
-unchanged. Empty untouched chunks do not accumulate bounds-cache entries.
+boxes are cached; dynamic fence connections remain live. Runtime indexes are not
+serialized. Empty untouched chunks do not accumulate bounds-cache entries.
 
 Water-level-only edits skip unrelated block/stair notifications. Other edits wake
 water only when occupancy/support can change near it. Per-tick lookup caches are
@@ -721,8 +754,8 @@ of straight movement (100 settled sprint-jump cycles).
 | Flat-ground landing | Tick 12 / 0.600 s |
 
 These match at 5, 15, 30, 60, 120, 144, and 240 rendering FPS, plus uneven frame
-intervals. Tests cover unit cube dimensions and triangle winding, three-layer
-terrain, successive digging and face targeting, placement safety, walls,
+intervals. Tests cover unit cube dimensions and triangle winding, four-layer
+generation and controlled collision fixtures, successive digging and face targeting, placement safety, walls,
 ceilings, falling and jumping on placed blocks, hidden-face removal, distance
 LOD polygon reduction, camera-frustum culling, boundary rebuilds, and geometry
 disposal. Browser-based visual QA depends on availability of the browser host.

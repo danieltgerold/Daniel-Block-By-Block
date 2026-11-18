@@ -9,7 +9,7 @@ import { updatePlayerCamera } from '../src/player-visuals.js';
 import { mergeEase } from '../src/dropped-items.js';
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
 const camera = () => { const c = new THREE.PerspectiveCamera(75, 1, .05, 500); c.position.y = .3; return c; };
-const controller = () => { const c = new MovementController(new VoxelWorld()); c.respawn({ x: 100, y: 0, z: 100 }); return c; };
+const controller = () => { const c = new MovementController(new VoxelWorld({ depth: 3 })); c.respawn({ x: 100, y: 0, z: 100 }); return c; };
 const drawn = mesh => mesh?.visible ? mesh.children.filter(cube => cube.visible).length : 0;
 
 test('reusable visibility uses authored bounds, including every rotating/bobbing cluster corner without per-frame model bounds', () => {
@@ -29,7 +29,7 @@ test('reusable visibility uses authored bounds, including every rotating/bobbing
 
 test('24-block detail switches have a half-block hysteresis buffer and retain shared cached cubes across changes', () => {
   const c = controller(), cam = camera(), renderer = new DroppedItemRenderer(new THREE.Scene());
-  const p = c.drops.spawn('test.block', 64, { x: 0, y: 0, z: -24 });
+  const p = c.drops.spawn('dirt', 64, { x: 0, y: 0, z: -24 });
   const move = z => { p.z = z; p.previous.z = z; renderer.update(c.drops, 0, cam); return renderer.meshes.get(p.id); };
   const group = move(-24); assert.equal(drawn(group), 5); const cubes = [...group.children];
   assert.equal(drawn(move(-24.2)), 5); assert.equal(drawn(move(-24.6)), 1);
@@ -42,8 +42,8 @@ test('24-block detail switches have a half-block hysteresis buffer and retain sh
 
 test('camera turns and F5 changes reveal piles immediately and use the actual rear/front camera distance', () => {
   const c = controller(), cam = camera(), renderer = new DroppedItemRenderer(new THREE.Scene());
-  const front = c.drops.spawn('test.block', 64, { x: 0, y: 0, z: -22 });
-  const back = c.drops.spawn('test.block', 64, { x: 0, y: 0, z: 22 });
+  const front = c.drops.spawn('dirt', 64, { x: 0, y: 0, z: -22 });
+  const back = c.drops.spawn('dirt', 64, { x: 0, y: 0, z: 22 });
   renderer.update(c.drops, 0, cam); const frontModel = renderer.meshes.get(front.id);
   assert.equal(drawn(frontModel), 5); assert.equal(renderer.meshes.has(back.id), false, 'Unseen piles do not allocate a model');
   cam.rotation.y = Math.PI; renderer.update(c.drops, 0, cam);
@@ -58,8 +58,8 @@ test('camera turns and F5 changes reveal piles immediately and use the actual re
 
 test('offscreen/simplified piles still merge, pick up and expire; merge visuals resume at the live destination without restarting', () => {
   const c = controller(), cam = camera(), renderer = new DroppedItemRenderer(new THREE.Scene());
-  const target = c.drops.spawn('test.block', 50, { x: 0, y: 2, z: -8 }, { velocity: { x: .1, y: 0 } });
-  const source = c.drops.spawn('test.block', 3, { x: 0, y: 2, z: -11 }, { velocity: { z: 1.4, y: 0 } });
+  const target = c.drops.spawn('dirt', 50, { x: 0, y: 2, z: -8 }, { velocity: { x: .1, y: 0 } });
+  const source = c.drops.spawn('dirt', 3, { x: 0, y: 2, z: -11 }, { velocity: { z: 1.4, y: 0 } });
   renderer.update(c.drops, 0, cam); const sourceModel = renderer.meshes.get(source.id);
   cam.rotation.y = Math.PI; renderer.update(c.drops, 0, cam); assert.equal(sourceModel.visible, false);
   c.update(.05); c.update(.05); assert.equal(c.drops.total(), 53n); assert.equal(c.drops.piles.length, 1);
@@ -74,9 +74,9 @@ test('offscreen/simplified piles still merge, pick up and expire; merge visuals 
   cam.position.z = 30; renderer.update(c.drops, .5, cam);
   assert.equal(drawn(renderer.meshes.get(target.id)), 1); assert.equal(c.drops.total(), 53n); assert.deepEqual(target.lots.map(l => l.expires), deadlines);
   for (let n = 0; n < 6; n++) c.update(.05); renderer.update(c.drops, 0, cam); assert.equal(renderer.meshes.has(source.id), false);
-  const pickup = controller(); pickup.drops.spawn('test.block', 5, { x: 100, y: .2, z: 100 });
+  const pickup = controller(); pickup.drops.spawn('dirt', 5, { x: 100, y: .2, z: 100 });
   renderer.update(pickup.drops, 0, camera()); pickup.update(.05); assert.equal(pickup.inventory.mainHand.count, 5); assert.equal(pickup.drops.total(), 0n);
-  pickup.inventory.insert('test.block', 2304); const expiring = pickup.drops.spawn('test.block', 7, { x: 100, y: .2, z: 100 });
+  pickup.inventory.insert('dirt', 2304); const expiring = pickup.drops.spawn('dirt', 7, { x: 100, y: .2, z: 100 });
   pickup.drops.time = expiring.lots[0].expires - .05; pickup.update(.05); renderer.update(pickup.drops, 0, camera());
   assert.equal(pickup.drops.total(), 0n); assert.equal(renderer.states.size, 0); assert.equal(renderer.meshes.size, 0);
 });

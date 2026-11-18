@@ -12,7 +12,9 @@ import { getBlockAssets } from './block-assets.js';
 import { BlockParticles } from './block-particles.js';
 import { BlockParticleRenderer } from './block-particle-renderer.js';
 import { AdaptiveVisualQuality } from './visual-quality.js';
-import { BlockPlacement, bindPlacementInput, breakTargetBlock } from './block-placement.js';
+import { BlockPlacement, bindPlacementInput } from './block-placement.js';
+import { BlockBreaking } from './block-breaking.js';
+import { BreakingIndicator } from './breaking-indicator.js';
 import { ChatUI, isTextEntry } from './chat-ui.js';
 import { createPlayerModel, animatePlayerModel, nextCameraMode, updatePlayerCamera,
   createEmptyHand, updateEmptyHand, renderPlayerScene, syncEquipment } from './player-visuals.js';
@@ -33,7 +35,6 @@ let active = false;
 let previousTime = null;
 let cameraMode = 0;
 let hitboxesVisible = false;
-let primaryClickQueued = false;
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -51,9 +52,8 @@ const baseFov = camera.fov;
 camera.rotation.order = 'YXZ';
 const emptyHand = createEmptyHand(camera.aspect);
 
-// One texture tile covers one block face; retain filtered lines without shimmer.
-const gridTexture = getBlockAssets(renderer.capabilities.getMaxAnisotropy()).texture;
-const material = new THREE.MeshBasicMaterial({ map: gridTexture, vertexColors: true, fog: true });
+// Reuse crisp block textures and materials across all generated ground layers.
+const material = getBlockAssets(renderer.capabilities.getMaxAnisotropy()).material;
 const chunks = new ChunkRenderer(world, scene, material);
 const droppedRenderer = new DroppedItemRenderer(scene);
 const visualQuality = new AdaptiveVisualQuality();
@@ -62,14 +62,15 @@ const particleRenderer = new BlockParticleRenderer(scene);
 const selection = new BlockOutline();
 selection.visible = false;
 scene.add(selection);
+const breakingIndicator = new BreakingIndicator(); scene.add(breakingIndicator);
 
 function targetBlock(feet = controller.renderState()) {
   return controller.targetBlock(feet, yaw, pitch);
 }
 
-function breakBlock(feet = controller.renderState()) {
-  return breakTargetBlock({ controller, world, yaw, pitch, feet, onBreak: (x, y, z) => chunks.invalidateBlock(x, z, true) });
-}
+const breaking = new BlockBreaking({ controller, world, getAim: () => ({ yaw, pitch }),
+  canInteract: () => active && document.pointerLockElement === canvas && document.hasFocus() && !document.hidden,
+  onBreak: (x, y, z) => chunks.invalidateBlock(x, z, true) });
 const placement = new BlockPlacement({ controller, world, getAim: () => ({ yaw, pitch }),
   onUse: block => {
     if (block.definition.interaction === 'furnace') { chatUI.openFurnace(world.furnaceAt(block.x, block.y, block.z)); return true; }
@@ -80,10 +81,7 @@ const placement = new BlockPlacement({ controller, world, getAim: () => ({ yaw, 
 bindPlacementInput(placement, canvas, document, window);
 controller.onTick = player => {
   if (!active) return;
-  if (player.animation.swingStartedThisTick && (controller.miningHeld || primaryClickQueued)) {
-    breakBlock(player);
-  }
-  primaryClickQueued = false;
+  breaking.tick();
   placement.tick();
 };
 canvas.addEventListener('mousedown', event => {
@@ -94,14 +92,12 @@ canvas.addEventListener('mousedown', event => {
   if (!active || event.button !== 0) return;
   event.preventDefault();
   if (event.button === 0) {
-    primaryClickQueued = true;
-    controller.setMining(true);
-    controller.requestSwing();
+    breaking.press();
   }
 });
 document.addEventListener('mouseup', event => { if (event.button === 0) controller.setMining(false); });
 
-function clearInput(options) { primaryClickQueued = false; controller.pause(options); }
+function clearInput(options) { controller.pause(options); }
 function renderInputMode(mode) {
   active = mode === 'playing';
   intro.hidden = mode !== 'menu';
@@ -126,7 +122,7 @@ const chatUI = new ChatUI({ document, window, controller, clearInput, requestCap
   onCameraCycle: () => { cameraMode = nextCameraMode(cameraMode); },
   onHitboxToggle: () => { hitboxesVisible = !hitboxesVisible; }, storage: profileStorage });
 controller.onTeleport = () => {
-  primaryClickQueued = false;
+  breaking.cancel();
   previousTime = null;
   refreshWorldView();
 };
@@ -212,6 +208,7 @@ function refreshWorldView() {
   chunks.update(camera);
   const target = active ? targetBlock() : null;
   selection.update(target, world);
+  breakingIndicator.update(breaking, target, world, camera);
   hitboxes.update([{ id: chatUI.profile.player.id, ...position, local: true }, ...controller.drops.piles.map(p => ({
     id: `drop:${p.id}`, bounds: { min: { x: p.x - .125, y: p.y, z: p.z - .125 }, max: { x: p.x + .125, y: p.y + .25, z: p.z + .125 } },
   }))], cameraMode, hitboxesVisible);

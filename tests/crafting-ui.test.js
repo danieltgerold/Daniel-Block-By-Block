@@ -12,7 +12,7 @@ const stack = (id, count = 1) => ({ id, count });
 function fixture(t) {
   const window = new Window({ url: 'http://localhost:4173', settings: { disableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   const document = window.document; document.write(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
-  const c = new MovementController(new VoxelWorld()); let cameras = 0;
+  const c = new MovementController(new VoxelWorld({ depth: 3 })); let cameras = 0;
   const inventoryUI = new InventoryUI({ inventory: c.inventory, document, window, onClose: () => ui.closeInventory() });
   const ui = new ChatUI({ document, window, controller: c, inventoryUI,
     clearInput: options => c.pause(options), requestCapture: () => {}, requestUnlock: () => {}, onCameraCycle: () => cameras++, storage: window.localStorage });

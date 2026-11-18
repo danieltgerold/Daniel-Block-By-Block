@@ -13,10 +13,10 @@ import { InventoryUI } from '../src/inventory-ui.js';
 import { gameSimulationRunning, updateCrosshair } from '../src/gameplay-hud.js';
 import { updatePlayerCamera } from '../src/player-visuals.js';
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
-const stack = count => ({ id: 'test.block', count });
+const stack = count => ({ id: 'dirt', count });
 const tick = c => c.update(.05);
 const totalInventory = c => c.inventory.slots.reduce((n, s) => n + BigInt(s?.count ?? 0), BigInt(c.inventory.cursor?.count ?? 0));
-function controller() { const c = new MovementController(new VoxelWorld()); c.respawn({ x: 100, y: 0, z: 100 }); return c; }
+function controller() { const c = new MovementController(new VoxelWorld({ depth: 3 })); c.respawn({ x: 100, y: 0, z: 100 }); return c; }
 
 test('throws use eye minus 0.3, full look direction, bounded spread and 40-tick delay; items use drag/gravity and bounce', () => {
   const c = controller(); c.configure('size', 2); c.getAim = () => ({ yaw: Math.PI / 2, pitch: Math.PI / 6 });
@@ -24,7 +24,7 @@ test('throws use eye minus 0.3, full look direction, bounded spread and 40-tick 
   near(p.x, c.player.x); near(p.z, c.player.z); near(p.y, c.player.y + 3.24 - .3);
   near(p.vx, -.3 * Math.cos(Math.PI / 6) + .02); near(p.vy, .25); near(p.vz, 0); near(p.lots[0].pickup, 2);
   const oldVy = p.vy; tick(c); near(p.vy, (oldVy - .04) * .98);
-  const bounce = c.drops.spawn('test.block', 1, { x: 10, y: .1, z: 10 }, { velocity: { y: -.4 } });
+  const bounce = c.drops.spawn('dirt', 1, { x: 10, y: .1, z: 10 }, { velocity: { y: -.4 } });
   tick(c); near(bounce.y, 0); near(bounce.vy, .08); tick(c); assert.ok(bounce.y > 0);
   c.inventory.slots[0] = stack(5); c.inventory.drop(0); c.inventory.drop(0, true);
   assert.equal(c.inventory.slots[0], null); assert.equal(c.drops.total(), 13n);
@@ -32,8 +32,8 @@ test('throws use eye minus 0.3, full look direction, bounded spread and 40-tick 
 
 test('smaller piles animate into the live larger pile for 0.25 seconds with stable compact cubes and no physics mutation', () => {
   const c = controller(), renderer = new DroppedItemRenderer(new THREE.Scene());
-  const large = c.drops.spawn('test.block', 100, { x: 10, y: 2, z: 10 }, { velocity: { x: .2, y: 0 } });
-  const small = c.drops.spawn('test.block', 5, { x: 13, y: 2, z: 10 }, { velocity: { x: -1.4, y: 0 } });
+  const large = c.drops.spawn('dirt', 100, { x: 10, y: 2, z: 10 }, { velocity: { x: .2, y: 0 } });
+  const small = c.drops.spawn('dirt', 5, { x: 13, y: 2, z: 10 }, { velocity: { x: -1.4, y: 0 } });
   renderer.update(c.drops); const oldGroup = renderer.meshes.get(small.id);
   tick(c); assert.equal(c.drops.piles.length, 1); assert.equal(c.drops.piles[0].id, large.id); assert.equal(c.drops.total(), 105n);
   const effect = c.drops.transitions[0]; assert.equal(effect.targetId, large.id); near(effect.ends - effect.started, .25);
@@ -56,19 +56,19 @@ test('smaller piles animate into the live larger pile for 0.25 seconds with stab
 });
 
 test('partial pickup, chained merges, complete pickup and original despawn during transitions conserve every quantity', () => {
-  const c = controller(); c.inventory.insert('test.block', 2304); c.inventory.slots[0].count = 60;
+  const c = controller(); c.inventory.insert('dirt', 2304); c.inventory.slots[0].count = 60;
   c.player.x = .5; c.player.z = .5;
-  const first = c.drops.spawn('test.block', 10, { x: .5, y: .2, z: .5 });
-  c.drops.spawn('test.block', 20, { x: .6, y: .2, z: .5 });
+  const first = c.drops.spawn('dirt', 10, { x: .5, y: .2, z: .5 });
+  c.drops.spawn('dirt', 20, { x: .6, y: .2, z: .5 });
   tick(c); assert.equal(c.inventory.mainHand.count, 64); assert.equal(c.drops.total(), 26n);
   const before = c.drops.total(); c.drops.merge(first, c.drops.piles[0]); assert.equal(c.drops.total(), before, 'Removed source cannot transfer twice');
-  c.drops.spawn('test.block', 100, { x: .5, y: .2, z: .5 });
+  c.drops.spawn('dirt', 100, { x: .5, y: .2, z: .5 });
   assert.equal(c.drops.total(), 126n); assert.ok(c.drops.transitions.every(e => e.targetId === c.drops.piles[0].id));
   c.inventory.slots[0] = c.inventory.slots[1] = null;
   tick(c); assert.equal(c.drops.total(), 0n); assert.equal(c.drops.transitions.length, 0); assert.equal(totalInventory(c), 2302n);
-  c.inventory.insert('test.block', 2304);
-  c.drops.spawn('test.block', 7, { x: .5, y: .2, z: .5 }); c.drops.time += 299.9;
-  c.drops.spawn('test.block', 8, { x: .5, y: .2, z: .5 });
+  c.inventory.insert('dirt', 2304);
+  c.drops.spawn('dirt', 7, { x: .5, y: .2, z: .5 }); c.drops.time += 299.9;
+  c.drops.spawn('dirt', 8, { x: .5, y: .2, z: .5 });
   tick(c); tick(c); assert.equal(c.drops.total(), 8n, 'Old lot expires during the visible merge without resetting its lifetime');
   assert.equal(c.drops.transitions.length, 0);
 });
@@ -80,7 +80,7 @@ test('inventory keeps simulation and pickups running with gameplay muted; Escape
   const inventoryUI = new InventoryUI({ inventory: c.inventory, document, window, onClose: () => ui.closeInventory() });
   const ui = new ChatUI({ document, window, controller: c, inventoryUI, clearInput: () => c.pause(), requestCapture: () => {}, requestUnlock: () => {}, storage: window.localStorage });
   t.after(() => { inventoryUI.dispose(); ui.dispose(); window.happyDOM.abort(); window.close(); });
-  const pile = c.drops.spawn('test.block', 3, { x: .5, y: 1, z: .5 }, { thrown: true });
+  const pile = c.drops.spawn('dirt', 3, { x: .5, y: 1, z: .5 }, { thrown: true });
   ui.onPointerLockChange(true); ui.openInventory(); c.keyDown('KeyW'); c.keyDown('Space'); c.placementHeld = true;
   const simulate = frames => { for (let i = 0; i < frames; i++) if (gameSimulationRunning(ui.mode)) c.update(.05, { gameplayEnabled: ui.mode === 'playing' }); };
   simulate(20); assert.ok(c.drops.time > .9); assert.ok(pile.y < 1); near(c.player.x, .5); near(c.player.z, .5);
@@ -94,7 +94,7 @@ test('Creative pick selects an existing stack or creates one without losing disp
   const c = controller(); c.world.setBlock(0, 1, 0, true); c.teleport({ x: 3.5, y: 0, z: .5 }); c.setGameMode('creative');
   for (const mode of [0, 1, 2]) {
     updatePlayerCamera(new THREE.PerspectiveCamera(), mode, c.renderState(), Math.PI / 2, 0, c.world);
-    assert.equal(c.pickBlock(Math.PI / 2, 0), true); assert.equal(c.inventory.mainHand.id, 'test.block'); assert.equal(c.inventory.mainHand.count, 1);
+    assert.equal(c.pickBlock(Math.PI / 2, 0), true); assert.equal(c.inventory.mainHand.id, 'dirt'); assert.equal(c.inventory.mainHand.count, 1);
   }
   c.inventory.slots[7] = stack(12); c.inventory.slots[0] = null; c.pickBlock(Math.PI / 2, 0); assert.equal(c.inventory.selected, 7);
   c.inventory.slots.fill(null); c.inventory.slots[9] = stack(10); c.pickBlock(Math.PI / 2, 0);

@@ -3,7 +3,7 @@ import { ITEMS } from './inventory.js';
 import { createSharedBlock, getItemGeometry, getItemMaterials, getFaceTexture } from './block-assets.js';
 import { spriteGeometry, spritePlaneGeometry } from './sprite-geometry.js';
 const flatMaterials = new Map();
-export function setItemAppearance(mesh, id = 'test.block') {
+export function setItemAppearance(mesh, id = 'dirt') {
   const key = `${id}:${mesh.userData.displayContext ?? 'world'}`;
   if (mesh.userData.appearanceKey === key) return;
   const item = ITEMS.get(id), size = mesh.userData.itemSize ?? 1;
@@ -16,6 +16,6 @@ export function setItemAppearance(mesh, id = 'test.block') {
   } else { mesh.geometry = getItemGeometry(size, id); mesh.material = getItemMaterials(id, mesh.geometry); }
   mesh.userData.appearanceKey = key; mesh.userData.itemId = id; mesh.userData.blockId = item?.block ? id : null;
 }
-export function createItemMesh(size = .375, id = 'test.block') {
+export function createItemMesh(size = .375, id = 'dirt') {
   const mesh = createSharedBlock(size); setItemAppearance(mesh, id); return mesh;
 }

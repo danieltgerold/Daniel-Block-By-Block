@@ -62,7 +62,7 @@ test('high speed cannot skip an unsupported gap even if the destination is suppo
   }
   const narrow = platform(); narrow.setBlock(2, -1, 0, true);
   assert.equal(narrow.supportedPath({ x: .5, y: 0, z: .5, size: 1.6 }, 2, 0), false, 'Finds the 0.04-block unsupported interval');
-  const dug = new VoxelWorld(); dug.setBlock(1, -1, 0, false);
+  const dug = new VoxelWorld({ depth: 3 }); dug.setBlock(1, -1, 0, false);
   assert.equal(dug.supportedPath({ x: .5, y: 0, z: .5, size: 1 }, 2, 0), false, 'Also checks holes in analytic default terrain');
   const run = fps => {
     const world = platform(); world.setBlock(3, -1, 0, true);

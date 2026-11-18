@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { PlayerInventory } from '../src/inventory.js';
 import { createPlayerModel, animatePlayerModel, syncEquipment, createEmptyHand, updateEmptyHand } from '../src/player-visuals.js';
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
-const stack = () => ({ id: 'test.block', count: 1 });
+const stack = () => ({ id: 'dirt', count: 1 });
 const base = { torsoYaw: .2, headYaw: .1, aimPitch: -.4, phase: 2, amount: .8, crouch: 0, swingActive: false, swingProgress: 0 };
 // Independent point-transform oracle: apply the written MC operations from
 // right to left. Only the shoulder/output basis is MC Y-down; block model

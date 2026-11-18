@@ -9,14 +9,15 @@ import { ChatService, LocalPlayerProfile } from '../src/chat.js';
 import { ChunkRenderer } from '../src/chunk-renderer.js';
 import { createPlayerModel, animatePlayerModel, syncEquipment, createEmptyHand, updateEmptyHand, createBlockItem, MODEL_SCALE } from '../src/player-visuals.js';
 import { getBlockAssets } from '../src/block-assets.js';
-import { TEST_BLOCK_ICON } from '../src/block-appearance.js';
+import { blockIcon } from '../src/block-icons.js';
+const DIRT_ICON = blockIcon('dirt');
 import { drawStack } from '../src/inventory-ui.js';
 import { DroppedItemRenderer, droppedCubeCount, PILE_OFFSETS } from '../src/dropped-item-renderer.js';
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `${a} != ${b}`);
-const block = count => ({ id: 'test.block', count });
+const block = count => ({ id: 'dirt', count });
 function setup() {
   const world = new VoxelWorld({ depth: 0 }), controller = new MovementController(world);
-  controller.inventory.insert('test.block', 10);
+  controller.inventory.insert('dirt', 10);
   let aim = { yaw: Math.PI / 2, pitch: 0 }, swings = 0;
   const swing = controller.requestSwing.bind(controller);
   controller.requestSwing = () => { swings++; swing(); };
@@ -82,10 +83,10 @@ test('one cached three-face icon and shared textured block resources serve inven
   t.after(() => { window.happyDOM.abort(); window.close(); });
   const a = document.createElement('button'), b = document.createElement('button');
   drawStack(document, a, block(1)); drawStack(document, b, block(64));
-  assert.equal(a.querySelector('img').getAttribute('src'), TEST_BLOCK_ICON);
-  assert.equal(b.querySelector('img').getAttribute('src'), TEST_BLOCK_ICON);
+  assert.equal(a.querySelector('img').getAttribute('src'), DIRT_ICON);
+  assert.equal(b.querySelector('img').getAttribute('src'), DIRT_ICON);
   assert.equal(a.querySelector('.stack-count').textContent, ''); assert.equal(b.querySelector('.stack-count').textContent, '64');
-  assert.equal((decodeURIComponent(TEST_BLOCK_ICON).match(/<polygon/g) ?? []).length, 3);
+  assert.match(decodeURIComponent(DIRT_ICON), /<svg/);
   const f = setup(), model = createPlayerModel(), hand = createEmptyHand();
   f.controller.inventory.slots[40] = block(2);
   const pose = { torsoYaw: .3, aimPitch: -.4, headYaw: .1, phase: 2, amount: .7, crouch: 1, swingActive: true, swingProgress: .35 };
@@ -107,7 +108,7 @@ test('one cached three-face icon and shared textured block resources serve inven
 
 test('pile cube counts, stable offsets, exact bob/rotation and shared geometry never alter physics or lot expiry', () => {
   const f = setup(), renderer = new DroppedItemRenderer(new THREE.Scene());
-  const pile = f.controller.drops.spawn('test.block', 1, { x: 10, y: 0, z: 10 });
+  const pile = f.controller.drops.spawn('dirt', 1, { x: 10, y: 0, z: 10 });
   const expiry = pile.lots[0].expires;
   for (const [count, cubes] of [[1n, 1], [2n, 2], [16n, 2], [17n, 3], [32n, 3], [33n, 4], [48n, 4], [49n, 5], [1000000000000n, 5]]) {
     pile.count = count; pile.lots[0].count = count; renderer.update(f.controller.drops, .5);
@@ -120,9 +121,10 @@ test('pile cube counts, stable offsets, exact bob/rotation and shared geometry n
 });
 
 test('successful edits immediately rebuild loaded chunk meshes on both sides of a boundary', () => {
-  const world = new VoxelWorld(), chunks = new ChunkRenderer(world, new THREE.Scene(), new THREE.MeshBasicMaterial());
+  const world = new VoxelWorld({ depth: 3 }), chunks = new ChunkRenderer(world, new THREE.Scene(), new THREE.MeshBasicMaterial());
   const a = chunks.rebuild(-1, 0, 1), b = chunks.rebuild(0, 0, 1);
+  const oldA = a.mesh, oldB = b.mesh;
   world.setBlock(-1, 0, 0, true); chunks.invalidateBlock(-1, 0, true);
-  assert.notEqual(chunks.chunks.get('-1,0').mesh, a.mesh); assert.notEqual(chunks.chunks.get('0,0').mesh, b.mesh);
+  assert.notEqual(chunks.chunks.get('-1,0').mesh, oldA); assert.notEqual(chunks.chunks.get('0,0').mesh, oldB);
   assert.equal(chunks.chunks.get('-1,0').dirty, false); chunks.dispose();
 });
