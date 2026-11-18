@@ -108,7 +108,7 @@ export function buildChunkMesh(world, cx, cz, level = 1) {
     }
   }
   // Partial shapes remain exact at all distances, rather than becoming cubes.
-  for (const edit of world.edits()) {
+  for (const edit of world.solidEditsInChunk(cx, cz)) {
     if (!edit.solid || edit.x < originX || edit.x >= originX + CHUNK_SIZE || edit.z < originZ || edit.z >= originZ + CHUNK_SIZE) continue;
     const block = world.blockAt(edit.x, edit.y, edit.z); if (block.definition.collisionShape === 'cube') continue;
     for (const quad of shapeQuads(block, world)) {

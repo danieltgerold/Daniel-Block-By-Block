@@ -2,6 +2,7 @@ import { isWater, isWaterSource, waterHeight, waterSurfaceAt } from './fluid-sur
 const horizontal = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const keyOf = (x, y, z) => `${x},${y},${z}`;
 const chunkOf = (x, z) => `${Math.floor(x / 16)},${Math.floor(z / 16)}`;
+const neighbors = [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 export const WATER_RULES = Object.freeze({ id: 'water', interval: 5, maxLevel: 7, search: 4 });
 
 // Sparse, deduplicated game-tick work. A settled cell owns no repeating timer.
@@ -10,26 +11,36 @@ export class FluidSystem {
   constructor(world, rules = WATER_RULES) {
     Object.assign(this, { world, rules }); this.time = 0; this.pending = new Map(); this.queue = new Map(); this.cells = new Map(); this.chunks = new Map();
   }
-  at(x, y, z) { return this.world.blockAt(x, y, z); }
+  at(x, y, z) {
+    if (!this.lookups) return this.world.blockAt(x, y, z);
+    const key = keyOf(x, y, z); if (!this.lookups.has(key)) this.lookups.set(key, this.world.blockAt(x, y, z)); return this.lookups.get(key);
+  }
+  invalidate(x, y, z) { this.lookups?.delete(keyOf(x, y, z)); }
+  affected(x, y, z) {
+    if (!this.cells.size) return false;
+    return neighbors.some(([dx, dy, dz]) => this.cells.has(keyOf(x + dx, y + dy, z + dz)));
+  }
   schedule(x, y, z) {
-    if (!isWater(this.at(x, y, z))) return;
     const key = keyOf(x, y, z), due = this.time + this.rules.interval;
     if (this.pending.has(key)) return;
+    if (this.world.blockIdAt(x, y, z) !== this.rules.id) return;
     this.pending.set(key, due);
     if (!this.queue.has(due)) this.queue.set(due, new Map());
-    this.queue.get(due).set(key, { x, y, z });
+    this.queue.get(due).set(key, this.cells.get(key) ?? { x, y, z });
   }
   changed(x, y, z) {
     const key = keyOf(x, y, z), chunkKey = chunkOf(x, z), block = this.at(x, y, z);
     if (isWater(block)) {
-      this.cells.set(key, { x, y, z });
-      if (!this.chunks.has(chunkKey)) this.chunks.set(chunkKey, new Map()); this.chunks.get(chunkKey).set(key, { x, y, z });
+      if (!this.cells.has(key)) {
+        const at = { x, y, z }; this.cells.set(key, at);
+        if (!this.chunks.has(chunkKey)) this.chunks.set(chunkKey, new Map()); this.chunks.get(chunkKey).set(key, at);
+      }
     } else {
       this.cells.delete(key); const chunk = this.chunks.get(chunkKey); chunk?.delete(key); if (chunk?.size === 0) this.chunks.delete(chunkKey);
       const due = this.pending.get(key);
       if (due !== undefined) { this.queue.get(due)?.delete(key); if (this.queue.get(due)?.size === 0) this.queue.delete(due); this.pending.delete(key); }
     }
-    for (const [dx, dy, dz] of [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) this.schedule(x + dx, y + dy, z + dz);
+    for (const [dx, dy, dz] of neighbors) this.schedule(x + dx, y + dy, z + dz);
   }
   tick() {
     this.time++; const due = this.queue.get(this.time); if (!due) return;
@@ -37,7 +48,9 @@ export class FluidSystem {
     // Remove all due keys before mutation: a changed neighbor can now schedule
     // a subsequent tick, but a newly-created cell cannot run in this batch.
     for (const key of due.keys()) this.pending.delete(key);
-    for (const at of due.values()) if (isWater(this.at(at.x, at.y, at.z))) this.update(at.x, at.y, at.z);
+    this.lookups = new Map();
+    try { for (const at of due.values()) if (isWater(this.at(at.x, at.y, at.z))) this.update(at.x, at.y, at.z); }
+    finally { this.lookups = null; } // Rebuild-local/tick-local caches never survive changes unobserved.
   }
   open(x, y, z) { const b = this.at(x, y, z); return !b || isWater(b) && !isWaterSource(b); }
   put(x, y, z, state) {
@@ -77,6 +90,7 @@ export class FluidSystem {
     const key = keyOf(x, y, z); visited.add(key); let best = Infinity;
     for (const [dx, dz] of horizontal) if (!visited.has(keyOf(x + dx, y, z + dz)) && this.open(x + dx, y, z + dz)) {
       best = Math.min(best, this.dropDistance(x + dx, y, z + dz, distance + 1, visited));
+      if (best === distance + 1) break; // Lowest possible remaining cost.
     }
     visited.delete(key); return best;
   }
@@ -93,6 +107,7 @@ export class FluidSystem {
     return { x: vx / length, y: vy / length, z: vz / length };
   }
   sample(min, max) {
+    if (!this.cells.size) return { inWater: false, x: 0, y: 0, z: 0 };
     let count = 0, x = 0, y = 0, z = 0;
     const consider = at => {
       const b = this.at(at.x, at.y, at.z);
@@ -104,7 +119,7 @@ export class FluidSystem {
       for (let a = Math.floor(min.x); a < max.x; a++) for (let b = Math.floor(min.y); b < max.y; b++) for (let c = Math.floor(min.z); c < max.z; c++) {
         if (this.cells.has(keyOf(a, b, c))) consider({ x: a, y: b, z: c });
       }
-    } else for (const at of this.cells.values()) consider(at);
+    } else for (const at of this.world.indexedEdits(this.chunks, min, max)) consider(at);
     return { inWater: count > 0, x: x / (count || 1), y: y / (count || 1), z: z / (count || 1) };
   }
   submerged(point) { return point.y < waterSurfaceAt(this.world, point); }

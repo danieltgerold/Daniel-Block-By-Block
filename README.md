@@ -560,6 +560,49 @@ number shortcuts still work over catalog templates. E closes outside text entry,
 Escape always closes, and carried stacks return through existing safe storage/
 overflow handling. Survival retains its existing crafting and inventory interface.
 
+## Water and editing performance
+
+Terrain and water keep independent dirty flags and buffers. An interior edit
+touches its own chunk; boundary faces/corners touch only the required neighbors.
+Breaking still flushes affected terrain immediately. Water graphics use a separate
+two-build/4ms frame budget, prioritizing nearby work with age-based fairness.
+The previous water buffer remains visible until its replacement is ready; both
+buffers are disposed on replacement/unload. Offscreen fluids keep simulating.
+
+Runtime solid, base-removal and source-water indexes share the existing chunk
+storage and are reconstructed on load. Local meshing, collision, support,
+targeting and camera sweeps avoid all-world edit scans. Very large queries fall
+back to occupied index entries or removal-boundary events, rather than looping
+through enormous empty coordinate ranges. Chunk bounds and immutable collision
+boxes are cached; dynamic fence connections remain live. The saved format stays
+unchanged. Empty untouched chunks do not accumulate bounds-cache entries.
+
+Water-level-only edits skip unrelated block/stair notifications. Other edits wake
+water only when occupancy/support can change near it. Per-tick lookup caches are
+invalidated on every mutation, without deferring or reordering fluid updates.
+Each water mesh caches nearby blocks/corners, omits hidden faces and merges only
+flat equal-height tops using repeating per-block UVs; slopes remain exact.
+
+`node scripts/profile-water.mjs` runs an offline CPU fixture with 4,096 distant
+stored water cells; it does not open a browser or alter a saved world. Matched
+before/after median measurements on this machine (12 samples after warmup):
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Interior dry break + visible terrain refresh | 4.51 ms / 5 terrain chunks | 1.21 ms / 1 terrain chunk |
+| Interior water-level refresh | 20.32 ms / 9 terrain, 4 water meshes | 1.39 ms / 0 terrain, 1 water mesh |
+| Nearby movement with distant water | 0.731 ms | 0.012 ms |
+| Nearby targeting with distant water | 0.228 ms | 0.006 ms |
+| Water-mesh block lookups | 10,016 | 904 |
+| All-world edit visits for local mesh/movement | 4,097 / 16,388 | 0 / 0 |
+
+These are CPU microbenchmarks, not browser FPS guarantees. The complete 60-tick
+world-state/pending-order trace matched the original implementation
+(`721dbdb8ebdc631d`), as did its settled-state fingerprint. With the simpler
+changes, measured water mesh preparation was about 1.07 ms, so no worker was added.
+Focused tests cover flow/recession, waterfalls, buckets, boundaries, deferred
+buffers, saved worlds, distant water, large queries, stairs and crouch support.
+
 ## Buckets and legacy water
 
 `bucket` stacks to 16; `water.bucket` stacks to one. Both have original flat

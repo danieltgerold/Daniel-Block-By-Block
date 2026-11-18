@@ -4,7 +4,7 @@ import { BLOCK_TYPES, blockDrops } from './block-types.js';
 import { worldBoxes, fullCube, blockOpaque, stairShapeAt, DIRECTIONS } from './block-shapes.js';
 import { FurnaceEntity } from './smelting.js';
 import { FluidSystem } from './fluid-system.js';
-import { isWaterSource, waterHeight } from './fluid-surface.js';
+import { waterHeight } from './fluid-surface.js';
 export const BLOCK_REACH = 4.5;
 const EPSILON = 1e-7;
 const AXES = ['x', 'y', 'z'];
@@ -47,8 +47,36 @@ export class VoxelWorld {
     this.random = random; this.behaviorBlocks = new Map(); this.behaviorTime = 0; this.listeners = new Set();
     this.furnaces = new Map(); this.tickRemainder = 0; this.pendingDrops = []; this.changingDoors = false; this.loading = false;
     this.fluids = new FluidSystem(this);
+    this.solidChunks = new Map(); this.removedChunks = new Map(); this.sourceChunks = new Map();
+    this.boundsCache = new Map(); this.boxCaches = { collision: new WeakMap(), selection: new WeakMap() };
   }
   *edits() { for (const edits of this.chunkEdits.values()) yield* edits.values(); }
+  *editsInChunk(cx, cz) { yield* this.chunkEdits.get(chunkKey(cx, cz))?.values() ?? []; }
+  *solidEditsInChunk(cx, cz) { yield* this.solidChunks.get(chunkKey(cx, cz))?.values() ?? []; }
+  indexEdit(index, chunk, key, edit) {
+    if (edit) { if (!index.has(chunk)) index.set(chunk, new Map()); index.get(chunk).set(key, edit); }
+    else { const entries = index.get(chunk); entries?.delete(key); if (entries?.size === 0) index.delete(chunk); }
+  }
+  *indexedEdits(index, min = null, max = null) {
+    if (!index.size) return;
+    const matches = e => !min || e.x + 1 >= min.x - EPSILON && e.x <= max.x + EPSILON && e.z + 1 >= min.z - EPSILON && e.z <= max.z + EPSILON && e.y + 1.5 >= min.y - EPSILON && e.y <= max.y + EPSILON;
+    if (min) {
+      const x0 = Math.floor((min.x - EPSILON) / CHUNK_SIZE), x1 = Math.floor((max.x + EPSILON) / CHUNK_SIZE), z0 = Math.floor((min.z - EPSILON) / CHUNK_SIZE), z1 = Math.floor((max.z + EPSILON) / CHUNK_SIZE);
+      const count = (x1 - x0 + 1) * (z1 - z0 + 1);
+      // Small local queries visit their chunks directly; huge developer-mode
+      // sweeps visit occupied index chunks, never enormous empty ranges.
+      if (count <= Math.max(16, index.size * 2) && [x0, x1, z0, z1].every(Number.isSafeInteger)) {
+        for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) for (const e of index.get(chunkKey(x, z))?.values() ?? []) if (matches(e)) yield e;
+        return;
+      }
+    }
+    for (const entries of index.values()) for (const e of entries.values()) if (matches(e)) yield e;
+  }
+  boxesFor(block, kind = 'collision') {
+    if (block.definition.collisionShape === 'fence') return worldBoxes(block, kind, this);
+    const cache = this.boxCaches[kind]; if (!cache.has(block)) cache.set(block, worldBoxes(block, kind, this));
+    return cache.get(block);
+  }
   blockIdAt(x, y, z) {
     const edit = this.chunkEdits.get(chunkKey(Math.floor(x / CHUNK_SIZE), Math.floor(z / CHUNK_SIZE)))?.get(blockKey(x, y, z));
     // Old boolean occupancy entries are still Test Blocks, including old ground.
@@ -70,7 +98,7 @@ export class VoxelWorld {
     const id = value === true ? 'test.block' : value === false || value === null ? null : value;
     const definition = BLOCK_TYPES.get(id);
     if (id !== null && !definition) return false;
-    const previousId = this.blockIdAt(x, y, z);
+    const previousId = this.blockIdAt(x, y, z), previousState = this.blockStateAt(x, y, z);
     const state = Object.freeze(id === null ? {} : { ...definition.defaultState, ...properties });
     if (previousId === id && sameState(this.blockStateAt(x, y, z), state)) return false;
     const solid = Boolean(definition?.solid);
@@ -82,6 +110,7 @@ export class VoxelWorld {
     const isDefault = y >= -this.depth && y < 0;
     if (isDefault) this.removedCount += Number(previousFull) - Number(nextFull);
     const coordinateKey = blockKey(x, y, z);
+    const waterLevelOnly = id === 'water' && previousId === 'water';
     if (previousId === 'furnace' && id !== 'furnace') {
       const entity = this.furnaces.get(coordinateKey); this.furnaces.delete(coordinateKey);
       if (entity) {
@@ -96,18 +125,32 @@ export class VoxelWorld {
       if (edits?.size === 0) this.chunkEdits.delete(key);
     } else {
       if (!edits) { edits = new Map(); this.chunkEdits.set(key, edits); }
-      edits.set(coordinateKey, { x, y, z, id, solid, state, ...(id === 'furnace' ? { furnace: this.furnaces.get(coordinateKey) } : {}) });
+      const edit = { x, y, z, id, solid, state, ...(id === 'furnace' ? { furnace: this.furnaces.get(coordinateKey) } : {}) };
+      Object.defineProperty(edit, 'definition', { value: definition }); // Runtime cache; save format is unchanged.
+      edits.set(coordinateKey, edit);
     }
+    const edit = edits?.get(coordinateKey);
+    this.indexEdit(this.solidChunks, key, coordinateKey, solid ? edit : null);
+    this.indexEdit(this.removedChunks, key, coordinateKey, isDefault && !nextFull ? edit : null);
+    this.indexEdit(this.sourceChunks, key, coordinateKey, id === 'water' && !state.falling && state.level === 0 ? edit : null);
+    const cachedBounds = this.boundsCache.get(key);
+    if (cachedBounds) {
+      if (Boolean(previous?.solid) !== solid) { cachedBounds.terrain = null; cachedBounds.all = null; }
+      else if ((previousId === 'water') !== (id === 'water')) cachedBounds.all = null;
+    }
+    this.fluids.invalidate?.(x, y, z);
     this.behaviorBlocks.delete(coordinateKey);
     if (definition?.behavior) this.behaviorBlocks.set(coordinateKey, { x, y, z });
-    for (const listener of this.listeners) listener({ x, y, z, id, previousId, state });
-    for (const [dx, dy, dz] of [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+    for (const listener of this.listeners) listener({ x, y, z, id, previousId, state, previousState });
+    if (!waterLevelOnly) for (const [dx, dy, dz] of [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
       const block = this.blockAt(x + dx, y + dy, z + dz);
       block?.definition.behavior?.neighborChanged?.(this, block);
       if (!this.changingDoors && block?.definition.collisionShape === 'door') this.checkDoor(block);
     }
-    if (!this.loading && !this.updatingStairs) this.updateStairs(x, y, z);
-    this.fluids.changed(x, y, z);
+    if (!this.loading && !this.updatingStairs && (previous?.collisionShape === 'stairs' || definition?.collisionShape === 'stairs')) this.updateStairs(x, y, z);
+    const fluidTopologyChanged = id === 'water' || previousId === 'water' || Boolean(id) !== Boolean(previousId) || solid !== Boolean(previous?.solid);
+    if (fluidTopologyChanged && (id === 'water' || previousId === 'water' || this.fluids.affected(x, y, z))) this.fluids.changed(x, y, z);
+    if (!this.solidChunks.has(key) && !this.fluids.chunks.has(key)) this.boundsCache.delete(key);
     return true;
   }
   updateStairs(x, y, z) {
@@ -121,8 +164,10 @@ export class VoxelWorld {
     this.updatingStairs = guard;
   }
   blockAt(x, y, z) {
-    const id = this.blockIdAt(x, y, z);
-    return id === null ? null : { x, y, z, id, state: this.blockStateAt(x, y, z), definition: BLOCK_TYPES.get(id) };
+    const edit = this.chunkEdits.get(chunkKey(Math.floor(x / CHUNK_SIZE), Math.floor(z / CHUNK_SIZE)))?.get(blockKey(x, y, z));
+    if (edit) return edit.id === null ? null : edit;
+    if (y < -this.depth || y >= 0) return null;
+    const definition = BLOCK_TYPES.get('test.block'); return { x, y, z, id: 'test.block', definition, state: definition.defaultState };
   }
   // Migration entry point for old {solid:true/false} and current typed edits.
   loadEdits(entries) {
@@ -146,12 +191,13 @@ export class VoxelWorld {
     for (const entity of this.furnaces.values()) { entity.removed = true; entity.changed(); }
     this.depth = saved.depth ?? this.depth; this.chunkEdits.clear(); this.furnaces.clear(); this.behaviorBlocks.clear();
     this.fluids = new FluidSystem(this);
+    this.solidChunks.clear(); this.removedChunks.clear(); this.sourceChunks.clear(); this.boundsCache.clear();
     this.removedCount = 0; this.pendingDrops = []; this.tickRemainder = 0; this.loadEdits(saved.edits ?? saved);
-    for (const at of old) for (const listener of this.listeners) listener({ x: at.x, y: at.y, z: at.z, id: this.blockIdAt(at.x, at.y, at.z) });
+    for (const at of old) for (const listener of this.listeners) listener({ x: at.x, y: at.y, z: at.z, id: this.blockIdAt(at.x, at.y, at.z), previousId: at.id, previousState: at.state });
   }
   furnaceAt(x, y, z) { return this.furnaces.get(blockKey(x, y, z)); }
   emitDrop(stack, at) { if (this.onDrop) this.onDrop(stack, at); else this.pendingDrops.push({ stack: { ...stack }, at: { ...at } }); }
-  *collisionBoxes() { for (const edit of this.edits()) if (edit.solid) yield* worldBoxes(this.blockAt(edit.x, edit.y, edit.z), 'collision', this); }
+  *collisionBoxes(min = null, max = null) { for (const edit of this.indexedEdits(this.solidChunks, min, max)) yield* this.boxesFor(edit); }
   topSupport(x, y, z) { const block = this.blockAt(x, y, z); return fullCube(block) || block?.definition.collisionShape === 'slab' && block.state.type === 'top'
     || block?.definition.collisionShape === 'stairs' && block.state.half === 'top'; }
   removeDoor(block) {
@@ -227,7 +273,7 @@ export class VoxelWorld {
     };
     for (let y = Math.max(low, -this.depth); y <= Math.min(high, -1); y++) consider(Math.floor(player.x), y, Math.floor(player.z));
     if (distance === 0) return best;
-    for (const edit of this.edits()) if (edit.solid) consider(edit.x, edit.y, edit.z);
+    for (const edit of this.indexedEdits(this.solidChunks, { ...min, y: player.y - depth - EPSILON }, { ...max, y: player.y })) consider(edit.x, edit.y, edit.z);
     // Bound the scan by stored removals, even at very large /size values.
     const x0 = Math.floor(min.x + EPSILON), x1 = Math.floor(max.x - EPSILON), z0 = Math.floor(min.z + EPSILON), z1 = Math.floor(max.z - EPSILON);
     if ([x0, x1, z0, z1].every(Number.isSafeInteger)) {
@@ -239,11 +285,25 @@ export class VoxelWorld {
     return best;
   }
   chunkBounds(cx, cz, includeWater = true) {
-    let minY = -this.depth, maxY = 0;
-    for (const edit of this.chunkEdits.get(chunkKey(cx, cz))?.values() || []) {
-      if (edit.solid || includeWater && edit.id === 'water') { minY = Math.min(minY, edit.y); maxY = Math.max(maxY, edit.y + 1); }
+    const key = chunkKey(cx, cz); let cached = this.boundsCache.get(key);
+    if (!this.solidChunks.has(key) && !this.fluids.chunks.has(key)) {
+      this.boundsCache.delete(key);
+      if (this.baseBounds?.minY !== -this.depth) this.baseBounds = { minY: -this.depth, maxY: 0 };
+      return this.baseBounds;
     }
-    return { minY, maxY };
+    if (!cached) { cached = { terrain: null, all: null }; this.boundsCache.set(key, cached); }
+    if (!cached.terrain) {
+      let minY = -this.depth, maxY = 0;
+      for (const edit of this.solidChunks.get(key)?.values() ?? []) { minY = Math.min(minY, edit.y); maxY = Math.max(maxY, edit.y + 1); }
+      cached.terrain = { minY, maxY };
+    }
+    if (!includeWater) return cached.terrain;
+    if (!cached.all) {
+      let { minY, maxY } = cached.terrain;
+      for (const at of this.fluids.chunks.get(key)?.values() ?? []) { minY = Math.min(minY, at.y); maxY = Math.max(maxY, at.y + 1); }
+      cached.all = { minY, maxY };
+    }
+    return cached.all;
   }
   // Untouched terrain is analytic, while edits remain sparse. Queries do not
   // enumerate an enormous box or a long flight path in developer mode.
@@ -261,13 +321,13 @@ export class VoxelWorld {
     }
     if (cells > this.removedCount) return true;
     let removed = 0;
-    for (const edit of this.edits()) if (!fullCube(this.blockAt(edit.x, edit.y, edit.z)) && AXES.every(a => edit[a] >= low[a] && edit[a] <= high[a])) removed++;
+    for (const edit of this.indexedEdits(this.removedChunks, clippedMin, clippedMax)) if (AXES.every(a => edit[a] >= low[a] && edit[a] <= high[a])) removed++;
     return cells > removed;
   }
   hasSolidInBox(min, max) {
     if (AXES.some(axis => max[axis] <= min[axis])) return false;
     if (this.baseSolidInBox(min, max)) return true;
-    for (const box of this.collisionBoxes()) if (boxOverlap(min, max, box)) return true;
+    for (const box of this.collisionBoxes(min, max)) if (boxOverlap(min, max, box)) return true;
     return false;
   }
   intersectsPlayer(player, size = player.size ?? 1) {
@@ -291,10 +351,13 @@ export class VoxelWorld {
     if (!length || reach < 0) return null;
     const d = Object.fromEntries(AXES.map(a => [a, direction[a] / length]));
     let best = null;
-    for (const edit of this.edits()) if (edit.solid || options.waterSources && isWaterSource(this.blockAt(edit.x, edit.y, edit.z))) {
-      const block = this.blockAt(edit.x, edit.y, edit.z);
+    const min = {}, max = {};
+    for (const a of AXES) { const end = origin[a] + d[a] * reach; min[a] = Math.min(origin[a], end); max[a] = Math.max(origin[a], end); }
+    const candidates = function* (world) { yield* world.indexedEdits(world.solidChunks, min, max); if (options.waterSources) yield* world.indexedEdits(world.sourceChunks, min, max); };
+    for (const edit of candidates(this)) {
+      const block = edit;
       const boxes = edit.id === 'water' ? [{ min: { x: edit.x, y: edit.y, z: edit.z }, max: { x: edit.x + 1, y: edit.y + waterHeight(block), z: edit.z + 1 } }]
-        : worldBoxes(block, 'selection', this);
+        : this.boxesFor(block, 'selection');
       for (const box of boxes) {
         const hit = rayBox(origin, d, box.min, box.max, best?.distance ?? reach);
         if (hit && (!best || hit.distance < best.distance)) best = { ...hit, x: edit.x, y: edit.y, z: edit.z };
@@ -344,17 +407,41 @@ export class VoxelWorld {
       const hit = rayBox(origin, motion, min, max, fraction);
       if (hit) fraction = Math.max(0, hit.distance - 1e-6);
     };
-    for (const box of this.collisionBoxes()) test(box);
     const low = {}, high = {};
     for (const a of AXES) {
       low[a] = Math.floor(Math.min(origin[a], origin[a] + motion[a]) - half);
       high[a] = Math.floor(Math.max(origin[a], origin[a] + motion[a]) + half);
     }
+    for (const box of this.collisionBoxes(low, high)) test(box);
     if (low.y <= -1 && high.y >= -this.depth) {
       if (![low.x, high.x, low.z, high.z].every(Number.isSafeInteger)) {
         const hit = rayBox(origin, motion, { x: -Infinity, y: -this.depth - half, z: -Infinity },
           { x: Infinity, y: half, z: Infinity }, fraction);
         if (hit) fraction = Math.max(0, hit.distance - 1e-6);
+      } else if ((high.x - low.x + 1) * (high.z - low.z + 1) > 4096) {
+        // A very long camera sweep must not enumerate empty columns. Terrain
+        // occupancy can change only at stored removal/partial-cell boundaries.
+        const holes = [...this.indexedEdits(this.removedChunks, low, high)];
+        for (let y = Math.max(low.y, -this.depth); y <= Math.min(high.y, -1); y++) {
+          let start = 0, end = fraction;
+          if (motion.y) { const a = (y - half - origin.y) / motion.y, b = (y + 1 + half - origin.y) / motion.y; start = Math.max(0, Math.min(a, b)); end = Math.min(end, Math.max(a, b)); }
+          else if (origin.y < y - half || origin.y > y + 1 + half) continue;
+          if (start > end) continue;
+          const times = new Set([start, end]);
+          for (const hole of holes) if (hole.y === y) for (const axis of ['x', 'z']) if (motion[axis]) {
+            for (const face of [hole[axis], hole[axis] + 1]) for (const side of [-1, 1]) {
+              const t = (face + side * half - origin[axis]) / motion[axis]; if (t > start && t < end) times.add(t);
+            }
+          }
+          const covered = t => this.baseSolidInBox({ x: origin.x + motion.x * t - half, y, z: origin.z + motion.z * t - half },
+            { x: origin.x + motion.x * t + half, y: y + 1, z: origin.z + motion.z * t + half });
+          const ordered = [...times].sort((a, b) => a - b);
+          if (covered(start)) fraction = Math.min(fraction, Math.max(0, start - 1e-6));
+          else for (let i = 1; i < ordered.length; i++) {
+            const middle = covered((ordered[i - 1] + ordered[i]) / 2), edge = middle || covered(ordered[i]);
+            if (edge) { fraction = Math.min(fraction, Math.max(0, (middle ? ordered[i - 1] : ordered[i]) - 1e-6)); break; }
+          }
+        }
       } else {
         for (let x = low.x; x <= high.x; x++) for (let z = low.z; z <= high.z; z++)
           for (let y = Math.max(low.y, -this.depth); y <= Math.min(high.y, -1); y++) if (fullCube(this.blockAt(x, y, z))) test({ x, y, z });
@@ -385,8 +472,10 @@ export class VoxelWorld {
     const half = 0.3 * (player.size ?? 1);
     const { min, max } = playerBounds(player);
     const times = new Set([0, 1]);
-    const boundaries = [...this.edits()].map(b => ({ min: { x: b.x, y: b.y, z: b.z }, max: { x: b.x + 1, y: b.y + 1, z: b.z + 1 } }));
-    for (const block of [...boundaries, ...this.collisionBoxes()]) {
+    const queryMin = { x: Math.min(min.x, min.x + dx), y: player.y - depth, z: Math.min(min.z, min.z + dz) };
+    const queryMax = { x: Math.max(max.x, max.x + dx), y: player.y, z: Math.max(max.z, max.z + dz) };
+    const boundaries = [...this.indexedEdits(this.removedChunks, queryMin, queryMax)].map(b => ({ min: { x: b.x, y: b.y, z: b.z }, max: { x: b.x + 1, y: b.y + 1, z: b.z + 1 } }));
+    for (const block of [...boundaries, ...this.collisionBoxes(queryMin, queryMax)]) {
       if (block.min.y >= player.y || block.max.y <= player.y - depth) continue;
       for (const [axis, delta] of [['x', dx], ['z', dz]]) {
         if (!delta) continue;
@@ -411,7 +500,7 @@ export class VoxelWorld {
     // Step height is measured ABOVE THE FEET, independent of block type or
     // total obstacle height. The same swept box handles headroom and walls.
     const footprint = playerBounds(normal, halfWidth, height);
-    const tops = [...this.collisionBoxes()].filter(box => box.max.y > player.y + EPSILON && box.max.y <= player.y + .6 * size + EPSILON
+    const tops = [...this.collisionBoxes({ ...footprint.min, y: player.y }, { ...footprint.max, y: player.y + .6 * size })].filter(box => box.max.y > player.y + EPSILON && box.max.y <= player.y + .6 * size + EPSILON
       && ['x', 'z'].every(a => footprint.max[a] >= box.min[a] - EPSILON && footprint.min[a] <= box.max[a] + EPSILON)).map(box => box.max.y);
     // Untouched base terrain has no stored boxes. Include its exposed layer
     // tops too, e.g. stepping out of a bottom slab carved into the ground.
@@ -432,6 +521,9 @@ export class VoxelWorld {
   moveRaw(player, velocity, halfWidth, height) {
     const p = { x: player.x, y: player.y, z: player.z, size: player.size ?? 1, crouching: player.crouching };
     const moved = { x: 0, y: 0, z: 0 }, blocked = { x: false, y: false, z: false };
+    const bounds = playerBounds(p, halfWidth, height), queryMin = {}, queryMax = {};
+    for (const a of AXES) { const delta = velocity[a] || 0; queryMin[a] = Math.min(bounds.min[a], bounds.min[a] + delta); queryMax[a] = Math.max(bounds.max[a], bounds.max[a] + delta); }
+    const boxes = [...this.collisionBoxes(queryMin, queryMax)];
     for (const axis of ['y', 'x', 'z']) {
       const wanted = velocity[axis];
       if (!wanted) continue;
@@ -443,7 +535,7 @@ export class VoxelWorld {
         if (wanted > 0 && max[axis] <= block.min[axis] + EPSILON) allowed = Math.min(allowed, block.min[axis] - max[axis]);
         if (wanted < 0 && min[axis] >= block.max[axis] - EPSILON) allowed = Math.max(allowed, block.max[axis] - min[axis]);
       };
-      for (const box of this.collisionBoxes()) clip(box);
+      for (const box of boxes) clip(box);
       if (axis === 'y') {
         for (let y = -this.depth; y < 0; y++) {
           const low = { ...min, y }, high = { ...max, y: y + 1 };
@@ -472,7 +564,7 @@ export class VoxelWorld {
       if (radius && Math.max(Math.abs(x), Math.abs(z)) !== radius) continue;
       const ys = [];
       for (let y = -this.depth; y < 0; y++) if (this.hasBlock(x, y, z)) for (const box of worldBoxes(this.blockAt(x, y, z), 'collision', this)) ys.push(box.max.y);
-      for (const edit of this.edits()) if (edit.solid && edit.x === x && edit.z === z) for (const box of worldBoxes(this.blockAt(x, edit.y, z), 'collision', this)) ys.push(box.max.y);
+      for (const edit of this.indexedEdits(this.solidChunks, { x, y: -Infinity, z }, { x: x + 1, y: Infinity, z: z + 1 })) if (edit.x === x && edit.z === z) for (const box of this.boxesFor(edit)) ys.push(box.max.y);
       ys.sort((a, b) => b - a);
       for (const y of ys) {
         const p = { x: x + 0.5, y, z: z + 0.5, size };
