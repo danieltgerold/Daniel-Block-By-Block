@@ -114,7 +114,6 @@ function renderInputMode(mode) {
   document.body.classList.toggle('world-view', mode !== 'menu');
   hud.root.hidden = mode === 'menu' || mode === 'death';
   inventoryUI.hotbar.hidden = !['playing', 'ready', 'chat'].includes(mode);
-  previousTime = null;
 }
 
 const hud = new GameplayHUD(document, profileStorage);
@@ -173,7 +172,7 @@ function releaseMouse() {
   chatUI.pause();
 }
 window.addEventListener('blur', releaseMouse);
-document.addEventListener('visibilitychange', () => { if (document.hidden) releaseMouse(); });
+document.addEventListener('visibilitychange', () => { previousTime=null; if (document.hidden) releaseMouse(); });
 function resizeRenderer() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
@@ -190,7 +189,7 @@ function animate(time) {
   previousTime = time;
   if (gameSimulationRunning(chatUI.mode)) {
     controller.update(dt, { yaw, pitch, gameplayEnabled: active });
-  } else if(chatUI.mode==='death')controller.reactions.advanceDeath(dt);
+  }
   const position = refreshWorldView();
   chatUI.updateVisibility();
   renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);

@@ -24,7 +24,7 @@ export function firstPersonDoorAttachment(sign = 1) {
   }
   return doorFirst.get(sign);
 }
-export const displayProfile = item => item?.model === 'flat' ? item.display ?? 'generated' : 'block';
+export const displayProfile = item => item?.model === 'flat' ? item.display ?? 'item' : 'block';
 export function itemModelTransform(profile, view, sign = 1) {
   const key = `${profile}:${view}:${sign}`; if (models.has(key)) return models.get(key);
   const p = ITEM_DISPLAY[profile === 'item' ? 'generated' : profile][view][sign > 0 ? 'right' : 'left'], [x, y, z] = p.rotation;
@@ -59,6 +59,15 @@ export function thirdPersonItemTransform(profile = 'block', sign = 1) {
 }
 export function itemSourceAlignment(profile, view, sign = 1) {
   const key = `${profile}:${view}:${sign}`; if (alignments.has(key)) return alignments.get(key);
+  if(profile==='item') {
+    // Adapt the source sheet's axes once, retaining Java's item-local display
+    // translation. The old origin-cancelling alignment placed the sheet in the
+    // forearm plane, rather than forward of the palm.
+    const basis=view==='third' ? new THREE.Matrix4().makeRotationX(Math.PI/4)
+      .multiply(new THREE.Matrix4().makeTranslation(0,-.2,0)).scale(new THREE.Vector3(sign,1,1))
+      : new THREE.Matrix4().makeRotationY(sign*Math.PI/2);
+    alignments.set(key,basis);return basis;
+  }
   // Adapt the source sprite to this renderer's grip/camera axes, independently
   // of Java's item display TRS. Grip the Stick near its lower endpoint and the
   // complete Door at its bottom frame, not through the middle of the picture.

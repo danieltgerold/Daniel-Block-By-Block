@@ -112,7 +112,7 @@ test('vitals survive teleport and helper world snapshots; old player data gets s
   c.teleport({x:5,y:8,z:5});near(c.vitals.health,8.25);near(c.vitals.hunger,19);assert.equal(c.player.damageFallDistance,0);
   const saved=JSON.parse(JSON.stringify(w.save())),r=new VoxelWorld(),rc=new MovementController(r);r.load(saved);assert.deepEqual(rc.vitals.toJSON(),c.vitals.toJSON());near(rc.player.y,8);
   rc.loadPlayer({x:0,y:4,z:0});assert.deepEqual(rc.vitals.toJSON(),{health:20,hunger:20,saturation:5,exhaustion:0});
-  rc.vitals.health=10;ticks(rc,10,{gameplayEnabled:false});assert.ok(rc.vitals.health>10);assert.equal(gameSimulationRunning('inventory'),true);assert.equal(gameSimulationRunning('death'),false);assert.equal(gameSimulationRunning('menu'),false);
+  rc.vitals.health=10;ticks(rc,10,{gameplayEnabled:false});assert.ok(rc.vitals.health>10);assert.equal(gameSimulationRunning('inventory'),true);assert.equal(gameSimulationRunning('death'),true);assert.equal(gameSimulationRunning('menu'),true);
 });
 
 test('HUD full/half/empty icons, developer saturation, food motion and death/menu routing work without opening a browser',t=>{

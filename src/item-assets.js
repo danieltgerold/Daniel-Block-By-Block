@@ -2,17 +2,27 @@ import * as THREE from 'three';
 import { ITEMS } from './inventory.js';
 import { createSharedBlock, getItemGeometry, getItemMaterials, getFaceTexture } from './block-assets.js';
 import { spriteGeometry, spritePlaneGeometry } from './sprite-geometry.js';
-const flatMaterials = new Map();
+const flatMaterials = new Map(), spriteTextures = new Map();
+function spriteTexture(id) {
+  if(!spriteTextures.has(id)) {
+    const texture=getFaceTexture(id).clone();
+    texture.minFilter=texture.magFilter=THREE.NearestFilter;texture.generateMipmaps=false;
+    texture.wrapS=texture.wrapT=THREE.ClampToEdgeWrapping;texture.needsUpdate=true;
+    spriteTextures.set(id,texture);
+  }
+  return spriteTextures.get(id);
+}
 export function setItemAppearance(mesh, id = 'dirt') {
   const key = `${id}:${mesh.userData.displayContext ?? 'world'}`;
   if (mesh.userData.appearanceKey === key) return;
   const item = ITEMS.get(id), size = mesh.userData.itemSize ?? 1;
   if (item?.model === 'flat') {
-    if (!flatMaterials.has(item.texture)) flatMaterials.set(item.texture, new THREE.MeshBasicMaterial({
-      map: getFaceTexture(item.texture), alphaTest: .5, side: THREE.DoubleSide, vertexColors: item.spriteDepth !== 0, depthWrite: true, depthTest: true,
+    const plane=item.spriteDepth===0,materialKey=`${item.texture}:${plane?'plane':'solid'}`;
+    if (!flatMaterials.has(materialKey)) flatMaterials.set(materialKey, new THREE.MeshBasicMaterial({
+      map: spriteTexture(item.texture), alphaTest: .5, side: plane?THREE.DoubleSide:THREE.FrontSide, vertexColors: !plane, depthWrite: true, depthTest: true,
     }));
-    const spriteSize = mesh.userData.displayContext === 'firstperson' ? item.display === 'item' ? .6 : 1 : size;
-    mesh.geometry = item.spriteDepth === 0 ? spritePlaneGeometry(spriteSize) : spriteGeometry(item.texture, spriteSize); mesh.material = flatMaterials.get(item.texture);
+    const spriteSize = mesh.userData.displayContext === 'firstperson' ? 1 : size;
+    mesh.geometry = plane ? spritePlaneGeometry(spriteSize) : spriteGeometry(item.texture, spriteSize); mesh.material = flatMaterials.get(materialKey);
   } else { mesh.geometry = getItemGeometry(size, id); mesh.material = getItemMaterials(id, mesh.geometry); }
   mesh.userData.appearanceKey = key; mesh.userData.itemId = id; mesh.userData.blockId = item?.block ? id : null;
 }

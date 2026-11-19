@@ -73,7 +73,7 @@ test('partial pickup, chained merges, complete pickup and original despawn durin
   assert.equal(c.drops.transitions.length, 0);
 });
 
-test('inventory keeps simulation and pickups running with gameplay muted; Escape menu pauses the clock', t => {
+test('inventory and Escape keep simulation and pickups running with gameplay muted', t => {
   const window = new Window({ url: 'http://localhost:4173', settings: { disableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true } });
   const document = window.document; document.write(readFileSync(new URL('../index.html', import.meta.url), 'utf8'));
   const c = controller(); c.player.x = c.player.z = .5;
@@ -86,7 +86,7 @@ test('inventory keeps simulation and pickups running with gameplay muted; Escape
   simulate(20); assert.ok(c.drops.time > .9); assert.ok(pile.y < 1); near(c.player.x, .5); near(c.player.z, .5);
   assert.equal(c.heldKeys.size, 0); assert.equal(c.placementHeld, false);
   simulate(20); assert.equal(c.inventory.mainHand.count, 3); assert.equal(c.drops.total(), 0n);
-  const time = c.drops.time; ui.pause(); simulate(10); near(c.drops.time, time);
+  const time = c.drops.time; ui.pause(); simulate(10); near(c.drops.time, time+.5);
 });
 
 test('Creative pick selects an existing stack or creates one without losing displacement; Survival pick and no-target behavior remain intact', () => {

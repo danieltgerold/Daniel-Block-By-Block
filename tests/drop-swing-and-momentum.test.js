@@ -51,7 +51,7 @@ test('opening/closing real inventory preserves airborne velocity/interpolation a
     assert.ok(Math.abs(f.c.player.vz) < Math.abs(velocity), 'Normal drag slows carried motion');
     const carried = f.c.player.vz;
     f.key('KeyE'); f.ui.onPointerLockChange(true); near(f.c.player.vz, carried);
-    f.ui.pause(); near(f.c.player.vz, 0); // Escape pause keeps its existing behavior.
+    f.ui.pause(); near(f.c.player.vz, carried); // Escape now releases input while retaining momentum too.
   }
 });
 

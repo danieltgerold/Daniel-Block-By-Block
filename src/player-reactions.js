@@ -1,7 +1,7 @@
 const STEP = .05, clamp = n => Math.max(0,Math.min(1,n));
 const smooth = n => { n=clamp(n); return n*n*(3-2*n); };
-// Visual clocks only. The death screen advances this bounded clock without
-// ticking physics, hunger, drops, fluids or furnaces.
+// Visual state, advanced by the same fixed world clock. Dead player physics and
+// vitals stay frozen while world systems keep ticking independently.
 export class PlayerReactions {
   constructor() { this.reset(); }
   reset() { this.hurtAge = this.previousHurtAge = -1; this.hurtSerial = 0; this.dead = false; this.deathTicks = 0; this.deathAccumulator = 0; }
@@ -20,10 +20,10 @@ export class PlayerReactions {
   }
   pose(alpha=0) {
     let age=this.hurtAge;
-    if(this.dead && age>=0)age+=this.deathAccumulator/STEP;
+    if(this.dead && age>=0)age+=this.deathAccumulator/STEP+alpha;
     else if(this.previousHurtAge>=0)age=this.previousHurtAge+((age<0?10:age)-this.previousHurtAge)*alpha;
     const t=clamp(age/10);
-    const death=smooth((this.deathTicks+this.deathAccumulator/STEP)/20);
+    const death=smooth((this.deathTicks+this.deathAccumulator/STEP+(this.dead?alpha:0))/20);
     return { hurtRoll:age<0?0:-.18*Math.sin(Math.PI*Math.sqrt(t))*(1-t), deathProgress:death, deathRoll:-.22*smooth(death*2) };
   }
 }

@@ -386,15 +386,24 @@ export class MovementController {
   }
 
   update(frameSeconds, input = {}) {
-    if (this.vitals.dead) { this.die(); this.accumulator = 0; return; }
-    const gameplay = input.gameplayEnabled !== false;
+    if (this.vitals.dead) this.die();
+    const gameplay = input.gameplayEnabled !== false && !this.vitals.dead;
     if (!gameplay) this.clearHeldInputs();
     // Keep every active game tick, including slow rendering frames: dropping
-    // elapsed time would silently discard fluid/furnace work. Focus loss and
-    // the Escape menu pause separately, without simulating unattended input.
+    // elapsed time would silently discard fluid/furnace work. Menus release
+    // controls while the world and the living player's carried physics continue.
     this.accumulator += Number.isFinite(frameSeconds) ? Math.max(0, frameSeconds) : 0;
     // Sub-nanosecond rounding must not postpone a tick at a clock boundary.
     while (this.accumulator + 1e-9 >= MOVEMENT.fixedStep) {
+      if(this.vitals.dead) {
+        this.previous=snapshot(this.player);
+        this.accumulator-=MOVEMENT.fixedStep;this.totalSteps++;
+        this.world?.step?.(MOVEMENT.fixedStep);
+        this.reactions.advanceDeath(MOVEMENT.fixedStep);
+        this.particles?.step();
+        this.drops.step(this.player,{pickup:false});
+        continue;
+      }
       this.reactions.tick();
       this.previous = snapshot(this.player);
       const wasFlying = this.player.flying;
@@ -422,8 +431,8 @@ export class MovementController {
         swimDistance: Math.hypot(this.player.x-before.x,this.player.y-before.y,this.player.z-before.z),
         jumped: this.player.jumpCount !== before.jumpCount, sprintJump: this.player.sprintImpulseCount !== before.sprintImpulseCount, settings:this.settings });
       if (this.gameMode === 'survival' && this.vitals.hunger <= 6) this.player.sprinting = false;
-      if (this.vitals.dead) { this.die(); this.accumulator = 0; break; }
-      this.drops.step(this.player);
+      if (this.vitals.dead) this.die();
+      this.drops.step(this.player,{pickup:!this.vitals.dead});
     }
     this.accumulator = Math.max(0, this.accumulator);
   }
@@ -497,13 +506,18 @@ export class MovementController {
   }
   die() {
     if (!this.vitals.dead || this.deathHandled) return false;
+    const remainingWorldTime=this.accumulator;
     this.deathHandled = true;
     this.deathEquipment = {mainHand:this.inventory.mainHand?{...this.inventory.mainHand}:null,
       offhand:this.inventory.offhand?{...this.inventory.offhand}:null,slots:this.inventory.slots.slice(0,41).map(s=>s?{...s}:null)};
     this.reactions.die(); this.pause();
     const at = {x:this.player.x,y:this.player.y+.2,z:this.player.z};
     this.inventory.dropCarried(stack => this.drops.spawn(stack.id,stack.count,at,{thrown:true}));
-    this.onDeath?.(); return true;
+    this.onDeath?.();
+    // Input/camera cleanup in the death-screen transition must not discard
+    // unprocessed world ticks from this render frame.
+    if(this.vitals.dead)this.accumulator=remainingWorldTime;
+    return true;
   }
   savePlayer() { return { x:this.player.x,y:this.player.y,z:this.player.z,...this.vitals.toJSON(),settings:{...this.settings} }; }
   loadPlayer(data = {}) {

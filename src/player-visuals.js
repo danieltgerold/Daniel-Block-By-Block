@@ -204,7 +204,9 @@ function spriteInFirstPerson(mesh, item, sign, pose, equipHeight, wrist) {
   }
   // The camera-space hand/swing/equip parent is separate from item model units.
   // Sprite items sit a little farther forward to fit comfortably in the view.
-  mesh.matrixAutoUpdate = false; mesh.position.set(sign * (.44 - .4 * q), -.54 + .2 * r - .6 * (1 - equipHeight), -.9 - .2 * a);
+  mesh.matrixAutoUpdate = false;
+  const ordinary=profile==='item';
+  mesh.position.set(sign * ((ordinary ? .56 : .44) - .4 * q), (ordinary ? -.68 : -.54) + .2 * r - .6 * (1 - equipHeight), (ordinary ? -1 : -.9) - .2 * a);
   mesh.matrix.makeTranslation(...mesh.position.toArray())
     .multiply(handRotation.makeRotationY(sign * (45 - 20 * b) * Math.PI / 180))
     .multiply(handRotation.makeRotationZ(-sign * 20 * q * Math.PI / 180))

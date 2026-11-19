@@ -2,7 +2,8 @@ import { vitalIcon } from './vital-icons.js';
 // Round halves away from zero consistently, without ever displaying "-0".
 export const roundCoordinate = value => Math.sign(value) * Math.round(Math.abs(value)) || 0;
 export const coordinateText = feet => ['x', 'y', 'z'].map(axis => `${axis.toUpperCase()}: ${roundCoordinate(feet[axis])}`).join('  ');
-export const gameSimulationRunning = mode => mode === 'playing' || mode === 'inventory';
+const SIMULATION_MODES = new Set(['playing','ready','inventory','chat','menu','death']);
+export const gameSimulationRunning = mode => SIMULATION_MODES.has(mode);
 export function updateCrosshair(element, mode, cameraMode) {
   element.hidden = mode !== 'playing' || cameraMode !== 0;
 }

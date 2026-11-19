@@ -168,7 +168,19 @@ the panel drops all/one cursor items. Closing returns cursor items to storage
 and drops any remainder. Inventory blocks all gameplay input and releases the
 mouse, but the 20 Hz world simulation keeps running, including gravity, drops,
 pickup, merging and despawn. Closing uses the same capture/resume flow as chat.
-The Escape pause menu and lost-focus state still pause simulation.
+Chat, Escape and the death screen also keep the world clock running. Leaving
+gameplay cancels held mining, placement and eating and releases movement keys.
+Living players retain airborne momentum and normal gravity/drag. Menus do not
+accumulate deferred work; returning uses the same clock and interpolation.
+Browser visibility changes reset the frame timestamp to avoid replaying a hidden
+interval. Browser-imposed background throttling remains a limitation.
+
+Water, falling blocks, grass, furnaces and dropped items tick on every screen.
+Eligible nearby drops still enter a living player's inventory. Death freezes only
+the player's physics, vitals and interactions: world simulation, drop merging/
+expiration and the interpolated death pose continue. Dead players cannot collect
+items. A death in chat or a menu closes that interface and drops owned inventory
+once through the same guarded death transaction.
 Static inventory labels/instructions have been removed. Hovering a stack shows
 its item name immediately in an in-game tooltip; stack counts remain visible.
 The top gameplay-controls hint and movement-test milestone banner are removed.
@@ -333,15 +345,16 @@ cached player snapshot. The HUD reads the fresh values immediately. Mode changes
 preserve vitals. Inspection and focused checks did not reproduce saturation
 carryover through the original normal respawn path; that path already called
 `PlayerVitals.reset()` with five saturation.
-Inventory keeps vitals and world ticks running; Escape and the death screen pause.
+Inventory, chat and Escape keep living-player vitals and world ticks running.
+The death screen keeps world ticks running while dead-player vitals stay frozen.
 
 Actual health loss starts one smooth ten-tick camera roll; undamaging landings
 and Creative fall immunity do not trigger it. The world and first-person hand
 receive the same visual roll, without changing aim, rays or camera collision.
 Escape's Damage tilt setting offers Normal, Reduced and Off. Teleport, respawn
-and F5 camera changes clear the remaining hurt effect. A separate bounded visual
-clock keeps the twenty-tick sideways death rotation running while all world
-simulation is paused. The body pivots from its feet with a small authored lift
+and F5 camera changes clear the remaining hurt effect. A bounded visual state
+advances the twenty-tick sideways death rotation with the continuing world clock,
+without stepping the dead player's physics. The body pivots from its feet with a small authored lift
 so its limbs stay above the landing surface. Held equipment uses a cosmetic
 snapshot after the real stacks have dropped exactly once. First person keeps
 the full body hidden and adds a death tilt under the existing red death screen.
@@ -461,8 +474,9 @@ walking/sprinting acceleration is 0.098/0.1274; air values are 0.0196/0.02548.
 Diagonals are normalized with the 1/0.98 adjustment. Collision resolves motion,
 then horizontal drag is 0.546 for ticks that started grounded or 0.91 for ticks
 that started airborne. Vertical update is vy = (vy - 0.08) * 0.98. Held jump uses
-a 10-tick cooldown, reset on jump release. Hidden/unfocused sessions pause;
-frames over 0.25 s are capped to prevent runaway catch-up.
+a 10-tick cooldown, reset on jump release. Chat and menus release input while
+simulation continues. Visibility transitions discard hidden-interval catch-up;
+ordinary slow rendering frames retain all fixed ticks.
 
 Internal measurements use actual displacement before drag. Sprint-jump speed
 varies during each jump; the value below averages consecutive jumps.
@@ -487,7 +501,7 @@ and active entities update. They pass through water, replace water on landing,
 and notify the existing fluid/chunk systems. Partial obstacles or player overlap
 that prevent safe settling produce one matching item instead of overwriting a
 block or trapping the player. Stacks settle from the bottom upward. Inventory
-keeps these ticks running; the Escape menu pauses them. Programmatic world
+and all other game screens keep these ticks running. Programmatic world
 snapshots include pending checks and active falls, without adding persistence.
 
 Definitions share cube collision/placement/breaking code and specify names, IDs,
@@ -544,8 +558,8 @@ each uncovered Grass Block chooses a random neighbor within one block on each
 axis; uncovered Dirt there becomes Grass. Newly spread grass waits until the
 next round. Glass and Leaves are solid but nonopaque and do not count as covers
 in this simplified rule; it is not Minecraft's full lighting system.
-Uncovering Dirt does not instantly restore Grass. Inventory keeps
-this timer running, while the Escape menu pauses it.
+Uncovering Dirt does not instantly restore Grass. All game screens keep this
+timer running.
 
 ## Crafting and recipe book
 
@@ -560,7 +574,7 @@ for the 3x3 interface; crouch-right-click to place against it instead. Empty han
 and held Sticks can use the table. Both screens retain the existing inventory
 controls and keep physics/item simulation running with gameplay inputs released.
 Opening them preserves airborne momentum. Escape closes crafting and resumes
-the existing mouse-capture flow; the separate Escape pause menu still pauses.
+the existing mouse-capture flow; the Escape menu also keeps simulation running.
 
 The initial recipes, in either grid, are:
 
@@ -659,6 +673,29 @@ wooden panels and Pine has horizontal bands, with no accidental holes. Third-per
 attach their bottom grip directly to the animated arm's actual palm, with player
 render scale applied once. Stick, regular-block and equip/swing behavior remain.
 Internal projection checks keep complete resting Doors clear of the crosshair.
+
+Ordinary flat items use the shared `item` display profile (also the default for
+new flat items), independently of Door and Stick grip profiles. Raw/cooked pork
+and buckets use Java's generated-item display TRS: first person rotation
+`[0,-90,25]`, translation `[1.13,3.2,1.13]/16`, scale 0.68; third person rotation
+zero, translation `[0,3,1]/16`, scale 0.55. Those compose after the wrist/animated
+shoulder, with separate source-axis/palm adaptation and the avatar render scale.
+The former shared alignment canceled the item-model translation and left the
+picture against the forearm; the corrected alignment retains that translation
+and puts an angled sheet forward of the actual palm. Both hands use the same
+shared path and follow walk, crouch, swing and eating poses in both F5 views.
+First person shows the item without an empty-hand arm and returns to the same
+lower-right/left resting pose after equip, swing or eating.
+
+Each ordinary item reuses one cached generated sprite mesh: two continuous
+textured faces and 1/16-block thickness before display scaling, with side quads
+only on exposed opaque-pixel boundaries. Front/back UVs show readable artwork,
+nearest filtering avoids blur, and uniform edge colors avoid dark striping.
+Doors retain their zero-thickness plane and hidden first-person arm. Original
+16px pork art now depicts an irregular pink/rose or toasted brown/tan cut, with
+a small fat highlight instead of a pale handle. The same texture supplies flat
+icons, hands, drops and eating; nutrition, 32-tick eating and the 200-tick recipe
+are unchanged.
 
 ## Creative inventory
 
@@ -790,8 +827,8 @@ as normal swimming. Creative flight bypasses this check. Tall walls, ceilings an
 submerged exits reject it. The local probes run only on wet horizontal collisions
 on physics ticks, never as per-render-frame work.
 Creative flight keeps its own movement in water. A camera-position surface query
-controls a subtle blue tint, including F5 views. Inventory leaves all simulation
-running; Escape still pauses. No waterlogging, modern swimming pose, oxygen,
+controls a subtle blue tint, including F5 views. All game screens leave world
+simulation running. No waterlogging, modern swimming pose, oxygen,
 drowning, lava or other fluids are added.
 
 ## Furnaces
@@ -813,8 +850,8 @@ current cook while remaining fuel keeps burning. A plank supplies one complete
 Sand plus 100 cooking ticks; a lone Stick cannot finish a Sand.
 
 Furnace entities simulate independently of camera visibility and open screens.
-Inventory/furnace screens preserve momentum and simulation; Escape pause retains
-its pause behavior. Versioned `world.save()`/`world.load()` and compatible
+Inventory/furnace, chat and Escape preserve momentum and simulation; the death
+screen continues furnace/world work without moving the corpse. Versioned `world.save()`/`world.load()` and compatible
 `loadEdits()` include block states plus furnace slots/burn/cook counters. This
 extends the existing programmatic world snapshots; page reload still starts the
 current local session afresh. Breaking a furnace drops its actual stored contents
@@ -825,8 +862,8 @@ stays consumed. No experience, extra smelting items, or tool requirements are ad
 
 Opening and closing inventory releases gameplay inputs while preserving carried
 velocity and interpolation. Air drag, gravity and collision keep running, just
-as when movement keys are released. The Escape pause menu retains its existing
-motion reset.
+as when movement keys are released. Chat and Escape use the same released-key
+behavior, without a motion reset.
 
 Successful gameplay Q/Ctrl+Q drops request the same six-tick main-hand swing as
 block actions. Empty slots, key repeats and inventory-interface drops do not.
@@ -857,8 +894,8 @@ Smoothed frame timing, independent of the FPS HUD, selects normal, half-density,
 or quarter-density effects with sustained thresholds and gradual recovery.
 Inactive-tab time is excluded, and the quality policy accepts a known frame cap.
 Reduced quality simplifies bounded merge visuals; low quality skips them.
-These settings never affect authoritative items, movement or inventory. Inventory
-continues simulation, while the Escape menu retains its existing pause behavior.
+These settings never affect authoritative items, movement or inventory. Every
+game screen continues world simulation.
 
 ## Verification
 

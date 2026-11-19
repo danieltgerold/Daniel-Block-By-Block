@@ -61,9 +61,9 @@ export class DroppedItems {
     this.piles = this.piles.filter(p => p !== source);
     return target;
   }
-  step(player) {
+  step(player, {pickup=true}={}) {
     this.time += .05;
-    const bounds = pickupBounds(player);
+    const bounds = pickup ? pickupBounds(player) : null;
     for (const pile of this.piles) {
       pile.lots = pile.lots.filter(l => l.expires > this.time + 1e-8);
       pile.count = lotCount(pile.lots, this.time);
@@ -79,7 +79,7 @@ export class DroppedItems {
       pile.vz = motion.blocked.z ? 0 : pile.vz * (motion.grounded ? .6 : .98);
       const bounce = oldVy < 0 ? -oldVy * .2 : 0;
       pile.vy = motion.blocked.y ? (bounce >= .02 ? bounce : 0) : (oldVy - .04) * .98;
-      const touches = pile.x + .125 > bounds.min.x && pile.x - .125 < bounds.max.x
+      const touches = bounds && pile.x + .125 > bounds.min.x && pile.x - .125 < bounds.max.x
         && pile.y + .25 > bounds.min.y && pile.y < bounds.max.y
         && pile.z + .125 > bounds.min.z && pile.z - .125 < bounds.max.z;
       if (touches && this.inventory.capacity(pile.item)) {

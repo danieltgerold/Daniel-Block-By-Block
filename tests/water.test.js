@@ -39,7 +39,7 @@ test('Door arms stay hidden through equip/swing in both hands; buckets use indep
   for (const [id, cap] of [['bucket', 16], ['water.bucket', 1]]) {
     assert.equal(ITEMS.get(id).maxStack, cap); assert.ok(commandCompletions('/give ').includes(`/give ${id} `));
     c.inventory.slots[0] = stack(id); updateEmptyHand(hand, { swingActive: false }, c.inventory);
-    assert.equal(hand.mainItem.geometry.type, 'PlaneGeometry'); assert.equal(hand.doorHands[0].visible, false);
+    assert.equal(hand.mainItem.geometry.type, 'BufferGeometry'); near(hand.mainItem.geometry.boundingBox.max.z-hand.mainItem.geometry.boundingBox.min.z,1/16); assert.equal(hand.doorHands[0].visible, false);
   }
   assert.notEqual(ITEMS.get('bucket').icon, ITEMS.get('water.bucket').icon);
   assert.equal(RECIPES.recipes.has('bucket'), false); assert.deepEqual(BUCKET_RECIPE.output, stack('bucket'));
