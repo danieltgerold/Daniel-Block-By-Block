@@ -45,24 +45,22 @@ class VoxelWorldTest {
     }
 
     /**
-     * Equal-distance hits keep the first edit found, so edits must iterate in insertion order (ruling R9).
-     * Each geometry is checked in both insertion orders; the expected winners were confirmed against
-     * src/voxel-world.js. Three geometries: one plane, one across a chunk border, one whose keys land in
-     * different hash buckets, so a hash-ordered map cannot pass by accident.
+     * Current JS local queries visit numeric chunks, then insertion order within a chunk.
+     * Winners for both insertion orders were checked directly against src/voxel-world.js.
      */
-    @Test void raycastTieBreakFollowsInsertionOrder() {
-        assertTieWinner(new double[] {0.5, 2.5, 0.5}, new double[] {1, -1, 0}, new double[] {1, 2, 0}, new double[] {0, 1, 0});
-        assertTieWinner(new double[] {0.5, 0.5, 2.5}, new double[] {1, 0, -1}, new double[] {1, 0, 2}, new double[] {0, 0, 1});
-        assertTieWinner(new double[] {15.5, 2.5, 0.5}, new double[] {1, -1, 0}, new double[] {16, 2, 0}, new double[] {15, 1, 0});
+    @Test void raycastTiesFollowCurrentQueryIndexOrder() {
+        assertTieWinner(new double[] {0.5, 2.5, 0.5}, new double[] {1, -1, 0}, new double[] {1, 2, 0}, new double[] {0, 1, 0}, null);
+        assertTieWinner(new double[] {0.5, 0.5, 2.5}, new double[] {1, 0, -1}, new double[] {1, 0, 2}, new double[] {0, 0, 1}, null);
+        assertTieWinner(new double[] {15.5, 2.5, 0.5}, new double[] {1, -1, 0}, new double[] {16, 2, 0}, new double[] {15, 1, 0}, new double[] {15, 1, 0});
     }
 
-    private static void assertTieWinner(double[] o, double[] d, double[] a, double[] b) {
+    private static void assertTieWinner(double[] o, double[] d, double[] a, double[] b, double[] fixedWinner) {
         for (double[][] order : new double[][][] {{a, b}, {b, a}}) {
             var w = new VoxelWorld(3);
             for (double[] block : order) w.setBlock(block[0], block[1], block[2], true);
             RaycastHit hit = w.raycast(o[0], o[1], o[2], d[0], d[1], d[2], 4.5);
             assertNotNull(hit);
-            double[] winner = order[0];
+            double[] winner = fixedWinner == null ? order[0] : fixedWinner;
             assertEquals(winner[0], hit.x, "tie winner x");
             assertEquals(winner[1], hit.y, "tie winner y");
             assertEquals(winner[2], hit.z, "tie winner z");

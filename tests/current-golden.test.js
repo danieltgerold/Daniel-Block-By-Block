@@ -23,6 +23,14 @@ test('current movement fixtures exercise supported terrain and their named modes
   assert.ok(permission.slice(0, 80).every(state => !state.sprinting));
   assert.ok(permission.slice(80).every(state => state.sprinting));
   assert.ok(replay('water').some(state => state.inWater));
+  const flow = replay('flowing-water');
+  assert.ok(flow[0].inWater && flow[0].vx > 0, 'flow changes horizontal velocity');
+  const falling = replay('falling-water');
+  assert.ok(falling.some(state => state.inWater && state.vy < 0), 'falling water pulls downward');
+  assert.ok(replay('step-slab').some(state => state.y === 4.5 && state.grounded), 'walk steps onto half slab');
+  const ledge = replay('crouch-ledge');
+  assert.ok(ledge.every(state => state.grounded && state.y === 4), 'crouch cannot cross the pit');
+  assert.ok(ledge.at(-1).z > -3, 'ledge protects the near bank');
 });
 
 test('fixture replay rejects empty, unsupported and obstructed starting states', () => {

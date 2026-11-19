@@ -32,6 +32,21 @@ export function currentFixtures() {
       { x: 0, y: 4, z: 0, id: 'water', state: { level: 0, falling: false } },
       { x: 0, y: 5, z: 0, id: 'water', state: { level: 0, falling: false } },
     ]),
+    fixture('flowing-water', () => ({ forward: 0, right: 1 }), [
+      { x: 0, y: 4, z: 0, id: 'water', state: { level: 0, falling: false } },
+      { x: 1, y: 4, z: 0, id: 'water', state: { level: 3, falling: false } },
+    ]),
+    fixture('falling-water', () => ({ forward: 0, right: 1 }), [
+      { x: 0, y: 4, z: 0, id: 'water', state: { level: 0, falling: true } },
+      { x: 0, y: 5, z: 0, id: 'water', state: { level: 0, falling: true } },
+      ...Array.from({ length: 6 }, (_, y) => ({ x: 1, y, z: 0, id: 'water', state: { level: 0, falling: true } })),
+    ]),
+    fixture('step-slab', () => ({}), [
+      { x: 0, y: 4, z: -2, id: 'oak.slab', state: { type: 'bottom' } },
+    ]),
+    fixture('crouch-ledge', () => ({ crouch: true }),
+      Array.from({ length: 56 }, (_, i) => ({ x: i % 7 - 3, y: Math.floor(i / 14),
+        z: -3 - Math.floor(i % 14 / 7), id: null, state: {} }))),
   ];
 }
 
@@ -73,6 +88,12 @@ export function generateCurrent(outDir) {
     writeFileSync(join(dir, 'fixture.json'), JSON.stringify({ formatVersion: 1, name,
       world, initial, edits, ticks: states.length,
       schedule: 'stepPlayer only; world simulation does not tick' }, null, 2) + '\n');
+    writeFileSync(join(dir, 'fixture.csv'), 'baseY,layers,x,y,z,ticks\n' +
+      [world.baseY, world.layers.join('|'), initial.x, initial.y, initial.z, states.length].join(',') + '\n');
+    writeFileSync(join(dir, 'edits.csv'), 'x,y,z,id,type,facing,half,stairShape,hinge,open,level,falling\n' +
+      edits.map(e => [e.x, e.y, e.z, e.id ?? '', e.state.type ?? '', e.state.facing ?? '',
+        e.state.half ?? '', e.state.shape ?? '', e.state.hinge ?? '', Number(e.state.open ?? false),
+        e.state.level ?? 0, Number(e.state.falling ?? false)].join(',')).join('\n') + (edits.length ? '\n' : ''));
     writeTable(dir, 'inputs.csv', INPUT_FIELDS, fixture.inputs);
     writeTable(dir, 'expected.csv', STATE_FIELDS, states);
   }
