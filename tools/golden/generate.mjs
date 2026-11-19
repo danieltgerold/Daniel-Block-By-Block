@@ -4,12 +4,14 @@
 //   npm run golden            (writes tests/golden, leaves tests/golden/trig alone)
 //   node tools/golden/generate.mjs <dir>
 import { mkdirSync, writeFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createPlayer, stepPlayer, DEFAULT_WALK_SPEED } from '../../src/movement.js';
 import { BLOCK_REACH, VoxelWorld } from '../../src/voxel-world.js';
 import { jumpVelocityForHeight } from '../../src/player-settings.js';
 import { formatBool, formatNumber } from './format.mjs';
+import { generateCurrent } from './current-fixtures.mjs';
 
 const DEFAULT_OUT = new URL('../../tests/golden/', import.meta.url).pathname;
 
@@ -76,9 +78,11 @@ function farFlightInputs() {
 }
 
 function runMovement(edits, inputs) {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   for (const [x, y, z, solid] of edits) world.setBlock(x, y, z, solid);
   const player = { ...createPlayer(), x: 0.5, y: 0, z: 0.5 };
+  assert.ok(world.isSupported(player), 'legacy spawn must be supported');
+  assert.ok(!world.intersectsPlayer(player), 'legacy spawn must be clear');
   const rows = [];
   for (const row of inputs) {
     // Mirrors MovementController.set: a resize that would intersect blocks is refused.
@@ -126,7 +130,7 @@ function raycastCases() {
 }
 
 function runRaycast(edits, cases) {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   for (const [x, y, z, solid] of edits) world.setBlock(x, y, z, solid);
   return cases.map(([ox, oy, oz, dx, dy, dz, reach]) => {
     const hit = world.raycast({ x: ox, y: oy, z: oz }, { x: dx, y: dy, z: dz }, reach);
@@ -142,6 +146,11 @@ function writeCsv(dir, name, header, rows) {
 }
 
 export function generate(outDir = DEFAULT_OUT) {
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, 'legacy-fixture.json'), JSON.stringify({ formatVersion: 1,
+    suites: ['movement', 'raycast'], world: { depth: 3, baseY: -3, layers: ['dirt', 'dirt', 'dirt'] },
+    initial: { x: 0.5, y: 0, z: 0.5 },
+    schedule: 'stepPlayer only; world simulation does not tick' }, null, 2) + '\n');
   const course = courseEdits();
   const scenarios = {
     'obstacle-course': [course, obstacleCourseInputs()],
@@ -164,6 +173,7 @@ export function generate(outDir = DEFAULT_OUT) {
   writeCsv(dir, 'edits.csv', 'x,y,z,solid', rayEdits.map(formatEdit));
   writeCsv(dir, 'cases.csv', 'ox,oy,oz,dx,dy,dz,reach', cases.map(c => c.map(formatNumber).join(',')));
   writeCsv(dir, 'expected.csv', 'hit,x,y,z,nx,ny,nz,distance', runRaycast(rayEdits, cases));
+  generateCurrent(outDir);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) generate(process.argv[2] ?? DEFAULT_OUT);
