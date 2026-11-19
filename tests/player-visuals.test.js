@@ -92,7 +92,7 @@ test('angle interpolation crosses +/-180 by the short path', () => {
 });
 
 test('holding W against a wall settles actual-displacement-driven limbs', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   for (let y = 0; y < 3; y++) world.setBlock(0, y, -2, true);
   const controller = new MovementController(world);
   controller.respawn({ x: 0.5, y: 0, z: 0.5 });
@@ -113,7 +113,7 @@ test('holding W against a wall settles actual-displacement-driven limbs', () => 
 
 test('walking pose is interpolated and agrees at different rendering frame rates', () => {
   const controllers = [30, 60, 144, 240].map(fps => {
-    const controller = new MovementController(new VoxelWorld());
+    const controller = new MovementController(new VoxelWorld({ depth: 3 }));
     controller.keyDown('KeyW');
     for (let i = 0; i < fps * 2; i++) controller.update(1 / fps, { yaw: degrees(179), pitch: 0.2 });
     return controller;
@@ -127,14 +127,12 @@ test('walking pose is interpolated and agrees at different rendering frame rates
   }
 });
 
-test('first person hides the whole avatar by default and the menu option shows one body without head or duplicate right arm', () => {
+test('first person hides the whole avatar and both third-person views show it', () => {
   const model = createPlayerModel();
   const feet = { x: 0.5, y: 0, z: 0.5 };
   animatePlayerModel(model, feet, pose(), 0);
   assert.equal(model.visible, false);
   near(model.position.x, feet.x); near(model.position.z, feet.z);
-  animatePlayerModel(model, feet, pose(), 0, true);
-  assert.equal(model.visible, true);
   assert.equal(model.userData.joints.Head.visible, false);
   assert.equal(model.userData.joints['Right Arm'].visible, false);
   for (const mode of [1, 2]) {
@@ -192,8 +190,8 @@ for (const mode of [1, 2]) {
 }
 
 test('six-tick swing repeats during mining, stops on release and does not change walk phase', () => {
-  const mining = new MovementController(new VoxelWorld());
-  const walking = new MovementController(new VoxelWorld());
+  const mining = new MovementController(new VoxelWorld({ depth: 3 }));
+  const walking = new MovementController(new VoxelWorld({ depth: 3 }));
   mining.keyDown('KeyW'); walking.keyDown('KeyW');
   mining.setMining(true);
   const starts = [];

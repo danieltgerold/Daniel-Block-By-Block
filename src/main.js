@@ -2,10 +2,23 @@
 import { MovementController } from './movement.js';
 import { VoxelWorld } from './voxel-world.js';
 import { ChunkRenderer } from './chunk-renderer.js';
+import { BlockOutline } from './block-outline.js';
 import { EntityHitboxes } from './entity-hitboxes.js';
+import { GameplayHUD, gameSimulationRunning, updateCrosshair } from './gameplay-hud.js';
+import { InventoryUI } from './inventory-ui.js';
+import { InventoryPreview } from './inventory-preview.js';
+import { DroppedItemRenderer } from './dropped-item-renderer.js';
+import { FallingBlockRenderer } from './falling-block-renderer.js';
+import { getBlockAssets } from './block-assets.js';
+import { BlockParticles } from './block-particles.js';
+import { BlockParticleRenderer } from './block-particle-renderer.js';
+import { AdaptiveVisualQuality } from './visual-quality.js';
+import { BlockPlacement, bindPlacementInput } from './block-placement.js';
+import { BlockBreaking } from './block-breaking.js';
+import { BreakingIndicator } from './breaking-indicator.js';
 import { ChatUI, isTextEntry } from './chat-ui.js';
 import { createPlayerModel, animatePlayerModel, nextCameraMode, updatePlayerCamera,
-  createEmptyHand, updateEmptyHand, renderPlayerScene } from './player-visuals.js';
+  createEmptyHand, updateEmptyHand, renderPlayerScene, syncEquipment } from './player-visuals.js';
 import './style.css';
 
 const canvas = document.querySelector('#world');
@@ -13,17 +26,16 @@ const intro = document.querySelector('#intro');
 const startButton = document.querySelector('#start');
 const startNote = document.querySelector('#start-note');
 const crosshair = document.querySelector('#crosshair');
-const playingHint = document.querySelector('#playing-hint');
 const world = new VoxelWorld();
 const controller = new MovementController(world);
 controller.respawn(world.findSpawn());
 let yaw = 0;
 let pitch = -0.12;
+controller.getAim = () => ({ yaw, pitch });
 let active = false;
 let previousTime = null;
 let cameraMode = 0;
 let hitboxesVisible = false;
-let primaryClickQueued = false;
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -41,92 +53,87 @@ const baseFov = camera.fov;
 camera.rotation.order = 'YXZ';
 const emptyHand = createEmptyHand(camera.aspect);
 
-// One texture tile covers one block face; retain filtered lines without shimmer.
-const gridCanvas = document.createElement('canvas');
-gridCanvas.width = gridCanvas.height = 128;
-const gridContext = gridCanvas.getContext('2d');
-gridContext.fillStyle = '#d9dfcd';
-gridContext.fillRect(0, 0, 128, 128);
-gridContext.strokeStyle = '#bac4ae';
-gridContext.lineWidth = 2;
-gridContext.beginPath();
-// Draw both sides so filtering wraps seamlessly at the tile boundary.
-gridContext.rect(0, 0, 128, 128);
-gridContext.stroke();
-const gridTexture = new THREE.CanvasTexture(gridCanvas);
-gridTexture.colorSpace = THREE.SRGBColorSpace;
-gridTexture.wrapS = gridTexture.wrapT = THREE.RepeatWrapping;
-gridTexture.minFilter = THREE.LinearMipmapLinearFilter;
-gridTexture.magFilter = THREE.LinearFilter;
-gridTexture.generateMipmaps = true;
-gridTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-const material = new THREE.MeshBasicMaterial({ map: gridTexture, vertexColors: true, fog: true });
+// Reuse crisp block textures and materials across all generated ground layers.
+const material = getBlockAssets(renderer.capabilities.getMaxAnisotropy()).material;
 const chunks = new ChunkRenderer(world, scene, material);
-const selection = new THREE.LineSegments(
-  new THREE.EdgesGeometry(new THREE.BoxGeometry(1.004, 1.004, 1.004)),
-  new THREE.LineBasicMaterial({ color: '#fff4ad' }),
-);
+const droppedRenderer = new DroppedItemRenderer(scene);
+const fallingRenderer = new FallingBlockRenderer(scene);
+const visualQuality = new AdaptiveVisualQuality();
+controller.particles = new BlockParticles(world, { quality: visualQuality });
+const particleRenderer = new BlockParticleRenderer(scene);
+const selection = new BlockOutline();
 selection.visible = false;
 scene.add(selection);
+const breakingIndicator = new BreakingIndicator(); scene.add(breakingIndicator);
 
 function targetBlock(feet = controller.renderState()) {
   return controller.targetBlock(feet, yaw, pitch);
 }
 
-canvas.addEventListener('contextmenu', event => event.preventDefault());
-function editBlock(place, feet = controller.renderState()) {
-  const hit = targetBlock(feet);
-  if (!hit) return false;
-  let { x, y, z } = hit;
-  if (place) {
-    if (!Math.hypot(hit.normal.x, hit.normal.y, hit.normal.z)) return false;
-    x += hit.normal.x; y += hit.normal.y; z += hit.normal.z;
-    if (!world.canPlaceBlock(x, y, z, [controller.player, controller.renderState()])) return false;
-  }
-  const changed = world.setBlock(x, y, z, place);
-  if (changed) chunks.invalidateBlock(x, z);
-  return changed;
-}
+const breaking = new BlockBreaking({ controller, world, getAim: () => ({ yaw, pitch }),
+  canInteract: () => active && document.pointerLockElement === canvas && document.hasFocus() && !document.hidden,
+  onBreak: (x, y, z) => chunks.invalidateBlock(x, z, true) });
+const placement = new BlockPlacement({ controller, world, getAim: () => ({ yaw, pitch }),
+  onUse: block => {
+    if (block.definition.interaction === 'furnace') { chatUI.openFurnace(world.furnaceAt(block.x, block.y, block.z)); return true; }
+    if (block.definition.interaction !== 'crafting.table') return false; chatUI.openInventory(3); return true;
+  },
+  canInteract: () => active && document.pointerLockElement === canvas && document.hasFocus() && !document.hidden,
+  onPlace: (x, y, z) => { chunks.invalidateBlock(x, z, true); controller.lowerMainHand(); } });
+bindPlacementInput(placement, canvas, document, window);
 controller.onTick = player => {
-  if (player.animation.swingStartedThisTick && (controller.miningHeld || primaryClickQueued)) {
-    editBlock(false, player);
-  }
-  primaryClickQueued = false;
+  if (!active) return;
+  breaking.tick();
+  placement.tick();
 };
 canvas.addEventListener('mousedown', event => {
+  if (active && event.button === 1) {
+    event.preventDefault(); controller.pickBlock(yaw, pitch); return;
+  }
   // The click that captures the mouse does not also break a block.
-  if (!active || (event.button !== 0 && event.button !== 2)) return;
+  if (!active || event.button !== 0) return;
   event.preventDefault();
   if (event.button === 0) {
-    primaryClickQueued = true;
-    controller.setMining(true);
-    controller.requestSwing();
-  } else if (editBlock(true)) {
-    controller.requestSwing();
+    breaking.press();
   }
 });
 document.addEventListener('mouseup', event => { if (event.button === 0) controller.setMining(false); });
 
-function clearInput() { primaryClickQueued = false; controller.pause(); }
+function clearInput(options) { controller.pause(options); }
 function renderInputMode(mode) {
   active = mode === 'playing';
   intro.hidden = mode !== 'menu';
-  crosshair.hidden = !active;
-  playingHint.hidden = !active;
+  document.getElementById('death-screen').hidden = mode !== 'death';
+  updateCrosshair(crosshair, mode, cameraMode);
   document.body.classList.toggle('is-playing', active);
+  document.body.classList.toggle('world-view', mode !== 'menu');
+  hud.root.hidden = mode === 'menu' || mode === 'death';
+  inventoryUI.hotbar.hidden = !['playing', 'ready', 'chat'].includes(mode);
   previousTime = null;
 }
 
 let profileStorage = null;
 try { profileStorage = window.localStorage; } catch { /* Session identity still works without browser storage. */ }
+const hud = new GameplayHUD(document, profileStorage);
+const inventoryUI = new InventoryUI({ inventory: controller.inventory, document, window,
+  getGameMode: () => controller.gameMode,
+  onClose: () => chatUI.closeInventory(), onGameplayDrop: () => controller.requestSwing() });
+inventoryUI.preview = new InventoryPreview(document.getElementById('inventory-preview'), controller.inventory);
 const chatUI = new ChatUI({ document, window, controller, clearInput, requestCapture: captureMouse,
   requestUnlock: () => { if (document.pointerLockElement === canvas) document.exitPointerLock(); },
-  onModeChange: renderInputMode,
+  onModeChange: renderInputMode, inventoryUI,
   onCameraCycle: () => { cameraMode = nextCameraMode(cameraMode); },
   onHitboxToggle: () => { hitboxesVisible = !hitboxesVisible; }, storage: profileStorage });
+controller.onTeleport = () => {
+  breaking.cancel();
+  previousTime = null;
+  refreshWorldView();
+};
+controller.onDeath = () => chatUI.showDeath();
+document.getElementById('respawn').addEventListener('click', () => chatUI.respawn());
 
 async function captureMouse() {
-  if (chatUI.mode === 'chat') return false;
+  if (chatUI.mode === 'chat' || chatUI.mode === 'inventory' || chatUI.mode === 'death') return false;
   if (isTextEntry(document.activeElement)) document.activeElement.blur();
   try {
     if (!canvas.requestPointerLock) throw new Error('Pointer lock unavailable');
@@ -141,6 +148,10 @@ async function captureMouse() {
 }
 startButton.addEventListener('click', captureMouse);
 canvas.addEventListener('click', () => { if (!active && chatUI.mode !== 'chat') captureMouse(); });
+canvas.addEventListener('wheel', event => {
+  if (!active) return;
+  event.preventDefault(); controller.inventory.select(controller.inventory.selected + Math.sign(event.deltaY));
+}, { passive: false });
 document.addEventListener('pointerlockchange', () => chatUI.onPointerLockChange(document.pointerLockElement === canvas));
 document.addEventListener('pointerlockerror', () => {
   startNote.textContent = 'Mouse capture was blocked. Click again, or open this page directly in a desktop browser.';
@@ -165,27 +176,46 @@ window.addEventListener('resize', () => {
 });
 
 function animate(time) {
+  visualQuality.recordFrame(time, { active: gameSimulationRunning(chatUI.mode) && !document.hidden && document.hasFocus() });
   const dt = previousTime === null ? 0 : (time - previousTime) / 1000;
   previousTime = time;
-  if (active) {
-    controller.update(dt, { yaw, pitch });
-    if (controller.player.y < -32) controller.respawn(world.findSpawn(controller.size));
+  if (gameSimulationRunning(chatUI.mode)) {
+    controller.update(dt, { yaw, pitch, gameplayEnabled: active });
   }
+  const position = refreshWorldView();
+  chatUI.updateVisibility();
+  renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);
+  if (inventoryUI.isOpen && !controller.inventory.furnace && (inventoryUI.creative.active
+    ? inventoryUI.creative.tab === 'inventory' : controller.inventory.crafting.size === 2)) inventoryUI.preview.render();
+  hud.renderedFrame(time, position);
+  hud.updateVitals(controller,chatUI.mode);
+}
+
+function refreshWorldView() {
   const position = controller.renderState();
-  animatePlayerModel(playerModel, position, position.animation, cameraMode, chatUI.showFirstPersonBody);
-  updateEmptyHand(emptyHand, position.animation);
+  updateCrosshair(crosshair, chatUI.mode, cameraMode);
+  animatePlayerModel(playerModel, position, position.animation, cameraMode, controller.inventory);
+  syncEquipment(playerModel, controller.inventory);
+  updateEmptyHand(emptyHand, position.animation, controller.inventory);
   updatePlayerCamera(camera, cameraMode, position, yaw, pitch, world);
+  document.body.classList.toggle('underwater', world.fluids.submerged(camera.position));
   const fov = baseFov * position.fovMultiplier;
   if (Math.abs(camera.fov - fov) > 1e-8) {
     camera.fov = fov;
     camera.updateProjectionMatrix();
   }
+  // Camera pose/FOV must be current before entity culling, including F5 changes.
+  droppedRenderer.update(controller.drops, controller.accumulator / .05, camera, visualQuality);
+  fallingRenderer.update(world.falling, controller.accumulator / .05, camera);
+  particleRenderer.update(controller.particles, controller.accumulator / .05, camera);
   chunks.update(camera);
   const target = active ? targetBlock() : null;
-  selection.visible = Boolean(target);
-  if (target) selection.position.set(target.x + 0.5, target.y + 0.5, target.z + 0.5);
-  chatUI.updateVisibility();
-  hitboxes.update([{ id: chatUI.profile.player.id, ...position, local: true }], cameraMode, hitboxesVisible);
-  renderPlayerScene(renderer, scene, camera, emptyHand, cameraMode);
+  selection.update(target, world);
+  breakingIndicator.update(breaking, target, world, camera);
+  hitboxes.update([{ id: chatUI.profile.player.id, ...position, local: true }, ...controller.drops.piles.map(p => ({
+    id: `drop:${p.id}`, bounds: { min: { x: p.x - .125, y: p.y, z: p.z - .125 }, max: { x: p.x + .125, y: p.y + .25, z: p.z + .125 } },
+  }))], cameraMode, hitboxesVisible);
+  hud.updatePosition(position);
+  return position;
 }
 renderer.setAnimationLoop(animate);

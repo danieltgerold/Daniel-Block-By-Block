@@ -17,6 +17,8 @@ export class EntityHitboxes {
   }
   update(entities, cameraMode, enabled) {
     this.group.visible = enabled;
+    const live = new Set(entities.map(entity => entity.id));
+    for (const [id, line] of this.lines) if (!live.has(id)) { line.removeFromParent(); this.lines.delete(id); }
     for (const line of this.lines.values()) line.visible = false;
     if (!enabled) return;
     for (const entity of entities) {
@@ -27,7 +29,7 @@ export class EntityHitboxes {
         line.name = `Hitbox ${entity.id}`;
         this.lines.set(entity.id, line); this.group.add(line);
       }
-      const { min, max } = playerBounds(entity);
+      const { min, max } = entity.bounds ?? playerBounds(entity);
       line.position.set((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2);
       line.scale.set(max.x - min.x, max.y - min.y, max.z - min.z);
       line.visible = true;

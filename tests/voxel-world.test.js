@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { VoxelWorld, blockIntersectsPlayer } from '../src/voxel-world.js';
@@ -8,7 +8,7 @@ import { MovementController, createPlayer, stepPlayer } from '../src/movement.js
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-8, `Expected ${b}, got ${a}`);
 
 test('terrain contains exactly three one-meter layers, including negative coordinates', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   for (const x of [-17, -1, 0, 16]) {
     assert.equal(world.hasBlock(x, 0, x), false);
     for (const y of [-1, -2, -3]) assert.equal(world.hasBlock(x, y, x), true);
@@ -22,7 +22,7 @@ test('terrain contains exactly three one-meter layers, including negative coordi
 });
 
 test('selection ray hits successive layers and then the void after digging through', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   const origin = { x: 0.5, y: 1.8, z: 0.5 };
   for (const y of [-1, -2, -3]) {
     const hit = world.raycast(origin, { x: 0, y: -1, z: 0 });
@@ -78,7 +78,7 @@ test('isolated geometry is exactly a 1m cube with all triangles facing outwards'
 });
 
 test('internal faces are omitted and greedy merging reduces flat terrain at every LOD', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   for (const level of [1, 2, 4]) {
     const mesh = buildChunkMesh(world, 0, 0, level);
     assert.equal(mesh.quads, 2, 'Only the merged top and bottom are exposed');
@@ -94,7 +94,7 @@ test('internal faces are omitted and greedy merging reduces flat terrain at ever
 });
 
 test('distant LOD uses fewer polygons for small edits; nearby mesh retains exact holes', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   world.setBlock(1, -1, 1, false);
   const nearMesh = buildChunkMesh(world, 0, 0, 1);
   const farMesh = buildChunkMesh(world, 0, 0, 4);
@@ -110,7 +110,7 @@ test('distant LOD uses fewer polygons for small edits; nearby mesh retains exact
 });
 
 test('swept player collision stops at walls and floors without tunneling', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   world.setBlock(1, 0, 0, true);
   const wall = world.movePlayer({ x: 0.5, y: 0, z: 0.5 }, { x: 3, y: 0, z: 0 });
   near(wall.x, 0.7);
@@ -122,7 +122,7 @@ test('swept player collision stops at walls and floors without tunneling', () =>
 });
 
 test('standing on placed blocks and head collisions respect the 1.8m player', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   world.setBlock(0, 0, 0, true);
   const landing = world.movePlayer({ x: 0.5, y: 2, z: 0.5 }, { x: 0, y: -2, z: 0 });
   near(landing.y, 1);
@@ -137,7 +137,7 @@ test('standing on placed blocks and head collisions respect the 1.8m player', ()
 });
 
 test('breaking support makes the player fall into the hole and through all three layers', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   const controller = new MovementController(world);
   controller.respawn({ x: 0.5, y: 0, z: 0.5 });
   world.setBlock(0, -1, 0, false);
@@ -160,7 +160,7 @@ test('breaking support makes the player fall into the hole and through all three
 });
 
 test('jump measurements remain relative to takeoff height on placed blocks', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   world.setBlock(0, 0, 0, true);
   const controller = new MovementController(world);
   controller.respawn({ x: 0.5, y: 1, z: 0.5 });
@@ -172,7 +172,7 @@ test('jump measurements remain relative to takeoff height on placed blocks', () 
 });
 
 test('chunk renderer culls behind-camera chunks and loads all three distance LODs', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   const scene = new THREE.Scene();
   const material = new THREE.MeshBasicMaterial();
   const chunks = new ChunkRenderer(world, scene, material, { buildsPerFrame: 1000 });
@@ -199,7 +199,7 @@ test('chunk renderer culls behind-camera chunks and loads all three distance LOD
 });
 
 test('editing a chunk boundary invalidates both neighbors and replacement disposes old geometry', () => {
-  const world = new VoxelWorld();
+  const world = new VoxelWorld({ depth: 3 });
   const scene = new THREE.Scene();
   const material = new THREE.MeshBasicMaterial();
   const chunks = new ChunkRenderer(world, scene, material);

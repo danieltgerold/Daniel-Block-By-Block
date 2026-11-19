@@ -28,22 +28,55 @@ ignored; source files and the package lock are tracked.
 - Release R while holding W to keep sprinting, including in the air and after
   landing. Releasing forward input, or canceling it with S, stops sprinting.
 - Hold Space to jump repeatedly whenever grounded and the cooldown permits.
+- In Creative, two distinct **Space** presses within seven game ticks toggle
+  flight. Space rises, Left Shift descends, and releasing both eases to hover.
+  WASD follows yaw only; R or double-W sprints faster. Landing or switching to
+  Survival ends flight and restores normal gravity. Shift crouches again after
+  flight ends. Chat, inventory, menus and focus loss clear held inputs and tap
+  history; pausing a flight keeps it active but clears its movement momentum.
 - Hold **Left Shift** to crouch and avoid walking off ledges. Release to stand
   when there is enough headroom. An existing sprint can carry into crouching;
   starting a new sprint requires standing.
 - F5 cycles first-person, third-person rear, and third-person front views.
   Held-key repeats do not cycle again; F5's normal page reload is suppressed.
-- Default reach is **4.5 blocks** at size 1; `/reach` changes it. The outline marks the target.
+- Switching to Survival sets reach to **4.5 blocks** at size 1; switching to
+  Creative sets it to **5 blocks**. `/reach` changes it, and its `default` reset
+  follows the current mode. Reach continues to scale with `/size`.
 - **Left click / hold** mines the targeted block and swings the bare hand.
   A swing lasts six ticks (0.30 s); continued mining may restart it at tick three.
-- **Right click** places a block against the targeted face. Placement inside the
-  player's physical or interpolated body is rejected. The context menu is suppressed.
+- **Right click** queues a press for the next 20 Hz physics tick. Each queued
+  press attempts placement even during cooldown. Each attempt, successful or
+  not, resets the four-tick repeat delay; a hold repeats every 0.20 seconds.
+  Every attempt uses fresh eye targeting, current reach and the selected
+  main-hand stack. Only empty destinations outside the collision box succeed.
+  Success consumes one selected block and requests one swing; failure consumes none.
+  Close-up placement is allowed with no minimum eye distance. All six entered
+  faces work, and cubes may touch the scaled hitbox but must not overlap it.
+  The offhand is display/storage only. Active mining prevents placement. Loaded
+  edited chunks and their neighbors rebuild immediately, including boundaries.
+  Releasing the button, opening chat or menus, losing focus or releasing mouse
+  capture cancels the hold and requires a new press. Browser context menus are
+  suppressed while playing.
+- **E** opens/closes inventory; Escape closes it. **1-9** or the mouse wheel
+  selects a hotbar slot, **F** swaps the selected stack and offhand, and **Q**
+  drops one item (**Ctrl+Q** drops the selected stack). Middle click picks a
+  matching hotbar stack. Survival can swap a matching main-inventory stack in;
+  Creative creates one targeted block in an empty hotbar slot, or replaces the
+  selected slot while saving the displaced stack to inventory/dropping overflow.
+  No target within reach means no change, in any F5 view.
+- The first-person crosshair is a crisp translucent 15x15 GUI-pixel plus with
+  difference blending. It hides in third person and while chat, inventory or
+  menus have focus; eye-based targeting continues in all camera views.
 - Esc releases the mouse. Unlocking, switching windows, or hiding the tab clears
   held inputs, sprint, and double-tap history. Click again to resume.
 - **F3 + B** toggles depth-tested collision outlines, including the local player
   in either third-person view. Keyboard repeats are ignored.
-- The Escape menu's **Show body in first person** checkbox is off by default
-  and saved locally. It shows the body without the head or duplicate right arm.
+- The Escape menu has independent **Show Coordinates** and **Show FPS** toggles,
+  both on by default and saved locally. The top-left display uses feet X/Y/Z,
+  rounded to whole blocks without changing physics precision. Positive X is
+  east, Y is up, and Z is south; the world origin stays fixed. Half values round
+  away from zero, and negative zero displays as zero. FPS averages rendered
+  frame intervals and updates twice per second.
 
 ## Chat, names, and player settings
 
@@ -66,21 +99,106 @@ such as `/s`. Enter submits the completed command.
 | Command | Size-1 meaning | Normal range | Default |
 | --- | --- | --- | --- |
 | `/speed <number>` | Walking blocks/s | 0-255 | 4.3171806167 |
-| `/reach <number>` | Eye-to-hit blocks | 0-255 | 4.5 |
+| `/reach <number>` | Eye-to-hit blocks | 0-255 | 4.5 Survival / 5 Creative |
 | `/jump <number>` | Apex above takeoff, blocks | 0-255 | 1.252203352512 |
 | `/size <number>` | Player size multiplier | 0.1-4 | 1 |
 
 All accept decimals and `default`; each reset changes only its own setting.
 `/default` resets all four settings together, subject to the same resize checks.
 `/help` is one compact multiline server reply, with range details kept in errors.
+`/tp <x> <y> <z>` teleports the feet to exact finite coordinates, including air
+or inside blocks. Commas also work, for example `/tp 10, 64, -20`. Each axis may
+use `~` for its current coordinate or `~offset`, for example `/tp ~ ~1 ~-2`.
+All relative values resolve against one position snapshot. Tab suggests
+`~ ~ ~` for the coordinates. Negative and decimal values are accepted.
+Teleporting clears velocity, held inputs and
+interpolation, and immediately refreshes the camera, hitbox and nearby chunks.
+Aim and player settings are preserved. `/tp` also appears in help and autocomplete.
+
+`/gamemode survival` or `/gamemode creative` changes the mode for the current
+session, with argument autocomplete and a server confirmation. New loads start
+in Survival. Survival consumes one selected block per successful placement
+and breaking uses the block's drop rule. Creative preserves the selected stack
+and breaking creates no drop, but an empty main hand still cannot place. Mode
+changes preserve inventory, terrain and vitals and cancel active mining/eating.
+Creative flight uses the controls described above.
+
+Flight uses the same interpolated 20 Hz controller and swept scaled hitbox.
+At size one its separate ability acceleration is 0.05 (0.10 while sprinting),
+with the existing 0.98 input shaping and 0.91 horizontal retention. Settled
+straight speeds are 10.888889 and 21.777778 blocks/s. Vertical input adds
+0.15 blocks/tick per tick, followed by 0.60 retention without gravity. Both
+accelerations scale with size; `/speed` retains its walking-speed meaning.
+The camera smoothly combines the 1.1 flying multiplier with sprint FOV.
+
+## Inventory and collectible items
+
+Registered blocks stack to 64 and have cached, static three-face isometric icons
+shared across inventory, hotbar and cursor slots. World, held and dropped blocks
+use the corresponding block's face textures. Dirt is the fallback block item.
+Third-person blocks use Java's ordered hand/block-model
+transforms, converting only the shoulder/output frame with the rig's X/Y-flipped
+basis: block geometry already uses Y-up, so flipping its input frame as well
+would invert Grass Block faces. A single 0.9375 render scale gives a side length
+of 0.3515625 blocks at size one; both attachments
+follow the animated shoulders. Held arms halve their base walk pitch and add
+the Java hold pose before crouch/action offsets. First-person item transforms
+remain on their separate path. Inventory starts
+empty for the session; `/give <item> [quantity]` defaults to one, fills
+partial storage stacks before empty slots, and drops all overflow near the
+player. Quantities use exact integers, including totals larger than JavaScript's
+safe Number range. Tab completes the item ID and leaves a space for quantity.
+
+There are 27 main slots, nine shared HUD/inventory hotbar slots, four typed
+armor slots and one offhand slot. These blocks cannot enter armor slots. The
+2x2 crafting grid/output is active, with the same stack controls. Item definitions and
+armor slot rules support future items. The separate preview uses the actual
+colored rig and equipment at size one; its limited mouse-follow pose never
+changes player aim. Offhand contents display in world and first-person views.
+
+Left click picks up, merges or swaps full stacks; right click takes the rounded-up
+half or places one. With a held cursor stack, left drag shares equal whole-number
+amounts across eligible distinct slots, right drag places one per slot, and both
+show previews. Shift-click transfers between main inventory and hotbar, partial
+stacks first. Double click collects matching stacks up to 64; shift-double-click
+transfers matching source-area stacks. Hover plus 1-9 or F swaps with that hotbar
+slot or offhand. Hover plus Q/Ctrl+Q drops one/all. Left/right clicking outside
+the panel drops all/one cursor items. Closing returns cursor items to storage
+and drops any remainder. Inventory blocks all gameplay input and releases the
+mouse, but the 20 Hz world simulation keeps running, including gravity, drops,
+pickup, merging and despawn. Closing uses the same capture/resume flow as chat.
+The Escape pause menu and lost-focus state still pause simulation.
+Static inventory labels/instructions have been removed. Hovering a stack shows
+its item name immediately in an in-game tooltip; stack counts remain visible.
+The top gameplay-controls hint and movement-test milestone banner are removed.
+
+Survival block drops make collectible cube items with gravity and voxel
+collision. Piles show 1 cube for one item, 2 for 2–16, 3 for 17–32, 4 for 33–48,
+and 5 for 49 or more. Extra cubes have stable offsets and shared geometry/materials.
+Only the visual group bobs by `sin(ageTicks/10 + phase)*0.1 + 0.1` above a fixed
+height offset and rotates by `ageTicks/20 + phase`; physics bounds never bob.
+Touching picks up as much as storage can hold. Nearby
+compatible drops with exactly the same item ID merge within two blocks; smaller sources visually travel into
+the live larger pile over 0.25 seconds. Quantities transfer once immediately;
+the effect is visual-only, follows subsequent merges and ends on pickup/expiry.
+A visible pile may exceed 64, while
+inventory stacks stay capped. Each merged lot retains its original five-minute
+active-game-time expiry. Thrown items start at the player's X/Z and 0.3 blocks
+below the eye, with 0.3 blocks/tick along the full aim, +0.1 upward velocity and
+up to 0.02 horizontal spread. They use 0.04 gravity, 0.98 air drag, a small
+landing bounce and a 40-tick (two-second) pickup delay. Drops,
+inventory and block edits currently reset together on page reload.
 Values are stored independently. Effective speed, reach and jump height are
 their size-1 values times size. Thus speed 6 at size 2 is 12 blocks/s; sprint
 retains its 1.3 multiplier. Zero speed, reach and jump height are supported.
 Jump launch is tuned against the discrete tick apex; launch velocity and
 gravity scale together with size, preserving proportional flight time.
 
-Enter `Up Up Down Down Left Right Left Right B A Enter` within 60 seconds to
-enable developer mode for this load. Auto-repeat is ignored; a wrong key or
+Use `/devmode`, or enter `Up Up Down Down Left Right Left Right B A Enter`
+within 60 seconds, to enable developer mode for this load. The sequence uses
+physical B/A key codes when available, tolerates Shift/modifier key presses,
+and consumes matched keys outside text fields so they do not move the player
+or navigate the page. Auto-repeat is ignored; a wrong key or
 timeout resets the sequence. The final Enter is consumed, even in text fields.
 The server chat announces entry. Developer mode removes all four normal range
 limits, while requiring finite nonnegative speed/reach/jump and finite positive
@@ -88,13 +206,15 @@ size. Effective overflow and resizing into terrain are still rejected. This
 mode is not saved and starts disabled on a fresh load.
 
 The existing Escape screen has a **Player name** field and **Save name** button.
-The default is `player 1`. Accepted names are trimmed and saved in local storage;
+The default is `player1`. Accepted names are saved in local storage;
 blank names and all capitalizations of `server` are rejected beside the field.
-Names allow at most 16 ASCII letters, numbers and spaces, after trimming.
+Names allow at most 16 ASCII letters and numbers. All whitespace, including
+leading/trailing spaces, is invalid. Legacy saved names remove whitespace on
+load while keeping the same stable identity, with invalid names using a default.
 Invalid changes retain the last valid name. Player identity is a separate stable
 local ID, independent of display name. The reusable player directory checks join
 and rename uniqueness without case sensitivity and allocates the first free
-`player N` default for future multiplayer. An actual server will own that
+`playerN` default for future multiplayer. An actual server will own that
 registry and authenticate IDs; the current game remains single-player.
 
 All messages go through one delivery path. Public outgoing messages have an
@@ -108,8 +228,9 @@ button when recapture is denied.
 
 ## Blocks and collision
 
-Every block is **1 m x 1 m x 1 m**. The ground contains exactly **three layers**:
-voxel y=-1, -2, and -3, with the initial walking surface at y=0. The world extends
+Every block is **1 m x 1 m x 1 m**. New flat worlds contain **four layers**:
+Bedrock at Y=0, Dirt at Y=1 and Y=2, and Grass Block at Y=3. The walking surface
+and safe default feet position are Y=4. The world extends
 horizontally as you travel; only edits are stored. Edits remain while traveling
 away and back, but are currently session-only and reset on page reload.
 
@@ -119,15 +240,93 @@ targets 1.62*s standing or 1.27*s crouching in every F5 mode, easing halfway
 each tick with render interpolation. Crouching scales movement input by 0.30.
 While Shift is held, a 0.60*s downward footprint probe protects ledges by
 reducing horizontal motion in 0.05*s steps; upward jumps skip this check.
+Grounded contact uses that same full footprint with a contact-thin probe at
+the actual feet height. Overhanging players can stop and stand without a
+horizontal shift. The edge guard subdivides movement at edited voxel-face
+crossings to detect unsupported intervals along the path, including narrow
+gaps at fractional sizes. Blocked edge motion clears its horizontal momentum;
+vertical movement and gravity still determine actual floor contact.
 The world model scales uniformly about the feet. Growth is rejected if the new
 box intersects a solid voxel. Placement checks use the same scaled body.
 Swept collision against the actual unit blocks handles walls, floors, ceilings,
-placed blocks, and holes. Digging all three layers opens the void; there is no
-invisible floor below them. Falling below y=-32 respawns you at a supported
-column near the original spawn, with movement inputs cleared.
+placed blocks, and holes. Bedrock is a real, unbreakable Survival block, while
+Creative can remove it and open the void; there is no invisible floor below it.
+Below Y=-64, void damage removes four health points every ten ticks in both
+modes. Death opens a Respawn screen; respawn finds a safe supported column and
+clears movement inputs. There is no automatic Y=-32 respawn anymore.
 
 Jump peak is measured internally relative to the takeoff surface. The former
 Live Telemetry panel and block-unit label have been removed from the game UI.
+
+## Survival block breaking
+
+Holding primary click advances a separate 20 Hz breaking controller while the
+same reachable block remains targeted. Its animation clock does not decide
+when a block breaks. Release, menus/inventory, reach loss, a new target, or any
+meaningful target mutation cancels progress; switching faces on the same block does not.
+A successful non-instant break starts a six-tick interval before continued
+holding can progress on the next block. Existing drops stay unchanged, including
+bare-hand Stone, Cobblestone and Furnace drops; a door removes both halves once.
+
+The central bare-hand durations are Dirt/Sand 15 ticks, Grass/Gravel 18,
+Stone 150, Cobblestone 200, Glass 9, Leaves 6, wood logs/planks/slabs/stairs/fences
+60, wood doors 90, Crafting Table 75 and Furnace 350. Double slabs also take 60.
+Bedrock is unbreakable in Survival. Eyes underwater reduce per-tick progress to
+one fifth, and being airborne does so again, stacking to one twenty-fifth.
+These modifiers are sampled every tick. A shared calculation uses mining speed
+divided by hardness and by 30 (harvestable) or 100 (missing a required tool).
+Item definitions can later supply tool type, speed and level. Normal items use
+bare-hand speed. Harvest metadata affects timing independently of drops: Stone,
+Cobblestone and Furnace retain their current drops without adding tools today.
+
+A reused pair of contrasting planes displays the bar on the hit shape's actual
+exposed face, including stair unions, slabs and doors. The light rectangle fills left to right inside
+the dark background, draws after opaque block materials while testing normal
+world depth, and disappears when inactive,
+unbreakable or completed. Creative clicks break immediately, including Bedrock,
+without drops or a progress bar. Its existing held-repeat/swing behavior remains.
+Small hit particles and completion bursts use the existing particle system.
+
+## Health, hunger and food
+
+Survival starts with 20 health, 20 hunger, 5 saturation and zero exhaustion.
+Ten original pixel hearts and ten food icons above the hotbar show full, half
+and empty points. Creative hides these bars and preserves vitals without normal
+action exhaustion or fall damage; the void can still kill Creative players.
+Developer mode alone shows saturation beside the hunger bar.
+
+The fixed 20 Hz `PlayerVitals` clock charges actual ground sprint distance
+(0.1/block), swimming distance (0.01/block), normal/sprint takeoffs (0.05/0.2)
+and successful breaking (0.005). Walking, sneaking and blocked motion are free.
+Exhaustion above four spends saturation before hunger and preserves its remainder.
+Hunger at six or below disables Survival sprinting. Zero hunger never causes
+starvation damage. Fast regeneration runs every ten ticks at full hunger with
+saturation; slow regeneration runs every eighty ticks at hunger eighteen or more.
+Healing is fractional, capped at twenty, and charges normal exhaustion.
+
+`/give raw.porkchop` and `/give cooked.porkchop` provide original pink/brown sprite
+foods, also available in the Creative catalog. Hold right click for 32 ticks to
+eat while hungry: raw restores 3 hunger/1.8 saturation, cooked restores 8/12.8.
+Hunger fills first and caps saturation. Early release, changing the held stack,
+menus or focus loss cancel without consumption. Food uses the existing main-hand
+interaction path; doors and workstation interactions keep priority. Offhand stays
+storage/display only. The food and arm use a small repeated eating motion.
+Raw pork cooks into cooked pork in 200 furnace ticks using the existing fuels
+and recipe book. Both foods stack to 64.
+
+Fall damage uses `ceil(actual downward distance - 3)` on landing, including the
+last collision-adjusted tick and actual slab/stair height. It does not scale with
+player size. Contact with any source or flowing water clears the accumulated
+damage distance; a swept footprint catches shallow water and fast landing ticks.
+Teleports and Creative flight reset fall distance without resetting hunger/health.
+Only falls and the void cause damage. Death drops player-owned inventory,
+offhand, crafting inputs and cursor items once; it never duplicates the crafting
+output or takes the open furnace's slots. Respawn resets the four starting vitals.
+Inventory keeps vitals and world ticks running; Escape and the death screen pause.
+
+Programmatic world/player snapshots now carry health, hunger, saturation and
+exhaustion. Older player data gets starting defaults. These remain compatibility
+helpers: there is no automatic saving, save menu or persistent world store.
 
 ## Rendering and distance detail
 
@@ -149,8 +348,8 @@ Actions steer toward aim; otherwise idle torso yaw holds. The head stays within
 50 degrees, shifting the torso only as needed. Yaw interpolation wraps across
 180 degrees. From rest, aim 35 leaves torso 0; aim 70 gives torso 20/head 50.
 
-First-person hides the entire world avatar by default. The Escape-menu body
-toggle enables the depth-tested body, hiding its head and world right arm.
+First-person always hides the entire world avatar; the body toggle and its
+saved setting have been removed.
 The rig stays rooted at the feet without a first-person position offset.
 The one visible right arm renders in a separate camera-space scene after the
 world with a depth clear and its own 70-degree vertical FOV. Six-tick action
@@ -169,6 +368,14 @@ floors and ceilings, and restores the full scaled distance when clear. Editing a
 player's scaled eye and aim with the configured effective reach, independently of camera mode.
 
 - Terrain is divided into **16 x 16 block chunks**.
+- Dropped entities use a reusable `EntityVisibility` policy with authored sphere
+  bounds and per-type detail settings. Bounds cover the complete animated
+  cluster without rebuilding model bounds each frame. The active game camera,
+  including its F5 offset and current FOV, drives frustum culling and distance.
+  Piles use their normal cluster within 24 blocks and one cube farther away,
+  with a 0.5-block hysteresis buffer. Existing cube nodes, geometry and materials
+  are reused. Hidden and simplified piles still simulate, merge, pick up and
+  despawn normally; merge effects track the live destination even offscreen.
 - Only exposed block faces are meshed. Adjacent coplanar faces are greedily merged;
   an untouched chunk needs just a top quad and a bottom quad.
 - Camera-frustum culling skips chunks outside the view. GPU back-face culling
@@ -206,6 +413,387 @@ frames over 0.25 s are capped to prevent runaway catch-up.
 Internal measurements use actual displacement before drag. Sprint-jump speed
 varies during each jump; the value below averages consecutive jumps.
 
+## Block definitions and basic blocks
+
+Commands provide Bedrock (`bedrock`), Stone (`stone`), Cobblestone
+(`cobblestone`), Dirt (`dirt`), Grass Block (`grass.block`), Sand (`sand`),
+Gravel (`gravel`), Oak Log (`oak.log`), Oak Planks (`oak.planks`), Glass (`glass`),
+Oak Leaves (`oak.leaves`), Pine Log (`pine.log`), Pine Planks (`pine.planks`),
+Pine Leaves (`pine.leaves`), Crafting Table (`crafting.table`), Oak/Pine Slab
+(`oak.slab`, `pine.slab`), Oak/Pine Fence (`oak.fence`, `pine.fence`), Oak/Pine Door
+(`oak.door`, `pine.door`), and Furnace (`furnace`). Stick (`stick`)
+is a separate non-placeable item with a shared cutout sprite, rather than a cube.
+For example, `/give grass.block 64`; Tab completes all registered item IDs.
+No tools are added yet; the existing bare-hand drops remain available.
+
+Sand and Gravel schedule support checks two ticks after a nearby cell changes.
+Unsupported cells transfer into lightweight falling entities with 0.04 gravity,
+0.98 vertical retention and interpolated full-block visuals. Only scheduled cells
+and active entities update. They pass through water, replace water on landing,
+and notify the existing fluid/chunk systems. Partial obstacles or player overlap
+that prevent safe settling produce one matching item instead of overwriting a
+block or trapping the player. Stacks settle from the bottom upward. Inventory
+keeps these ticks running; the Escape menu pauses them. Programmatic world
+snapshots include pending checks and active falls, without adding persistence.
+
+Definitions share cube collision/placement/breaking code and specify names, IDs,
+face textures, stack sizes, solidity, opacity, collision shape, breaking time,
+optional behavior hooks and recipe tags. Breaking properties are centralized in
+`breaking-properties.js`, with explicit hardness/ticks and future tool hooks.
+Wood tags let recipes accept a group or an exact block ID.
+Sparse world edits retain the actual block ID; legacy Test Block data maps to
+Dirt. `loadEdits` remains a low-level coordinate import. Version-3 world-data
+helpers migrate older snapshots once: the old surface moves from 0 to 4, builds
+and holes shift by four blocks, and existing blocks take precedence over the new
+bedrock layer. Optional player/item data is cloned and migrated as well. These
+are compatibility helpers only: the game remains session-based, without saving
+UI or persistence. Controlled tests use an explicit zero-surface Dirt fixture.
+Survival breaks normally drop the actual block item, with explicit rules for
+Grass (one Dirt), Glass (none), and Leaves (no leaf block). Creative breaking
+always drops nothing. Drop rules may be data or functions of a tool/context,
+ready for future shears, Silk Touch and other loot without adding those today.
+Creative pick-block provides the actual targeted type, while Survival still
+requires an existing matching stack.
+
+The basic blocks use original, low-noise 16x16 pixel face artwork with
+nearest magnification and shared mipmaps. Bedrock has original irregular dark-gray
+pixel patches. Cached SVG icons
+project the same pixel artwork onto three shaded cube faces; no slot needs a
+live renderer. Grass has distinct top/side/bottom faces and logs have bark/end
+faces. Held blocks, drop clusters, merge ghosts and particles use their own
+block's appearance. Different item IDs never merge.
+
+Glass uses clear pixels, a thin light border and a few highlights. Leaves use
+opaque green clusters with clear gaps. Their textures and cached SVG icons retain
+binary alpha; shared materials use alpha testing with depth writes and front-face
+culling rather than blended translucent cubes. Holes do not write depth, leaving
+the world and entities visible through them. Particles retain the source alpha.
+Both blocks still have full solid-cube collision, targeting and outlines.
+
+Greedy meshes merge only compatible face textures, hide contacting opaque faces,
+and repeat the tile once per world block, including at distant LODs. Side UVs
+keep grass edges at the top and bark vertical. Chunk material groups reuse face
+materials and rebuild on identity changes, including grass behavior changes.
+Stone faces beside Glass/Leaves remain visible. Matching Glass omits shared
+internal faces; fancy-style Leaves retain their layered internal surfaces.
+Opposite-facing leaf interfaces use front-face culling to avoid coplanar fighting.
+The same rules apply to coarse LOD samples and neighboring chunks.
+
+Sparse edits also preserve per-block state. Oak and Pine Leaves default to
+`{ persistent: true, distance: 7 }`, so player placements remain until broken.
+Future natural generation may set persistent false and track log distance;
+there is no natural-leaf decay, tree generation or waterlogging system yet.
+
+Covering Grass with a solid opaque block changes it to Dirt immediately. Area
+refresh also checks covered grass. Every second of active 20 Hz simulation,
+each uncovered Grass Block chooses a random neighbor within one block on each
+axis; uncovered Dirt there becomes Grass. Newly spread grass waits until the
+next round. Glass and Leaves are solid but nonopaque and do not count as covers
+in this simplified rule; it is not Minecraft's full lighting system.
+Uncovering Dirt does not instantly restore Grass. Inventory keeps
+this timer running, while the Escape menu pauses it.
+
+## Crafting and recipe book
+
+Pine has original 16x16 dark bark, lighter log ends, cooler planks and dense,
+connected dark-green foliage with a few small pixel gaps. Its log/plank/cutout-leaf behavior shares the
+existing block system, including persistent player placements and no leaf-block
+drop. The Crafting Table has workstation top/side textures, full cube collision,
+and drops itself in Survival. All five additions work with `/give` and Tab.
+
+Press E for the player 2x2 grid. Right-click a placed Crafting Table within reach
+for the 3x3 interface; crouch-right-click to place against it instead. Empty hands
+and held Sticks can use the table. Both screens retain the existing inventory
+controls and keep physics/item simulation running with gameplay inputs released.
+Opening them preserves airborne momentum. Escape closes crafting and resumes
+the existing mouse-capture flow; the separate Escape pause menu still pauses.
+
+The initial recipes, in either grid, are:
+
+| Ingredients | Output |
+| --- | --- |
+| One Oak Log, anywhere | Four Oak Planks |
+| One Pine Log, anywhere | Four Pine Planks |
+| Two Planks vertically | Four Sticks |
+| Four Planks in a 2x2 square | One Crafting Table |
+
+Each plank slot independently accepts Oak or Pine, including mixed recipes.
+An output is a preview until taken. Taking it creates the full batch and consumes
+only the matched inputs; a mismatched/full cursor cannot consume ingredients.
+Shift-click output crafts into main inventory/hotbar until the next complete batch
+cannot fit or the recipe changes. Closing returns all real grid/cursor items to
+storage and drops overflow; the preview and missing-ingredient ghosts own no items.
+Crafting consumes real ingredients in both Survival and Creative.
+
+The Recipe book button opens a side panel with output icons/names, search,
+categories and a Craftable only filter. All implemented recipes are visible
+without unlocks, filtered by grid size. Click a recipe to fill one craft; Shift-click
+fills the maximum allowed by ingredients and each input stack's cap. This only
+moves ingredients; take the output to craft. Supplies come from main inventory,
+hotbar and existing grid inputs, never armor/offhand. A complete rearrangement is
+planned before mutation, so insufficient storage leaves everything unchanged.
+Missing ingredients appear in a separate, read-only recipe preview with red cells.
+Typing in search cannot activate movement, chat, hotbar or camera shortcuts.
+
+`recipes.js` owns definitions, exact/group ingredients, occupied-slot indexes,
+offset shaped matching, optional horizontal mirroring and shapeless assignment.
+`crafting.js` owns inventory transactions and capacity checks with no DOM access.
+The same registry drives both interfaces. Future plank definitions only need the
+`wood.planks` tag to join the `planks` group. Matching/craftability updates on
+relevant inventory changes; cached icons and unchanged slot nodes are reused.
+The 3x3 book also offers matching-wood slabs (three planks in a row -> six), fences
+(two rows of plank/stick/plank -> three), doors (two columns of three planks ->
+three), stairs (six planks in a three-row staircase -> four, including its mirror),
+and a Furnace (eight Cobblestone around an empty center -> one). These
+wood recipes require a single species, unlike the mixed-plank Stick/Table recipes.
+No tools or tree generation are added.
+
+## Partial blocks and directional placement
+
+`block-shapes.js` supplies shared local boxes for collision, targeting, placement,
+camera sweeps and outlines. Full cubes retain chunk-wide greedy meshing; partial
+blocks use a box-union surface mesh and stay partial even at distant LODs. Static
+inventory icons and cached held/drop geometry use the corresponding shapes and
+textures. Fence connections derive from current neighbors, including chunk edges.
+
+Log placement stores X/Y/Z axis from the actual clicked face. End grain appears
+at both axis ends and bark follows the long direction. Missing legacy axis state
+defaults to Y. Slabs use the clicked height/face to choose bottom/top, combine only
+matching exposed halves into a double slab, consume one item per placement, and
+drop one or two items accordingly. General step assist checks obstacle tops above
+the current feet, up to 0.6 times player size, with swept headroom and horizontal
+collision. This allows slab-to-full-block and stair ascent without jumping; a
+one-block wall still stops a size-one player. Crouch support
+probes use the actual shape footprint. Fences have one-block visible/selection
+height and 1.5-block post/connection collision, preventing a normal flat-ground
+jump over them. All physical sweeps remain continuous at high configured speeds.
+
+Doors atomically occupy two vertical cells above a suitable full top surface.
+Player yaw selects facing; neighboring doors, solid neighbors and the click point
+choose a hinge. Right-click either half to toggle just that door. Both halves share
+facing/hinge/open state and rotate their thin collision/selection panel. Breaking a
+half or removing support removes the pair and drops exactly one item in Survival;
+Creative drops none. Sneaking with a held block places against interactive blocks.
+No waterlogging or redstone is implemented.
+
+Oak/Pine Stairs (`oak.stairs`, `pine.stairs`) store facing, top/bottom half and
+straight/inner-left/inner-right/outer-left/outer-right shape. Same-half stairs of
+either wood connect using front/back perpendicular neighbors and Java's side
+continuation guards. Edits/removals and loading recalculate nearby shapes across
+chunk boundaries without dropping items. Cached boxes and box-union surface
+templates drive collision, rays, outlines and exact partial-block LOD rendering.
+
+Door items use separate original transparent 16px complete-door sprites in all
+slot/book icons, hands and dropped piles; placed two-cell doors are unchanged.
+Stick sprites retain shared 1/16-thick generated geometry and edge faces. Door
+items use a shared double-sided flat plane, crisp alpha-cutout silhouettes and a
+filled panel/window pattern with no interior transparent holes. Separate
+generated/handheld display paths adapt Java's model units to the animated hands;
+ordinary block and first-person equip/action paths remain separate. The carried
+stack icon centers on viewport pointer coordinates with percentage transforms,
+keeping the count at lower right and pointer events disabled in every inventory.
+
+Pine Leaves retain a connected dark-green canopy with approximately 20% small,
+irregular clear pixels across the whole tile. Shared binary-cutout textures serve
+world faces, icons, held items and drops; fancy neighboring leaf faces remain
+visible through gaps. Collision, persistence and leaf drop rules are unchanged.
+First-person Door items use a compact, angled 2D picture in the lower right/left,
+with a small part beyond the bottom edge. A shared wrist preserves picture
+equip/action motion; the associated first-person arm is entirely hidden for Door
+items in either hand. Other held items and empty main hands retain their prior paths. Oak has
+wooden panels and Pine has horizontal bands, with no accidental holes. Third-person pictures
+attach their bottom grip directly to the animated arm's actual palm, with player
+render scale applied once. Stick, regular-block and equip/swing behavior remain.
+Internal projection checks keep complete resting Doors clear of the crosshair.
+
+## Creative inventory
+
+E in Creative opens a registry-backed 5x9 catalog above the **real** hotbar, with
+Building, Nature, Functional, Materials, Search and Player Inventory tabs. Only
+populated categories appear. Items can set `creativeCategory` (block definitions
+pass it to their item) or use the default classification. New templates appear on
+the next interface update. Search matches names/IDs without case sensitivity;
+T opens it, row scrolling resets on filtering, and the scrollbar disables when
+all items fit. Forty-five reusable cells and cached icons avoid per-frame rebuilds.
+
+Catalog sorting groups kinds first (planks, logs, slabs, stairs, fences, doors,
+leaves), then material variants (Oak, Pine, future woods) in both categories and
+search. `creativeKind`/`creativeMaterial` registry metadata can override defaults
+inferred from conventional material.kind IDs; unknown registrations still appear.
+The kind/material ordering tables are independent of category membership.
+
+Catalog left/right click takes one, Shift-click/middle-click takes a full stack.
+With a carried matching stack, left adds one, Shift fills it, right removes one.
+A different template clears the carried stack on left-click or removes one on
+right-click. Number keys replace the numbered hotbar slot with a full stack;
+Q/Ctrl+Q creates a thrown item/full stack. The catalog itself never loses items.
+Shift-clicking a real hotbar slot deletes it only in the catalog view.
+Empty catalog cells and unused panel space delete the cursor on left-click or
+one carried item on right-click, without world drops. Cells remain clickable;
+fields, tabs, scrollbar, buttons, real slots and their hotbar area are excluded.
+Outside-panel clicks still drop items, and Survival/Player Inventory blank-space
+behavior is unchanged.
+
+Player Inventory exposes the same main storage, hotbar, armor, offhand and preview,
+with crafting disabled. Normal real-slot interactions are reused, plus empty-cursor
+middle-click cloning and middle-drag filling compatible slots to their stack cap
+without consuming the cursor. Armor/offhand rules remain enforced. Destroy Item
+deletes the cursor; Shift-click clears all real storage/equipment without drops.
+These creative actions are mode-guarded and unavailable in Survival. No Saved
+Hotbars page or shortcuts exist. Mode changes never replace/grant real inventory.
+
+Inventory opening clears gameplay inputs and keeps airborne velocity, dropped
+items and furnaces ticking. Search typing cannot move, chat or change hotbar;
+number shortcuts still work over catalog templates. E closes outside text entry,
+Escape always closes, and carried stacks return through existing safe storage/
+overflow handling. Survival retains its existing crafting and inventory interface.
+
+## Water and editing performance
+
+Terrain and water keep independent dirty flags and buffers. An interior edit
+touches its own chunk; boundary faces/corners touch only the required neighbors.
+Breaking still flushes affected terrain immediately. Water graphics use a separate
+two-build/4ms frame budget, prioritizing nearby work with age-based fairness.
+The previous water buffer remains visible until its replacement is ready; both
+buffers are disposed on replacement/unload. Offscreen fluids keep simulating.
+
+Runtime solid, base-removal and source-water indexes share the existing chunk
+storage and are reconstructed on load. Local meshing, collision, support,
+targeting and camera sweeps avoid all-world edit scans. Very large queries fall
+back to occupied index entries or removal-boundary events, rather than looping
+through enormous empty coordinate ranges. Chunk bounds and immutable collision
+boxes are cached; dynamic fence connections remain live. Runtime indexes are not
+serialized. Empty untouched chunks do not accumulate bounds-cache entries.
+
+Water-level-only edits skip unrelated block/stair notifications. Other edits wake
+water only when occupancy/support can change near it. Per-tick lookup caches are
+invalidated on every mutation, without deferring or reordering fluid updates.
+Each water mesh caches nearby blocks/corners, omits hidden faces and merges only
+flat equal-height tops using repeating per-block UVs; slopes remain exact.
+
+`node scripts/profile-water.mjs` runs an offline CPU fixture with 4,096 distant
+stored water cells; it does not open a browser or alter a saved world. Matched
+before/after median measurements on this machine (12 samples after warmup):
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Interior dry break + visible terrain refresh | 4.51 ms / 5 terrain chunks | 1.21 ms / 1 terrain chunk |
+| Interior water-level refresh | 20.32 ms / 9 terrain, 4 water meshes | 1.39 ms / 0 terrain, 1 water mesh |
+| Nearby movement with distant water | 0.731 ms | 0.012 ms |
+| Nearby targeting with distant water | 0.228 ms | 0.006 ms |
+| Water-mesh block lookups | 10,016 | 904 |
+| All-world edit visits for local mesh/movement | 4,097 / 16,388 | 0 / 0 |
+
+These are CPU microbenchmarks, not browser FPS guarantees. The complete 60-tick
+world-state/pending-order trace matched the original implementation
+(`721dbdb8ebdc631d`), as did its settled-state fingerprint. With the simpler
+changes, measured water mesh preparation was about 1.07 ms, so no worker was added.
+Focused tests cover flow/recession, waterfalls, buckets, boundaries, deferred
+buffers, saved worlds, distant water, large queries, stairs and crouch support.
+
+## Buckets and legacy water
+
+`bucket` stacks to 16; `water.bucket` stacks to one. Both have original flat
+pixel sprites and appear in Creative, /give and autocomplete. Right-click with
+an empty main-hand bucket collects only a source, using a fresh eye/reach ray
+obstructed by solids. Ordinary block rays pass through water. Survival replaces
+one bucket, inserts the filled result when splitting a stack, and drops any
+inventory overflow. Placing one source returns an empty bucket. Creative keeps
+the held bucket unchanged when placing or collecting, matching the requested
+1.12 rules. Bucket attempts cannot fall through into a second block action.
+Offhand remains storage/display only. `BUCKET_RECIPE` holds the three-ingot V;
+registering a future `iron.ingot` item enables it, without adding iron now.
+
+Water is a non-solid voxel with source, level 1–7, and falling states. Sparse,
+deduplicated work runs five game ticks apart on the world's 20 Hz clock. Sources
+persist; downward flow takes priority, with a four-block search favoring equally
+short routes to drops. Ground flow reaches seven blocks; unsupported flows
+recede. Two adjacent sources can renew a cell over solid support or a source.
+Sources remain after support removal. Partial blocks exclude water from their
+cells; ordinary placements replace water and notify surrounding fluid cells.
+Save/load retains states and rebuilds active schedules. Settled water has no
+repeating update, and renderer frame budgets never discard simulation work.
+
+Chunk-batched water meshes use common world-space corner heights, smooth slopes
+and culled internal faces. One translucent blue material tests depth without
+writing it, preserving cutout glass/leaves and submerged blocks/items. Fluid
+geometry stays separate from full-cube terrain LOD, including tall waterfalls;
+only affected visible chunks rebuild. Diagonal border edits refresh shared corners.
+
+Pre-aquatic movement uses 0.02 water input acceleration, 0.8 retention, sinking
+gravity and Space ascent, scaled with player size/settings. Currents move players
+and dropped items; drops retain gravity, pickup/merge rules and original lifetime.
+Creative flight keeps its own movement in water. A camera-position surface query
+controls a subtle blue tint, including F5 views. Inventory leaves all simulation
+running; Escape still pauses. No waterlogging, modern swimming pose, oxygen,
+drowning, lava or other fluids are added.
+
+## Furnaces
+
+Furnaces face their placing player and show a lit front while burning. Right-click
+to open input, registered-fuel and take-only output slots, a fuel flame, cooking
+arrow, player storage/hotbar, and a simple smelting book. Shift-click routes Sand, raw pork
+and fuels to the appropriate slot; splitting, dragging, hotbar swaps and output
+pickup reuse inventory controls. Closing leaves the three slots in that furnace.
+Missing-book previews are read-only; selecting Sand moves ingredients, not results.
+
+`smelting.js` separately registers Sand -> Glass (200 cooking ticks) and fuels:
+logs, planks, fences, stairs and Crafting Tables burn 300 ticks; doors 200, slabs 150,
+Sticks 100. Every active 20 Hz world tick burns fuel even with blocked/removed
+input. Fresh fuel starts only for a valid recipe with output capacity. Cooking
+consumes one Sand and creates one Glass after 200 ticks; unfueled unfinished
+progress cools by two ticks per tick. Invalid input or blocked output resets the
+current cook while remaining fuel keeps burning. A plank supplies one complete
+Sand plus 100 cooking ticks; a lone Stick cannot finish a Sand.
+
+Furnace entities simulate independently of camera visibility and open screens.
+Inventory/furnace screens preserve momentum and simulation; Escape pause retains
+its pause behavior. Versioned `world.save()`/`world.load()` and compatible
+`loadEdits()` include block states plus furnace slots/burn/cook counters. This
+extends the existing programmatic world snapshots; page reload still starts the
+current local session afresh. Breaking a furnace drops its actual stored contents
+once (also in Creative), plus the block itself in Survival; consumed burning fuel
+stays consumed. No experience, extra smelting items, or tool requirements are added.
+
+## Pickup and block particles
+
+Opening and closing inventory releases gameplay inputs while preserving carried
+velocity and interpolation. Air drag, gravity and collision keep running, just
+as when movement keys are released. The Escape pause menu retains its existing
+motion reset.
+
+Successful gameplay Q/Ctrl+Q drops request the same six-tick main-hand swing as
+block actions. Empty slots, key repeats and inventory-interface drops do not.
+The first-person block follows that swing; a stack-count change keeps it equipped.
+Changing to an empty hand lowers the old item, switches below 0.1 equip height,
+then raises the hand, at up to 0.4 equip height per physics tick with interpolation.
+Third-person drops use the existing animated shoulder attachment. A newly thrown
+item merged immediately into another pile retains a short cosmetic launch before
+converging; ownership, pickup delay and lifetime remain authoritative and unchanged.
+
+Dropped-item pickup tests the current scaled, crouch-aware collision box expanded
+by a fixed one block on each X/Z side and half a block above and below. Item-box
+overlap is sufficient, including through walls; delays, partial pickup, capacity,
+and each quantity's expiry remain unchanged.
+
+Block definitions designate a shared particle texture and optional tint. Sprint,
+landing, and instant-break effects use the actual supporting or broken block.
+Normal break bursts sample all 64 cell centers; landing bursts use accumulated
+downward travel before the final landing tick. A separate small mining-hit API
+is reserved for future progressive mining, without adding a delay today.
+
+Particles run at 20 Hz with interpolated, camera-facing quarter-texture crops,
+nearest filtering, collision and Java-style motion/lifetimes. A reusable pool
+caps active particles at 1,024; shared instanced batches render each texture.
+Frustum/distance culling and nearby-visible prioritization limit cosmetic work.
+
+Smoothed frame timing, independent of the FPS HUD, selects normal, half-density,
+or quarter-density effects with sustained thresholds and gradual recovery.
+Inactive-tab time is excluded, and the quality policy accepts a known frame cap.
+Reduced quality simplifies bounded merge visuals; low quality skips them.
+These settings never affect authoritative items, movement or inventory. Inventory
+continues simulation, while the Escape menu retains its existing pause behavior.
+
 ## Verification
 
 The browser and tests use the same voxel world, mesher, renderer, and controller.
@@ -221,8 +809,8 @@ of straight movement (100 settled sprint-jump cycles).
 | Flat-ground landing | Tick 12 / 0.600 s |
 
 These match at 5, 15, 30, 60, 120, 144, and 240 rendering FPS, plus uneven frame
-intervals. Tests cover unit cube dimensions and triangle winding, three-layer
-terrain, successive digging and face targeting, placement safety, walls,
+intervals. Tests cover unit cube dimensions and triangle winding, four-layer
+generation and controlled collision fixtures, successive digging and face targeting, placement safety, walls,
 ceilings, falling and jumping on placed blocks, hidden-face removal, distance
 LOD polygon reduction, camera-frustum culling, boundary rebuilds, and geometry
 disposal. Browser-based visual QA depends on availability of the browser host.
@@ -231,6 +819,9 @@ Focused automated checks also cover both scaled F5 cameras, size-two wall
 collision, leg separation, forward action swings, neutral hand rest, crouch
 speed (1.295154 blocks/s at size one), low-ceiling standing rejection, diagonal
 ledge overhang at sizes one and two, chat fading and revival, compact help,
-the four-setting reset, the body checkbox, and F3+B collision bounds. These
+the four-setting reset, and F3+B collision bounds. HUD checks cover independent
+saved toggles, coordinate rounding around zero, stable FPS samples, teleport
+formats and errors, exact positions and reset motion, plus destination cameras,
+collision outlines and chunk loading. These
 checks run without taking control of the user's computer; visual playtesting
 remains with the user.

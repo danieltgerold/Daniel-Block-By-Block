@@ -5,19 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#e8efe9" />
     <meta name="description" content="Block By Block — a first-person movement playground. Editable voxel playground." />
-    <title>Block By Block · Movement test</title>
+    <title>Block By Block</title>
   </head>
   <body>
     <canvas id="world" aria-label="First-person voxel test: editable blocks and open sky"></canvas>
     <header class="masthead">
       <a class="wordmark" href="./" aria-label="Block By Block home"><span class="brand-icon" aria-hidden="true">▦</span> BLOCK BY BLOCK</a>
-      <span class="milestone"><i></i> MOVEMENT TEST <span class="version">/ 001</span></span>
     </header>
 
     <main id="intro" class="intro">
       <section class="intro-card" aria-labelledby="intro-title">
         <h1 id="intro-title">Block test</h1>
-        <p class="description">Ground is three blocks deep. Type /help for commands.</p>
+        <p class="description">E opens inventory. Use /give dirt 64 for blocks.<br />Grass, dirt and bedrock form the flat ground. Type /help for commands.</p>
         <form id="name-form" class="name-form">
           <label for="player-name">Player name</label>
           <div class="name-row">
@@ -26,15 +25,19 @@
           </div>
           <span id="name-error" class="name-error" role="alert"></span>
         </form>
-        <label class="menu-toggle"><input id="show-first-person-body" type="checkbox" /> Show body in first person</label>
+        <label class="menu-toggle"><input id="show-coordinates" type="checkbox" checked /> Show Coordinates</label>
+        <label class="menu-toggle"><input id="show-fps" type="checkbox" checked /> Show FPS</label>
         <div class="controls">
+          <div><span class="key-group"><kbd>E</kbd><kbd>1–9</kbd></span><span>Inventory / select hotbar</span></div>
+          <div><span class="key-group"><kbd>F</kbd><kbd>Q</kbd></span><span>Swap offhand / drop item</span></div>
           <div><span class="key-group"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Walk</span></div>
           <div><span class="key-group"><kbd class="wide">MOUSE</kbd><kbd>F5</kbd></span><span>Look / switch camera</span></div>
           <div><span class="key-group"><kbd>W</kbd><kbd>R</kbd></span><span>Sprint (or double-tap W)</span></div>
-          <div><span class="key-group"><kbd class="wide">L SHIFT</kbd></span><span>Crouch / protect ledge</span></div>
+          <div><span class="key-group"><kbd class="wide">L SHIFT</kbd></span><span>Crouch / fly down</span></div>
           <div><span class="key-group"><kbd>F3</kbd><kbd>B</kbd></span><span>Toggle hitboxes</span></div>
-          <div><span class="key-group"><kbd class="wide">SPACE</kbd></span><span>Jump (hold to repeat)</span></div>
-          <div><span class="key-group"><kbd>LMB</kbd><kbd>RMB</kbd></span><span>Break / place block</span></div>
+          <div><span class="key-group"><kbd class="wide">SPACE</kbd></span><span>Jump / fly up</span></div>
+          <div><span class="key-group"><kbd>2×</kbd><kbd class="wide">SPACE</kbd></span><span>Toggle flight (Creative)</span></div>
+          <div><span class="key-group"><kbd>LMB</kbd><kbd>RMB</kbd></span><span>Break / place / eat</span></div>
           <div><span class="key-group"><kbd>T</kbd><kbd>/</kbd></span><span>Chat / commands</span></div>
           <div><span class="key-group"><kbd>ESC</kbd></span><span>Release mouse</span></div>
         </div>
@@ -43,7 +46,56 @@
       </section>
     </main>
 
-    <div id="crosshair" class="crosshair" hidden aria-hidden="true"></div>
+    <div id="world-hud" class="world-hud" hidden>
+      <div id="coordinates" title="Feet position: +X east, +Y up, +Z south">X: 0 Y: 0 Z: 0</div>
+      <div id="fps">FPS: —</div>
+    </div>
+    <div id="hotbar" class="hotbar" aria-label="Hotbar" hidden></div>
+    <div id="survival-hud" class="survival-hud" hidden>
+      <div id="health-bar" class="vital-bar" role="img" aria-label="Health: 20 / 20"></div>
+      <div id="hunger-bar" class="vital-bar hunger-bar" role="img" aria-label="Hunger: 20 / 20"></div>
+      <span id="saturation-value" class="saturation-value" hidden></span>
+    </div>
+    <section id="death-screen" class="death-screen" aria-labelledby="death-title" hidden>
+      <h1 id="death-title">You died</h1>
+      <button id="respawn" type="button">Respawn</button>
+    </section>
+    <section id="inventory-screen" class="inventory-screen" aria-label="Player inventory" hidden>
+      <div id="inventory-panel" class="inventory-panel">
+        <div class="inventory-heading"><button id="inventory-close" type="button" aria-label="Close inventory">&#215;</button></div>
+        <div class="inventory-workspace">
+        <aside id="recipe-book" class="recipe-book" data-recipe-book hidden aria-label="Recipe book">
+          <input id="recipe-search" type="search" placeholder="Search recipes" aria-label="Search recipes" autocomplete="off" />
+          <select id="recipe-category" aria-label="Recipe category"><option value="all">All categories</option></select>
+          <label class="recipe-filter"><input id="recipe-craftable" type="checkbox" /> Craftable only</label>
+          <div id="recipe-list" class="recipe-list"></div>
+          <div id="recipe-ghost" class="recipe-ghost" hidden><span>Recipe preview</span><div id="recipe-ghost-grid" class="crafting-grid"></div></div>
+          <div id="recipe-status" class="recipe-status" role="status"></div>
+        </aside>
+        <div class="inventory-content">
+        <div class="inventory-top">
+          <div id="inventory-armor" class="armor-slots" aria-label="Armor"></div>
+          <canvas id="inventory-preview" width="180" height="200" aria-label="Player appearance preview"></canvas>
+          <div class="offhand-area"><div id="inventory-offhand"></div></div>
+          <div class="crafting-area"><div class="crafting-layout"><div id="crafting-grid" class="crafting-grid" aria-label="Crafting inputs"></div>
+          <span class="crafting-arrow" aria-hidden="true">&#8594;</span><button id="crafting-output" class="inventory-slot" type="button" aria-label="Crafting output"></button></div>
+          <button id="recipe-book-toggle" type="button" aria-expanded="false" aria-controls="recipe-book">Recipe book</button></div>
+          <div id="furnace-area" class="furnace-area" hidden>
+            <div class="furnace-inputs"><div id="furnace-input"></div><div class="furnace-flame-display"><svg viewBox="0 0 20 26" aria-hidden="true"><defs><clipPath id="furnace-flame-clip"><rect id="furnace-flame-level" x="0" y="26" width="20" height="0"/></clipPath></defs><path fill="#8b9f8c" d="M10 0L12 9L16 5L20 17L16 24L10 26L4 24L0 17L5 6L6 15Z"/><path fill="#e99c36" clip-path="url(#furnace-flame-clip)" d="M10 0L12 9L16 5L20 17L16 24L10 26L4 24L0 17L5 6L6 15Z"/></svg><progress id="furnace-flame" max="1" value="0" aria-label="Fuel remaining"></progress></div><div id="furnace-fuel"></div></div>
+            <progress id="furnace-progress" max="1" value="0" aria-label="Smelting progress"></progress><div id="furnace-output"></div>
+            <button id="furnace-book-toggle" type="button">Recipe book</button>
+          </div>
+        </div>
+        <div id="inventory-main" class="slot-grid" aria-label="Main inventory"></div>
+        <div id="inventory-hotbar" class="slot-grid inventory-hotbar" aria-label="Hotbar"></div>
+        </div></div>
+      </div>
+      <div id="cursor-stack" class="cursor-stack" hidden></div>
+      <div id="inventory-tooltip" class="inventory-tooltip" role="tooltip" hidden></div>
+    </section>
+    <div id="crosshair" class="crosshair" hidden aria-hidden="true">
+      <svg viewBox="0 0 15 15" width="15" height="15" shape-rendering="crispEdges" focusable="false"><path fill="#fff" d="M7 0h1v7h7v1H8v7H7V8H0V7h7z" /></svg>
+    </div>
     <button id="resume-note" class="resume-note" type="button" hidden>Click to resume mouse look</button>
     <section id="chat-panel" class="chat-panel" aria-label="Chat" hidden>
       <ol id="chat-log" class="chat-log" role="log" aria-live="polite" aria-relevant="additions"></ol>
@@ -52,7 +104,6 @@
         <input id="chat-input" type="text" aria-label="Chat message or command" autocomplete="off" spellcheck="false" placeholder="Say something, or type /help" />
       </form>
     </section>
-    <div id="playing-hint" class="playing-hint" hidden>WASD move <span>·</span> R / double W sprint · L SHIFT crouch <span>·</span> Hold SPACE jump <span>·</span> F5 camera <span>·</span> Left click break / right click place <span>·</span> ESC pause</div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

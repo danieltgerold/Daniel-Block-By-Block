@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { readFileSync } from 'node:fs';
@@ -13,7 +13,7 @@ import { VoxelWorld } from '../src/voxel-world.js';
 import { updatePlayerCamera, createPlayerModel, animatePlayerModel } from '../src/player-visuals.js';
 import { createPlayerAnimation, interpolatePlayerAnimation } from '../src/player-animation.js';
 const near = (a, b, eps = 1e-8) => assert.ok(Math.abs(a - b) < eps, `Expected ${b}, got ${a}`);
-function service(world = new VoxelWorld()) {
+function service(world = new VoxelWorld({ depth: 3 })) {
   const controller = new MovementController(world);
   controller.respawn({ x: 0.5, y: 0, z: 0.5 });
   const profile = new LocalPlayerProfile(null, () => 'test-player');
@@ -100,6 +100,7 @@ test('scaled hitbox rejects low-ceiling growth and prevents placing inside the l
   chat.submit('/size 2'); assert.equal(controller.size, 2);
   assert.equal(world.canPlaceBlock(1, 0, 0, [controller.player]), false);
   world.setBlock(2, 0, 0, true);
+  world.setBlock(2, 1, 0, true); // Higher than the scaled 1.2-block step height.
   near(world.movePlayer(controller.player, { x: 20, y: 0, z: 0 }).x, 1.4);
   const model = createPlayerModel();
   const animation = createPlayerAnimation();
@@ -146,7 +147,7 @@ test('developer sequence works in a text field, consumes final Enter, bypasses c
   for (const key of keys) final = f.key(key);
   assert.equal(final.defaultPrevented, true);
   assert.equal(f.controller.developerMode, true);
-  assert.equal(f.ui.profile.player.displayName, 'player 1');
+  assert.equal(f.ui.profile.player.displayName, 'player1');
   assert.equal(f.ui.service.messages.at(-1).text, 'You have entered developer mode.');
   assert.equal(f.document.getElementById('start-note').textContent, '<server>: You have entered developer mode.');
   for (const command of ['/speed 300', '/reach 300', '/jump 300', '/size 5']) f.ui.service.submit(command);
@@ -177,9 +178,10 @@ test('fast movement still hits a one-block wall and long reach queries stay spar
   assert.equal(world.raycast({ x: 0.5, y: 1.6, z: 0.5 }, { x: 0, y: 1, z: 0 }, 1e6), null);
 });
 
-test('names allow at most 16 letters, numbers and spaces while keeping reserved-name validation', () => {
-  assert.equal(validateName('Abc 123456789012').ok, true);
-  assert.equal(validateName('Abc 1234567890123').ok, false);
+test('names allow at most 16 letters/numbers and reject spaces and reserved names', () => {
+  assert.equal(validateName('A'.repeat(16)).ok, true);
+  assert.equal(validateName('A'.repeat(17)).ok, false);
+  assert.equal(validateName('Abc 123').ok, false);
   assert.equal(validateName('player_name').ok, false);
   assert.equal(validateName(' SERVER ').ok, false);
 });

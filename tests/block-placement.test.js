@@ -1,0 +1,53 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { MovementController } from '../src/movement.js';
+import { VoxelWorld } from '../src/voxel-world.js';
+import { BlockPlacement, breakTargetBlock } from '../src/block-placement.js';
+function setup() {
+  const world = new VoxelWorld({ depth: 3 }), controller = new MovementController(world);
+  world.setBlock(0, 1, 0, true); controller.respawn({ x: 5.5, y: 0, z: .5 });
+  controller.inventory.insert('dirt', 10);
+  const ticks = [], aim = { yaw: Math.PI / 2, pitch: 0 };
+  let enabled = true, rays = 0, swings = 0;
+  const raycast = controller.targetBlock.bind(controller), swing = controller.requestSwing.bind(controller);
+  controller.targetBlock = (...args) => { rays++; ticks.push(controller.totalSteps); return raycast(...args); };
+  controller.requestSwing = () => { swings++; swing(); };
+  const placement = new BlockPlacement({ controller, world, getAim: () => aim, canInteract: () => enabled });
+  controller.onTick = () => placement.tick();
+  return { world, controller, placement, ticks, aim, rays: () => rays, swings: () => swings, enable: value => { enabled = value; } };
+}
+test('queued presses run on ticks, bypass cooldown, and held attempts repeat every four ticks including failures', () => {
+  const f = setup();
+  f.placement.press(); assert.equal(f.rays(), 0);
+  f.controller.update(.05); assert.deepEqual(f.ticks, [1]);
+  assert.equal(f.controller.inventory.mainHand.count, 9); assert.equal(f.swings(), 1);
+  f.controller.update(.15); assert.deepEqual(f.ticks, [1]);
+  f.controller.update(.05); assert.deepEqual(f.ticks, [1, 5]);
+  assert.equal(f.controller.inventory.mainHand.count, 8, 'Close destination now succeeds without the old distance buffer');
+  f.placement.release(); f.placement.press(); f.placement.release(); f.placement.press();
+  f.controller.update(.05); assert.deepEqual(f.ticks, [1, 5, 6, 6]);
+  assert.equal(f.controller.placementRepeat, 4);
+  f.controller.update(.2); assert.equal(f.ticks.at(-1), 10);
+  f.controller.pause(); const count = f.rays(); f.controller.update(.2); assert.equal(f.rays(), count);
+  f.placement.press(); f.enable(false); f.controller.update(.05);
+  assert.equal(f.controller.placementHeld, false); assert.equal(f.controller.placementPresses, 0);
+});
+test('each attempt reads current aim, reach and main-hand stack; successful blocks consume once and breaking yields a collectible', () => {
+  const f = setup(); f.placement.press();
+  f.controller.inventory.select(1); f.controller.update(.05);
+  assert.equal(f.world.hasBlock(1, 1, 0), false, 'Empty selected hand cannot place');
+  f.placement.release(); f.controller.inventory.select(0); f.controller.configure('reach', 4.49); f.placement.press(); f.controller.update(.05);
+  assert.equal(f.swings(), 0);
+  f.placement.release(); f.controller.configure('reach', 4.5); f.placement.press(); f.controller.update(.05);
+  assert.equal(f.world.hasBlock(1, 1, 0), true); assert.equal(f.controller.inventory.mainHand.count, 9);
+  f.placement.release();
+  assert.equal(breakTargetBlock({ ...f, yaw: Math.PI / 2, pitch: 0 }), true);
+  assert.equal(f.world.hasBlock(1, 1, 0), false); assert.equal(f.controller.drops.total(), 1n);
+  f.controller.teleport({ x: 1.5, y: 1, z: .5 });
+  for (let i = 0; i < 15; i++) f.controller.update(.05);
+  assert.equal(f.controller.inventory.mainHand.count, 10); assert.equal(f.controller.drops.total(), 0n);
+  f.controller.inventory.slots[9] = { id: 'dirt', count: 5 }; f.controller.inventory.select(2);
+  f.controller.inventory.pick('dirt'); assert.equal(f.controller.inventory.selected, 0);
+  f.controller.inventory.slots[0] = null; f.controller.inventory.pick('dirt');
+  assert.equal(f.controller.inventory.mainHand.count, 5); assert.equal(f.controller.inventory.slots[9], null);
+});
