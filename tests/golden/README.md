@@ -17,11 +17,11 @@ flight, crouch and sprint permissions; `expected.csv` includes the corresponding
 state and fall-distance fields. Boolean CSV fields are 0 or 1.
 
 These scenarios exercise walking, sprint-jumping, crouching, flight transitions,
-sprint permissions and movement in static water. They call `stepPlayer` only:
+sprint permissions, slab steps, ledges, and movement in flowing/falling water.
+They call `stepPlayer` only:
 fluid propagation, world ticks, food and vitals do not run. Those need separate
-replay contracts. The current suites are recorded JS reference targets; Java and
-TeaVM replay for them is pending. A green historical Java test does not establish
-parity for the newer features.
+replay contracts. Both historical and current suites are replayed on the JVM and
+through TeaVM in Node, Chromium, Firefox and WebKit.
 
 `trig/` is produced separately by `./gradlew :core:writeTrigGolden`.
 
@@ -33,8 +33,13 @@ bits 0..3, with -1 for the no-world item shape. This contract consumes resolved
 stair shapes and fence connections; neighbor discovery and stair recomputation
 belong to the later world integration stage.
 `./gradlew :core:test` replays all 404 shape cases and compares the 964 ordered
-boxes by raw double bits. This proves JVM geometry parity; TeaVM and world-query
-integration remain pending.
+boxes by raw double bits. The same geometry references run through TeaVM in Node
+and all three browser engines.
+
+`world/` defines three terrain configurations, typed edits and 312 query results.
+It covers shape-aware support, collision, step-up, continuous support paths,
+selection raycasts, source-water selection, hit points, and chunk-boundary ties.
+The shared Node/browser replay checks the same results as the JVM tests.
 
 When rules change, investigate mismatches before replacing reference values.
 Never use a changed default terrain configuration to silently redefine a fixture.
