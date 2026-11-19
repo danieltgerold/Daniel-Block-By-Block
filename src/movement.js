@@ -8,6 +8,7 @@ import { DroppedItems } from './dropped-items.js';
 import { PlayerVitals } from './player-vitals.js';
 import { FoodUse } from './food-use.js';
 import { PlayerReactions } from './player-reactions.js';
+import { canEscapeWater, WATER_EDGE } from './water-edge.js';
 export { DEFAULT_WALK_SPEED };
 export const MOVEMENT = Object.freeze({
   ticksPerSecond: 20,
@@ -79,6 +80,7 @@ export function stepPlayer(player, input = {}, world = null) {
   if (!input.jump) player.jumpCooldown = 0;
   const size = player.size ?? 1;
   const launchVelocity = input.jumpVelocity ?? MOVEMENT.jumpVelocity * size;
+  const swimJumpScale = launchVelocity / (MOVEMENT.jumpVelocity * size);
   const takeoff = !flying && !wet && Boolean(input.jump) && launchVelocity > 0 && startedGrounded && player.jumpCooldown === 0;
   const yaw = input.yaw || 0;
   const sinYaw = Math.sin(yaw);
@@ -101,7 +103,7 @@ export function stepPlayer(player, input = {}, world = null) {
   }
   if (flying) player.vy += (Number(Boolean(input.jump)) - Number(Boolean(input.crouch))) * MOVEMENT.flyingVerticalAcceleration * size;
   if (wet) {
-    if (input.jump) player.vy += .04 * size * (launchVelocity / (MOVEMENT.jumpVelocity * size));
+    if (input.jump) player.vy += .04 * size * swimJumpScale;
     player.vx += medium.x * .014 * size; player.vy += medium.y * .014 * size; player.vz += medium.z * .014 * size;
   }
 
@@ -128,6 +130,7 @@ export function stepPlayer(player, input = {}, world = null) {
   player.vz += (-right * sinYaw - forward * cosYaw) * acceleration;
 
   // 3. Move, resolve the floor, then apply drag using the PREVIOUS grounded state.
+  let waterCollision = null;
   if (world) {
     let requested = { x: player.vx, z: player.vz };
     if (input.crouch && !wet && !flying && !takeoff && player.vy <= 0 && (startedGrounded || world.supportProbe(player))) {
@@ -135,6 +138,7 @@ export function stepPlayer(player, input = {}, world = null) {
     }
     const motion = world.movePlayer(player, { ...requested, y: player.vy }, 0.3 * size,
       (player.crouching ? MOVEMENT.crouchHeight : MOVEMENT.playerHeight) * size);
+    if(wet && (motion.blocked.x || motion.blocked.z))waterCollision={x:requested.x,z:requested.z,blocked:motion.blocked};
     player.x = motion.x; player.y = motion.y; player.z = motion.z;
     if (motion.blocked.x || requested.x !== player.vx) player.vx = 0;
     if (motion.blocked.y) player.vy = 0;
@@ -193,6 +197,16 @@ export function stepPlayer(player, input = {}, world = null) {
   player.vz *= drag;
   player.vy = wet ? player.vy * .8 - .02 * size : flying ? player.vy * MOVEMENT.flyingVerticalDrag : (player.vy - MOVEMENT.gravity * size) * MOVEMENT.verticalDrag;
   if (player.grounded && player.vy < 0) player.vy = 0;
+  // Java 1.12's edge impulse happens AFTER water retention/gravity. Setting it
+  // once (rather than adding .3 before drag) preserves its intended strength.
+  if(waterCollision && swimJumpScale>0 && canEscapeWater(world,player,previousY,
+    {x:waterCollision.x*drag,z:waterCollision.z*drag},.3*size,(player.crouching?MOVEMENT.crouchHeight:MOVEMENT.playerHeight)*size)) {
+    player.vy=Math.max(player.vy,WATER_EDGE.velocity*size*swimJumpScale);
+    // Collision clipped this tick's displacement, not a legal pending escape's
+    // momentum. Retain it with normal water drag so the next tick can clear the lip.
+    if(waterCollision.blocked.x)player.vx=waterCollision.x*drag;
+    if(waterCollision.blocked.z)player.vz=waterCollision.z*drag;
+  }
   const fovTarget = (player.sprinting ? MOVEMENT.sprintFovMultiplier : 1) * (player.flying ? MOVEMENT.flyingFovMultiplier : 1);
   player.fovMultiplier += (fovTarget - player.fovMultiplier) * 0.5;
   tickPlayerAnimation(player.animation, { dx: player.x - previousX, dz: player.z - previousZ,

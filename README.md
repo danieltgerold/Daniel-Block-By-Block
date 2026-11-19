@@ -777,6 +777,18 @@ only affected visible chunks rebuild. Diagonal border edits refresh shared corne
 Pre-aquatic movement uses 0.02 water input acceleration, 0.8 retention, sinking
 gravity and Space ascent, scaled with player size/settings. Currents move players
 and dropped items; drops retain gravity, pickup/merge rules and original lifetime.
+Wet horizontal collisions also test a raised exit using the full player box:
+approximately 0.6 blocks at size one, with the old-Java vertical-motion correction.
+Both the route upward and the short route ahead must be free of solid shapes,
+and the destination must be clear of water. This respects real slab/stair bounds,
+headroom and the source surface below the cell top, without grid rounding or
+snapping the player upward. A valid exit sets 0.3 blocks/tick vertical velocity
+after water drag/gravity and retains the blocked horizontal momentum with normal
+water drag. It can trigger from carried/current motion without a fresh Space
+press. Size scales the probe and boost; the boost uses the same jump-launch ratio
+as normal swimming. Creative flight bypasses this check. Tall walls, ceilings and
+submerged exits reject it. The local probes run only on wet horizontal collisions
+on physics ticks, never as per-render-frame work.
 Creative flight keeps its own movement in water. A camera-position surface query
 controls a subtle blue tint, including F5 views. Inventory leaves all simulation
 running; Escape still pauses. No waterlogging, modern swimming pose, oxygen,
