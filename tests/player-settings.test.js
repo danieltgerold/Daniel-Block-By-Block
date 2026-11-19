@@ -63,8 +63,8 @@ test('Tab completes prefixes and default arguments, shows/cycles multiple matche
 test('settings are independent, size two doubles effective values, and every default resets only its setting', () => {
   const { controller, chat } = service();
   for (const command of ['/speed 6', '/reach 8', '/jump 3', '/size 2']) chat.submit(command);
-  assert.deepEqual(controller.settings, { speed: 6, reach: 8, jump: 3, size: 2 });
-  assert.deepEqual(controller.effective, { speed: 12, reach: 16, jump: 6, size: 2 });
+  assert.deepEqual(controller.settings, { ...DEFAULT_SETTINGS, speed: 6, reach: 8, jump: 3, size: 2 });
+  assert.deepEqual(controller.effective, { speed: 12, reach: 16, jump: 6, size: 2, falldamage:1 });
   assert.match(chat.messages.at(-1).text, /12.*16.*6/);
   controller.keyDown('KeyW');
   for (let i = 0; i < 100; i++) controller.update(0.05);
@@ -151,7 +151,7 @@ test('developer sequence works in a text field, consumes final Enter, bypasses c
   assert.equal(f.ui.service.messages.at(-1).text, 'You have entered developer mode.');
   assert.equal(f.document.getElementById('start-note').textContent, '<server>: You have entered developer mode.');
   for (const command of ['/speed 300', '/reach 300', '/jump 300', '/size 5']) f.ui.service.submit(command);
-  assert.deepEqual(f.controller.settings, { speed: 300, reach: 300, jump: 300, size: 5 });
+  assert.deepEqual(f.controller.settings, { ...DEFAULT_SETTINGS, speed: 300, reach: 300, jump: 300, size: 5 });
   const before = { ...f.controller.settings };
   f.ui.service.submit('/size 1e308');
   assert.match(f.ui.service.messages.at(-1).text, /overflow/);

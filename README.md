@@ -101,10 +101,11 @@ such as `/s`. Enter submits the completed command.
 | `/speed <number>` | Walking blocks/s | 0-255 | 4.3171806167 |
 | `/reach <number>` | Eye-to-hit blocks | 0-255 | 4.5 Survival / 5 Creative |
 | `/jump <number>` | Apex above takeoff, blocks | 0-255 | 1.252203352512 |
+| `/falldamage <number>` | Fall damage multiplier | 0-255 | 1 |
 | `/size <number>` | Player size multiplier | 0.1-4 | 1 |
 
 All accept decimals and `default`; each reset changes only its own setting.
-`/default` resets all four settings together, subject to the same resize checks.
+`/default` resets speed, reach, jump, size and fall damage together, subject to the same resize checks.
 `/help` is one compact multiline server reply, with range details kept in errors.
 `/tp <x> <y> <z>` teleports the feet to exact finite coordinates, including air
 or inside blocks. Commas also work, for example `/tp 10, 64, -20`. Each axis may
@@ -314,21 +315,74 @@ storage/display only. The food and arm use a small repeated eating motion.
 Raw pork cooks into cooked pork in 200 furnace ticks using the existing fuels
 and recipe book. Both foods stack to 64.
 
-Fall damage uses `ceil(actual downward distance - 3)` on landing, including the
-last collision-adjusted tick and actual slab/stair height. It does not scale with
-player size. Contact with any source or flowing water clears the accumulated
+Fall damage measures the complete descent, including the last collision-adjusted
+tick and actual slab/stair height. The safe distance is the greater of `3 * size`
+and effective jump height. Damage is `ceil(max(0, fallDistance / size - max(3,
+jumpAtSize1)) * falldamage)`, with a small numerical tolerance. Thus normal jumps
+are safe at enlarged sizes and custom jump heights; a lower landing still adds
+real fall distance. `/falldamage 0` disables falls, `.5` scales before rounding,
+and `default` restores one. Void damage is independent of this multiplier.
+Contact with any source or flowing water clears the accumulated
 damage distance; a swept footprint catches shallow water and fast landing ticks.
 Teleports and Creative flight reset fall distance without resetting hunger/health.
 Only falls and the void cause damage. Death drops player-owned inventory,
 offhand, crafting inputs and cursor items once; it never duplicates the crafting
-output or takes the open furnace's slots. Respawn resets the four starting vitals.
+output or takes the open furnace's slots. Respawn resets the four starting vitals,
+regeneration/void timers, pending eating and exhaustion, visual effects, and the
+cached player snapshot. The HUD reads the fresh values immediately. Mode changes
+preserve vitals. Inspection and focused checks did not reproduce saturation
+carryover through the original normal respawn path; that path already called
+`PlayerVitals.reset()` with five saturation.
 Inventory keeps vitals and world ticks running; Escape and the death screen pause.
 
+Actual health loss starts one smooth ten-tick camera roll; undamaging landings
+and Creative fall immunity do not trigger it. The world and first-person hand
+receive the same visual roll, without changing aim, rays or camera collision.
+Escape's Damage tilt setting offers Normal, Reduced and Off. Teleport, respawn
+and F5 camera changes clear the remaining hurt effect. A separate bounded visual
+clock keeps the twenty-tick sideways death rotation running while all world
+simulation is paused. The body pivots from its feet with a small authored lift
+so its limbs stay above the landing surface. Held equipment uses a cosmetic
+snapshot after the real stacks have dropped exactly once. First person keeps
+the full body hidden and adds a death tilt under the existing red death screen.
+
 Programmatic world/player snapshots now carry health, hunger, saturation and
-exhaustion. Older player data gets starting defaults. These remain compatibility
+exhaustion and player settings, including the unscaled fall-damage multiplier.
+Older player data gets starting defaults. These remain compatibility
 helpers: there is no automatic saving, save menu or persistent world store.
 
 ## Rendering and distance detail
+
+Escape's **3D resolution** setting changes only the world/hand WebGL buffer.
+The default 100% uses at most one render pixel per CSS pixel; the previous
+renderer allowed two. At device pixel ratio 2, this reduces world pixels by 75%.
+50/75% lower GPU pixel work further; 150/200% restore higher-DPI sharpness when
+available. Lower settings soften the 3D scene; crosshair, text, inventory and
+health/food icons retain native browser resolution. Visual preferences are stored
+locally. The animation loop has no added frame cap and physics stays at 20 Hz.
+
+Stationary chunk visibility now reuses its last result after pending rebuild
+budgets drain. Camera/FOV changes, edits, water updates and world loads invalidate
+it. Hidden hitboxes no longer allocate per-drop bounds, particle positions avoid
+temporary arrays, and unchanged HUD/chat values avoid repeated DOM writes.
+The world and first-person hand passes remain separate because their projections
+and depth clears are intentionally different. Inventory's small player preview
+renders only while its inventory view is open.
+
+`node scripts/profile-frame-work.mjs` measured this matched Node CPU-only sample:
+
+| Chunk preparation | Before | After |
+| --- | ---: | ---: |
+| Stationary camera, median ms/frame | 0.08323 | 0.00205 |
+| Stationary chunk-bounds queries/frame | 315 | 0 |
+| Turning camera, median ms/frame | 0.09513 | 0.10076 |
+
+These exclude browser, GPU and display work, and are not FPS measurements. This
+small CPU cost does not explain a roughly 22 ms (45 FPS) frame by itself.
+Hardware queries were denied, so the active browser GPU and actual GPU frame
+time could not be identified without opening the game. High-DPI pixel throughput
+is a candidate, not a confirmed diagnosis. A 60 Hz display presents at most sixty
+distinct refreshes per second; no OS, graphics-driver or browser setting changed.
 
 The visual rig uses classic Steve model coordinates scaled by `0.9375 / 16`,
 with a feet-rooted Y-up group and independent neck, shoulder and hip joints.

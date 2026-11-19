@@ -39,9 +39,13 @@ export class GameplayHUD {
     this.resetFrames();
   }
   resetFrames() { this.lastFrame = null; this.elapsed = 0; this.frames = 0; }
-  updatePosition(feet) { this.coordinates.textContent = coordinateText(feet); }
+  updatePosition(feet) { const text=coordinateText(feet);if(this.coordinates.textContent!==text)this.coordinates.textContent=text; }
   updateVitals(controller, mode) {
     const v = controller.vitals;
+    const previous=this.lastVitals;
+    if(previous && previous.health===v.health && previous.hunger===v.hunger && previous.saturation===v.saturation
+      && previous.developer===controller.developerMode && previous.gameMode===controller.gameMode && previous.mode===mode)return;
+    this.lastVitals={health:v.health,hunger:v.hunger,saturation:v.saturation,developer:controller.developerMode,gameMode:controller.gameMode,mode};
     this.survival.hidden = controller.gameMode !== 'survival' || v.dead || !['playing','ready','chat'].includes(mode);
     for (const [kind,{row,icons}] of this.vitalRows) {
       const value = Math.ceil(v[kind]);

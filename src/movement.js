@@ -7,6 +7,7 @@ import { PlayerInventory } from './inventory.js';
 import { DroppedItems } from './dropped-items.js';
 import { PlayerVitals } from './player-vitals.js';
 import { FoodUse } from './food-use.js';
+import { PlayerReactions } from './player-reactions.js';
 export { DEFAULT_WALK_SPEED };
 export const MOVEMENT = Object.freeze({
   ticksPerSecond: 20,
@@ -234,6 +235,8 @@ export class MovementController {
     this.developerMode = false;
     this.gameMode = 'survival';
     this.vitals = new PlayerVitals(); this.eating = new FoodUse(this); this.deathHandled = false;
+    this.reactions = new PlayerReactions(); this.deathEquipment = null;
+    this.vitals.onDamage = () => this.reactions.hurt();
     if (world) {
       world.getPlayerData = () => this.savePlayer();
       const previousLoad = world.onLoad;
@@ -378,6 +381,7 @@ export class MovementController {
     this.accumulator += Number.isFinite(frameSeconds) ? Math.max(0, frameSeconds) : 0;
     // Sub-nanosecond rounding must not postpone a tick at a clock boundary.
     while (this.accumulator + 1e-9 >= MOVEMENT.fixedStep) {
+      this.reactions.tick();
       this.previous = snapshot(this.player);
       const wasFlying = this.player.flying;
       const before = { x: this.player.x, y: this.player.y, z: this.player.z, jumpCount: this.player.jumpCount, sprintImpulseCount: this.player.sprintImpulseCount };
@@ -402,7 +406,7 @@ export class MovementController {
       this.vitals.tick({ player: this.player, creative: this.gameMode === 'creative',
         distance: Math.hypot(this.player.x-before.x,this.player.z-before.z),
         swimDistance: Math.hypot(this.player.x-before.x,this.player.y-before.y,this.player.z-before.z),
-        jumped: this.player.jumpCount !== before.jumpCount, sprintJump: this.player.sprintImpulseCount !== before.sprintImpulseCount });
+        jumped: this.player.jumpCount !== before.jumpCount, sprintJump: this.player.sprintImpulseCount !== before.sprintImpulseCount, settings:this.settings });
       if (this.gameMode === 'survival' && this.vitals.hunger <= 6) this.player.sprinting = false;
       if (this.vitals.dead) { this.die(); this.accumulator = 0; break; }
       this.drops.step(this.player);
@@ -429,8 +433,13 @@ export class MovementController {
     this.player = { ...createPlayer(), ...position, size: this.size };
     this.player.eyeOffset = this.eyeHeight;
     this.player.animation = createPlayerAnimation(aimYaw, aimPitch);
-    if (resetVitals) { this.vitals.reset(); this.deathHandled = false; }
+    if (resetVitals) { this.vitals.reset(); this.deathHandled = false; this.deathEquipment = null; }
+    this.reactions.reset();
     this.pause();
+    if(resetVitals) {
+      if(this.world)this.world.playerData=this.savePlayer();
+      this.onRespawn?.();
+    }
   }
 
   teleport(position) {
@@ -474,15 +483,24 @@ export class MovementController {
   }
   die() {
     if (!this.vitals.dead || this.deathHandled) return false;
-    this.deathHandled = true; this.pause();
+    this.deathHandled = true;
+    this.deathEquipment = {mainHand:this.inventory.mainHand?{...this.inventory.mainHand}:null,
+      offhand:this.inventory.offhand?{...this.inventory.offhand}:null,slots:this.inventory.slots.slice(0,41).map(s=>s?{...s}:null)};
+    this.reactions.die(); this.pause();
     const at = {x:this.player.x,y:this.player.y+.2,z:this.player.z};
     this.inventory.dropCarried(stack => this.drops.spawn(stack.id,stack.count,at,{thrown:true}));
     this.onDeath?.(); return true;
   }
-  savePlayer() { return { x:this.player.x,y:this.player.y,z:this.player.z,...this.vitals.toJSON() }; }
+  savePlayer() { return { x:this.player.x,y:this.player.y,z:this.player.z,...this.vitals.toJSON(),settings:{...this.settings} }; }
   loadPlayer(data = {}) {
     if (['x','y','z'].every(axis=>Number.isFinite(data[axis]))) this.teleport(data);
+    if(data.settings) {
+      const settings=Object.fromEntries(Object.entries(data.settings).filter(([key,value])=>Object.hasOwn(DEFAULT_SETTINGS,key)&&Number.isFinite(value)&&(key==='size'?value>0:value>=0)));
+      const result=this.configureSettings(settings);
+      if(!result.ok && settings.falldamage!==undefined)this.configure('falldamage',settings.falldamage);
+    }
     this.vitals.restore(data.vitals ?? data); this.deathHandled = false;
+    this.reactions.reset(); this.deathEquipment=null;
     if (this.vitals.dead) this.die();
   }
 }

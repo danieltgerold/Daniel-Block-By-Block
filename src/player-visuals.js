@@ -82,6 +82,9 @@ export function animatePlayerModel(model, feet, pose, cameraMode = 0, inventory 
   model.scale.setScalar(feet.size ?? 1);
   model.position.set(feet.x, feet.y, feet.z);
   model.rotation.set(0, pose.torsoYaw, 0);
+  const deathAngle = (pose.deathProgress??0)*Math.PI/2;
+  model.rotation.z = deathAngle;
+  model.position.y += Math.sin(deathAngle)*8*MODEL_SCALE*(feet.size??1);
   model.visible = cameraMode !== 0;
   const j = model.userData.joints;
   j.Head.visible = cameraMode !== 0;

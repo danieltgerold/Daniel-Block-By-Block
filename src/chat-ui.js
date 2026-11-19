@@ -300,8 +300,9 @@ export class ChatUI {
     const age = time - this.lastMessageAt;
     const opacity = open ? 1 : Math.max(0, Math.min(1, 1 - (age - 10_000) / 1000));
     const panel = this.elements['chat-panel'];
-    panel.hidden = this.mode === 'menu' || this.mode === 'death' || (!open && (this.service.messages.length === 0 || opacity === 0));
-    panel.style.opacity = String(opacity);
+    const hidden = this.mode === 'menu' || this.mode === 'death' || (!open && (this.service.messages.length === 0 || opacity === 0));
+    if(panel.hidden!==hidden)panel.hidden=hidden;
+    if(panel.style.opacity!==String(opacity))panel.style.opacity=String(opacity);
   }
 
   dispose() {
