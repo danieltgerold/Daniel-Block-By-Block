@@ -8,13 +8,16 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "golden": "node tools/golden/generate.mjs"
+    "golden": "node tools/golden/generate.mjs",
+    "test:parity": "node --test tests/parity/*.test.js",
+    "test:browsers": "playwright test"
   },
   "dependencies": {
     "three": "^0.187.0"
   },
   "devDependencies": {
     "happy-dom": "^21.0.4",
-    "vite": "^8.3.8"
+    "vite": "^8.3.8",
+    "@playwright/test": "1.65.1"
   }
 }
