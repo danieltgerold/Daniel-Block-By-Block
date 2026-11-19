@@ -3,9 +3,11 @@
 import { ITEMS } from './inventory.js';
 import { placeBlock } from './block-actions.js';
 import { useBucket } from './bucket-use.js';
+import { miningToolWear, useHoe } from './tool-use.js';
 export function breakTargetBlock({ controller, world, yaw, pitch, feet = controller.player, hit = controller.targetBlock(feet, yaw, pitch), onBreak = () => {} }) {
   const block = hit ? world.blockAt(hit.x, hit.y, hit.z) : null;
-  if (!block || !world.destroyBlock(hit.x, hit.y, hit.z, { gameMode: controller.gameMode, tool: controller.inventory.mainHand, player: controller.player })) return false;
+  if (!block || !world.destroyBlock(hit.x, hit.y, hit.z, { gameMode: controller.gameMode, tool: controller.inventory.mainHand, toolDefinition:ITEMS.get(controller.inventory.mainHand?.id), player: controller.player })) return false;
+  miningToolWear(controller,block);
   controller.particles?.breakBlock(block);
   if (controller.gameMode !== 'creative') controller.vitals?.exhaust(.005);
   onBreak(hit.x, hit.y, hit.z); return true;
@@ -69,6 +71,8 @@ export class BlockPlacement {
     if (block?.definition.interaction && !secondary && this.onUse(block)) {
       this.release(true); return true;
     }
+    const hoe=useHoe(this.controller,this.world,hit);
+    if(hoe.handled)return hoe.success;
     if (ITEMS.get(stack?.id)?.food) {
       if (this.controller.placementHeld) this.controller.eating?.start();
       return false;

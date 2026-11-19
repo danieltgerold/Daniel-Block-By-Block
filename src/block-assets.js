@@ -32,12 +32,13 @@ export function getItemGeometry(size, id) {
   const geometry = new THREE.BufferGeometry(); geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3)); geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.setIndex(indices);
-  // Doors need separate upper/lower textures; other partials share one material.
-  if (parts.length === 2) groups.forEach((g, i) => geometry.addGroup(g.start, g.count, i));
+  // Face groups also preserve the distinct top/bottom/side textures on farmland.
+  groups.forEach((g, i) => geometry.addGroup(g.start, g.count, i));
   geometry.userData.textures = groups.map(g => g.texture); partialGeometries.set(key, geometry); return geometry;
 }
 export function getItemMaterials(id, geometry) {
-  return BLOCK_TYPES.get(id)?.collisionShape === 'door' ? geometry.userData.textures.map(getFaceMaterial) : getBlockMaterials(id);
+  if(geometry.userData.textures){const materials=geometry.userData.textures.map(getFaceMaterial);return materials.every(m=>m===materials[0])?materials[0]:materials;}
+  return getBlockMaterials(id);
 }
 export function getFaceTexture(id) {
   if (!faceTextures.has(id)) {

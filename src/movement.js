@@ -237,7 +237,7 @@ export class MovementController {
     this.inventory = new PlayerInventory({ onDrop: stack => this.throwItem(stack) });
     this.drops = new DroppedItems(world, this.inventory);
     if (world) {
-      world.onDrop = (stack, at) => this.drops.spawn(stack.id, stack.count, at);
+      world.onDrop = (stack, at) => this.drops.spawn(stack.id, stack.count, at,{stack});
       world.getGameMode = () => this.gameMode;
       world.getPlayers = () => [this.player];
       for (const drop of world.pendingDrops?.splice(0) ?? []) world.onDrop(drop.stack, drop.at);
@@ -327,7 +327,7 @@ export class MovementController {
     const ray = this.interactionRay(this.player, yaw, pitch);
     const angle = random() * Math.PI * 2, spread = random() * .02;
     this.drops.spawn(stack.id, stack.count, { x: this.player.x, y: ray.origin.y - .3, z: this.player.z },
-      { thrown: true, velocity: { x: ray.direction.x * .3 + Math.cos(angle) * spread,
+      { thrown: true, stack, velocity: { x: ray.direction.x * .3 + Math.cos(angle) * spread,
         y: ray.direction.y * .3 + .1, z: ray.direction.z * .3 + Math.sin(angle) * spread } });
   }
   pickBlock(yaw, pitch) {
@@ -512,14 +512,14 @@ export class MovementController {
       offhand:this.inventory.offhand?{...this.inventory.offhand}:null,slots:this.inventory.slots.slice(0,41).map(s=>s?{...s}:null)};
     this.reactions.die(); this.pause();
     const at = {x:this.player.x,y:this.player.y+.2,z:this.player.z};
-    this.inventory.dropCarried(stack => this.drops.spawn(stack.id,stack.count,at,{thrown:true}));
+    this.inventory.dropCarried(stack => this.drops.spawn(stack.id,stack.count,at,{thrown:true,stack}));
     this.onDeath?.();
     // Input/camera cleanup in the death-screen transition must not discard
     // unprocessed world ticks from this render frame.
     if(this.vitals.dead)this.accumulator=remainingWorldTime;
     return true;
   }
-  savePlayer() { return { x:this.player.x,y:this.player.y,z:this.player.z,...this.vitals.toJSON(),settings:{...this.settings} }; }
+  savePlayer() { return { x:this.player.x,y:this.player.y,z:this.player.z,...this.vitals.toJSON(),settings:{...this.settings},inventory:this.inventory.save(),drops:this.drops.save() }; }
   loadPlayer(data = {}) {
     if (['x','y','z'].every(axis=>Number.isFinite(data[axis]))) this.teleport(data);
     if(data.settings) {
@@ -527,6 +527,8 @@ export class MovementController {
       const result=this.configureSettings(settings);
       if(!result.ok && settings.falldamage!==undefined)this.configure('falldamage',settings.falldamage);
     }
+    if(data.drops)this.drops.load(data.drops);
+    if(data.inventory)this.inventory.load(data.inventory);
     this.vitals.restore(data.vitals ?? data); this.deathHandled = false;
     this.reactions.reset(); this.deathEquipment=null;
     if (this.vitals.dead) this.die();

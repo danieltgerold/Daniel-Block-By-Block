@@ -1,3 +1,4 @@
+import { STONE_SHAPES, MINERALS, TOOL_MATERIALS, TOOL_TYPES } from './mining-content.js';
 // Recipe data/matching has no DOM or inventory mutations. A server can use it too.
 export const INGREDIENT_GROUPS = new Map([['planks', { tag: 'wood.planks' }]]);
 export const registerIngredientGroup = (id, selector) => INGREDIENT_GROUPS.set(id, selector);
@@ -85,8 +86,7 @@ export function recipeLayout(recipe, size) {
   return layout;
 }
 export const RECIPES = new RecipeRegistry();
-// Ready for the future iron item; deliberately absent from the active book
-// until that ingredient exists. No iron progression is introduced here.
+// Register once both ingredients exist; the iron content unlocks this recipe.
 export const BUCKET_RECIPE = Object.freeze({ id: 'bucket', type: 'shaped', pattern: ['I I', ' I '],
   key: { I: 'iron.ingot' }, output: { id: 'bucket', count: 1 }, name: 'Bucket', category: 'materials', grids: [3] });
 export function registerBucketRecipe(items) {
@@ -105,3 +105,19 @@ for (const wood of ['oak', 'pine']) for (const [part, pattern, count] of [['slab
 RECIPES.register({ id: 'furnace', type: 'shaped', pattern: ['CCC', 'C C', 'CCC'], key: { C: 'cobblestone' }, output: { id: 'furnace', count: 1 }, name: 'Furnace', category: 'building', grids: [3] });
 for (const wood of ['oak', 'pine']) RECIPES.register({ id: `${wood}.stairs`, type: 'shaped', pattern: ['P  ', 'PP ', 'PPP'], key: { P: `${wood}.planks` },
   output: { id: `${wood}.stairs`, count: 4 }, name: `${wood === 'oak' ? 'Oak' : 'Pine'} Stairs`, category: 'building', grids: [3] });
+const shaped=(id,pattern,key,output,count=1,category='building')=>RECIPES.register({id,type:'shaped',pattern,key,output:{id:output,count},category});
+shaped('stone.bricks',['MM','MM'],{M:'stone'},'stone.bricks',4);
+for(const [base] of STONE_SHAPES)for(const [shape,pattern,count] of [['slab',['MMM'],6],['stairs',['M  ','MM ','MMM'],4],['wall',['MMM','MMM'],6]])
+  shaped(`${base}.${shape}`,pattern,{M:base},`${base}.${shape}`,count);
+shaped('chiseled.stone.bricks',['M','M'],{M:'stone.bricks.slab'},'chiseled.stone.bricks');
+for(const stone of ['granite','diorite','andesite'])shaped(`polished.${stone}`,['MM','MM'],{M:stone},`polished.${stone}`,4);
+for(const [mineral,,,,hardness,item] of MINERALS)if(hardness){
+  shaped(`${mineral}.block`,['MMM','MMM','MMM'],{M:item},`${mineral}.block`);
+  RECIPES.register({id:`${mineral}.unpack`,type:'shapeless',ingredients:[`${mineral}.block`],output:{id:item,count:9},category:'materials'});
+}
+const patterns={pickaxe:['MMM',' S ',' S '],axe:['MM','MS',' S'],shovel:['M','S','S'],hoe:['MM',' S',' S'],sword:['M','M','S']};
+for(const [material] of TOOL_MATERIALS)for(const type of TOOL_TYPES) {
+  const M=material==='wood'?{group:'planks'}:material==='stone'?'cobblestone':material==='diamond'?'diamond':`${material}.ingot`;
+  shaped(`${material}.${type}`,patterns[type],{M,S:'stick'},`${material}.${type}`,1,'tools');
+}
+shaped('shears',[' I','I '],{I:'iron.ingot'},'shears',1,'tools');

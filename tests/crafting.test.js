@@ -34,7 +34,7 @@ test('Pine/table definitions, give, cutout persistence, log faces and reusable f
   assert.equal(ITEMS.get('stick').block, false); assert.equal(stick.geometry.type, 'BufferGeometry');
   assert.equal(stick.geometry.boundingBox.max.z - stick.geometry.boundingBox.min.z, .375 / 16);
   assert.equal(stick.geometry, other.geometry); assert.equal(stick.material, other.material);
-  assert.equal(stick.material.alphaTest, .5); assert.equal(stick.material.side, THREE.DoubleSide);
+  assert.equal(stick.material.alphaTest, .5); assert.equal(stick.material.side, THREE.FrontSide);
   setItemAppearance(stick, 'pine.log'); assert.equal(stick.geometry.type, 'BoxGeometry');
   const c = new MovementController(new VoxelWorld({ depth: 3 })), renderer = new DroppedItemRenderer(new THREE.Scene());
   const pile = c.drops.spawn('stick', 4, { x: 10, y: 1, z: 10 }); renderer.update(c.drops);

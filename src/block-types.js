@@ -1,5 +1,8 @@
 import { grassBehavior } from './block-behaviors.js';
 import { breakingProperties } from './breaking-properties.js';
+import { canHarvest } from './breaking-properties.js';
+import { TOOL_DEFINITIONS } from './mining-content.js';
+import { registerStoneContent } from './stone-content.js';
 // Definitions describe identity; world storage, inventory and cubes share them.
 export const BLOCK_TYPES = new Map();
 const listeners = new Set();
@@ -19,6 +22,7 @@ export function registerBlockType(definition) {
 }
 export function blockFaceTexture(id, axis, sign, state = BLOCK_TYPES.get(id)?.defaultState ?? {}) {
   const definition = BLOCK_TYPES.get(id);
+  if(id==='farmland' && axis===1 && sign>0)return state.moisture>0?'farmland.wet':'farmland.dry';
   if (definition?.tags.includes('wood.logs')) return axis === 'xyz'.indexOf(state.axis ?? 'y') ? `${id.split('.')[0]}.end` : `${id.split('.')[0]}.bark`;
   if (definition?.collisionShape === 'door') {
     const turns = ['north', 'east', 'south', 'west']; let facing = state.facing ?? 'north';
@@ -46,6 +50,9 @@ export function blockFaceVisible(id, neighborId) {
 // Collision and render opacity have no bearing on what an item drops.
 export function blockDrops(block, context = {}) {
   if (context.gameMode === 'creative') return [];
+  const item=context.toolDefinition??TOOL_DEFINITIONS.get(context.tool?.id)??context.tool;
+  if(!canHarvest(block.definition,item))return [];
+  if(block.definition.tags.includes('leaves')&&item?.tool?.type==='shears')return [{id:block.id,count:1}];
   const rule = block.definition.drops;
   const drops = typeof rule === 'function' ? rule({ ...context, block })
     : rule === 'self' ? [{ id: block.definition.id, count: 1 }] : rule ?? [];
@@ -56,7 +63,7 @@ export const blockMatches = (id, ingredient) => typeof ingredient === 'string' ?
   : Boolean(ingredient?.tag && BLOCK_TYPES.get(id)?.tags.includes(ingredient.tag));
 for (const [id, name, color, extra = {}] of [
   ['bedrock', 'Bedrock', '#41474b'],
-  ['stone', 'Stone', '#929da4'], ['cobblestone', 'Cobblestone', '#879198'],
+  ['stone', 'Stone', '#929da4', {drops:[{id:'cobblestone',count:1}]}], ['cobblestone', 'Cobblestone', '#879198'],
   ['dirt', 'Dirt', '#a47145'],
   ['grass.block', 'Grass Block', '#74ba42', { faces: { top: 'grass.top', bottom: 'dirt', side: 'grass.side' }, particleTexture: 'grass.side', behavior: grassBehavior, drops: [{ id: 'dirt', count: 1 }] }],
   ['sand', 'Sand', '#edda98', { falling: true }], ['gravel', 'Gravel', '#a0a09a', { falling: true }],
@@ -84,3 +91,4 @@ registerBlockType({ id: 'furnace', name: 'Furnace', particleTexture: 'furnace.si
   defaultState: { facing: 'north', lit: false }, itemState: { facing: 'south', lit: false } });
 registerBlockType({ id: 'water', name: 'Water', solid: false, opaque: false, collisionShape: 'fluid', renderMode: 'fluid', inventoryItem: false,
   particles: false, drops: [], defaultState: { level: 0, falling: false } });
+registerStoneContent(registerBlockType);

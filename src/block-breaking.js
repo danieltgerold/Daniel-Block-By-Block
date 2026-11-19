@@ -1,6 +1,7 @@
 import { breakTargetBlock } from './block-placement.js';
 import { ITEMS } from './inventory.js';
 import { miningProgress, sameBreakingTarget } from './breaking-properties.js';
+import { stackKey } from './stack-data.js';
 
 export function breakingRate(block, controller, eye) {
   return miningProgress(block.definition, ITEMS.get(controller.inventory.mainHand?.id), {
@@ -15,7 +16,7 @@ export class BlockBreaking {
   }
   dispose() { this.unsubscribe?.(); this.cancel(); if (this.controller.breaking === this) this.controller.breaking = null; }
   cancel() { this.target = null; this.progress = 0; this.hit = null; this.cooldown = 0; this.creativeRepeat = 0; this.hitTicks = 0; }
-  clearProgress() { this.target = null; this.progress = 0; this.hit = null; this.hitTicks = 0; }
+  clearProgress() { this.target = null; this.progress = 0; this.hit = null; this.hitTicks = 0; this.heldKey=null; }
   press() {
     if (!this.canInteract()) return false;
     this.controller.setMining(true); this.controller.requestSwing();
@@ -36,8 +37,9 @@ export class BlockBreaking {
     const aim = this.getAim(), hit = this.controller.targetBlock(this.controller.player, aim.yaw, aim.pitch);
     const block = hit && this.world.blockAt(hit.x, hit.y, hit.z);
     if (!block?.definition.solid || block.definition.unbreakable) { this.clearProgress(); return false; }
-    if (!sameBreakingTarget(block, this.target)) {
-      this.clearProgress(); this.target = block;
+    const heldKey=`${this.controller.inventory.selected}:${stackKey(this.controller.inventory.mainHand)}`;
+    if (!sameBreakingTarget(block, this.target)||heldKey!==this.heldKey) {
+      this.clearProgress(); this.target = block;this.heldKey=heldKey;
     }
     this.hit = hit;
     const eye = this.controller.interactionRay(this.controller.player, aim.yaw, aim.pitch).origin;

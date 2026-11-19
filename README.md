@@ -278,8 +278,8 @@ same reachable block remains targeted. Its animation clock does not decide
 when a block breaks. Release, menus/inventory, reach loss, a new target, or any
 meaningful target mutation cancels progress; switching faces on the same block does not.
 A successful non-instant break starts a six-tick interval before continued
-holding can progress on the next block. Existing drops stay unchanged, including
-bare-hand Stone, Cobblestone and Furnace drops; a door removes both halves once.
+holding can progress on the next block. Pickaxe-only blocks drop nothing without
+a sufficient pickaxe; Stone drops Cobblestone. A door removes both halves once.
 
 The central bare-hand durations are Dirt/Sand 15 ticks, Grass/Gravel 18,
 Stone 150, Cobblestone 200, Glass 9, Leaves 6, wood logs/planks/slabs/stairs/fences
@@ -288,9 +288,9 @@ Bedrock is unbreakable in Survival. Eyes underwater reduce per-tick progress to
 one fifth, and being airborne does so again, stacking to one twenty-fifth.
 These modifiers are sampled every tick. A shared calculation uses mining speed
 divided by hardness and by 30 (harvestable) or 100 (missing a required tool).
-Item definitions can later supply tool type, speed and level. Normal items use
-bare-hand speed. Harvest metadata affects timing independently of drops: Stone,
-Cobblestone and Furnace retain their current drops without adding tools today.
+Tool definitions supply type, speed, harvest level and durability. Normal items
+use bare-hand speed. Harvest eligibility is checked separately from tool speed,
+and changing the held tool resets progress. See the stone/tool content below.
 
 A reused pair of contrasting planes displays the bar on the hit shape's actual
 exposed face, including stair unions, slabs and doors. The light rectangle fills left to right inside
@@ -492,7 +492,7 @@ Pine Leaves (`pine.leaves`), Crafting Table (`crafting.table`), Oak/Pine Slab
 (`oak.door`, `pine.door`), and Furnace (`furnace`). Stick (`stick`)
 is a separate non-placeable item with a shared cutout sprite, rather than a cube.
 For example, `/give grass.block 64`; Tab completes all registered item IDs.
-No tools are added yet; the existing bare-hand drops remain available.
+The stone/tool extension below adds pickaxe-gated drops and more registered items.
 
 Sand and Gravel schedule support checks two ticks after a nearby cell changes.
 Unsupported cells transfer into lightweight falling entities with 0.04 gravity,
@@ -614,7 +614,7 @@ The 3x3 book also offers matching-wood slabs (three planks in a row -> six), fen
 three), stairs (six planks in a three-row staircase -> four, including its mirror),
 and a Furnace (eight Cobblestone around an empty center -> one). These
 wood recipes require a single species, unlike the mixed-plank Stick/Table recipes.
-No tools or tree generation are added.
+Tools are registered in the same crafting book; tree generation is unchanged.
 
 ## Partial blocks and directional placement
 
@@ -928,3 +928,53 @@ formats and errors, exact positions and reset motion, plus destination cameras,
 collision outlines and chunk loading. These
 checks run without taking control of the user's computer; visual playtesting
 remains with the user.
+
+
+## Stone building blocks, minerals and tools
+
+The shared registries now include mossy cobblestone; stone bricks (ordinary,
+mossy, cracked and chiseled); granite, diorite and andesite (ordinary and polished).
+Stone, cobblestone, mossy cobblestone, stone bricks and mossy stone bricks each
+have slabs, stairs and connecting walls. Slabs merge and drop two when doubled;
+stairs retain corner/upside-down placement. Walls use narrow connected boxes
+with 1.5-block player collision. No flat-world layers or terrain generation changed.
+
+IDs use dotted names, such as `stone.bricks`, `mossy.cobblestone.wall`,
+`polished.granite` and `stone.bricks.slab`. Creative and `/give` list every item.
+Original procedural 16-pixel textures feed world, inventory, held and drop visuals.
+
+Eight ores are available: `coal.ore`, `iron.ore`, `gold.ore`, `lapis.ore`,
+`redstone.ore`, `diamond.ore`, `emerald.ore` and `nether.quartz.ore`.
+Iron/gold ore drop themselves; the others drop their minerals. Lapis drops 4-8,
+redstone 4-5. Harvest levels are wood/gold for coal/quartz, stone for iron/lapis,
+and iron for gold/redstone/diamond/emerald. Diamond can harvest all eight.
+Hands, wrong tools and insufficient picks yield no ore drops. Mineral IDs are
+`coal`, `iron.ingot`, `gold.ingot`, `lapis.lazuli`, `redstone.dust`, `diamond`,
+`emerald`, `nether.quartz`. The first seven have `<mineral>.block` storage forms.
+Redstone remains decorative. There are no enchantments, XP or newer-era ores.
+
+The recipe book includes all requested stone shapes, polished variants, stone
+bricks/chiseled bricks, and reversible 9-to-1 mineral storage. Mossy materials
+remain Creative/command-accessible because vines are not registered. Each new
+smelting recipe takes 200 ticks: iron/gold ore to ingots, cobblestone to stone,
+and stone bricks to cracked stone bricks. Coal burns 1,600 ticks (eight items);
+existing glass, porkchop and wood fuel behavior is retained.
+
+Tools use `<material>.<type>` IDs: wood/stone/iron/gold/diamond and
+pickaxe/axe/shovel/hoe/sword, plus `shears`. All 26 are nonstackable, have original
+sprites and durability bars, and follow the existing mirrored/offset crafting
+system. Wood accepts mixed oak/pine planks. Iron also unlocks the bucket recipe.
+Tool speed, harvest strength and wear are separate. Durability breaks only when
+damage exceeds the listed 1.8 maximum (60 wooden uses, 239 shears uses). Creative
+uses no durability. Shears collect leaves; swords mine leaves at 1.5x hand speed.
+No combat or mobs were added.
+
+Right-click exposed dirt/grass with a hoe for 15/16-high farmland. Existing
+scheduled world updates hydrate it from nearby water and eventually return dry
+unused farmland to dirt. Farmland drops dirt; crops and trampling are omitted.
+
+Individual tool damage survives cursor/drag/shift/offhand operations, throwing,
+pickup and programmatic world snapshots. Damaged tools never merge into stacks
+or common dropped piles. Snapshots now include player inventory and drop lots,
+with quantities and original pickup/despawn deadlines preserved. Older snapshots
+without these fields remain supported. This does not add automatic disk saving.

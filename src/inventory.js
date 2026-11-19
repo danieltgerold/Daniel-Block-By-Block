@@ -4,6 +4,8 @@ import { blockIcon, textureIcon } from './block-icons.js';
 import { CraftingSession, insertItemStacks } from './crafting.js';
 import { SMELTING, FUELS } from './smelting.js';
 import { registerBucketRecipe } from './recipes.js';
+import { MINERALS, TOOL_DEFINITIONS } from './mining-content.js';
+import { sameStack } from './stack-data.js';
 export function registerItem(definition) {
   if (!definition.id || !Number.isSafeInteger(definition.maxStack) || definition.maxStack < 1) throw new Error('Invalid item definition');
   ITEMS.set(definition.id, Object.freeze({ ...definition }));
@@ -25,6 +27,8 @@ for (const [id, name, maxStack] of [['bucket', 'Bucket', 16], ['water.bucket', '
   creativeKind: 'bucket', creativeMaterial: id === 'bucket' ? 'empty' : 'water', icon: textureIcon(id),
 });
 export const HOTBAR = Array.from({ length: 9 }, (_, i) => i);
+for(const [,name,color,,,id] of MINERALS)registerItem({id,name,color,maxStack:64,model:'flat',display:'item',texture:id,icon:textureIcon(id),creativeKind:'mineral',creativeCategory:'materials'});
+for(const definition of TOOL_DEFINITIONS.values())registerItem({...definition,icon:textureIcon(definition.texture)});
 export const MAIN = Array.from({ length: 27 }, (_, i) => i + 9);
 export const STORAGE = [...HOTBAR, ...MAIN];
 export const ARMOR = ['head', 'chest', 'legs', 'feet'];
@@ -55,23 +59,24 @@ export class PlayerInventory {
     if (index === FURNACE_INPUT) return Boolean(this.furnace && item);
     return Boolean(item && this.isSlot(index) && (index < 36 || index === OFFHAND || index >= CRAFT_START || item.armor === ARMOR[index - 36]));
   }
-  capacity(id, indices = STORAGE) {
+  capacity(id, indices = STORAGE, data = {}) {
     const item = ITEMS.get(id);
-    const offhand = indices === STORAGE && this.offhand?.id === id ? item.maxStack - this.offhand.count : 0;
-    return item ? offhand + indices.reduce((sum, i) => sum + (this.accepts(i, id) && (!this.slots[i] || this.slots[i].id === id)
+    const incoming={...data,id};
+    const offhand = indices === STORAGE && sameStack(this.offhand,incoming) ? item.maxStack - this.offhand.count : 0;
+    return item ? offhand + indices.reduce((sum, i) => sum + (this.accepts(i, id) && (!this.slots[i] || sameStack(this.slots[i],incoming))
       ? item.maxStack - (this.slots[i]?.count ?? 0) : 0), 0) : 0;
   }
-  insert(id, count, indices = STORAGE) {
+  insert(id, count, indices = STORAGE, data = {}) {
     let remaining = quantity(count);
     if (!ITEMS.has(id) || remaining < 0n) throw new Error('Invalid item stack');
     const partials = indices === STORAGE ? [this.selected, OFFHAND, ...STORAGE.filter(i => i !== this.selected)] : indices;
     for (const empty of [false, true]) for (const i of empty ? indices : partials) {
       if (!remaining) break;
       const stack = this.slots[i];
-      if (!this.accepts(i, id) || (empty ? Boolean(stack) : !stack || stack.id !== id)) continue;
+      if (!this.accepts(i, id) || (empty ? Boolean(stack) : !sameStack(stack,{...data,id}))) continue;
       const amount = Number(remaining < BigInt(ITEMS.get(id).maxStack - (stack?.count ?? 0))
         ? remaining : BigInt(ITEMS.get(id).maxStack - (stack?.count ?? 0)));
-      if (amount) { this.slots[i] = { id, count: (stack?.count ?? 0) + amount }; remaining -= BigInt(amount); }
+      if (amount) { this.slots[i] = { ...data,id, count: (stack?.count ?? 0) + amount }; remaining -= BigInt(amount); }
     }
     this.changed();
     return remaining;
@@ -96,13 +101,13 @@ export class PlayerInventory {
     if (!this.cursor) {
       if (!stack) return;
       const count = button === 2 ? Math.ceil(stack.count / 2) : stack.count;
-      this.cursor = { id: stack.id, count };
+      this.cursor = { ...stack, count };
       stack.count -= count;
       if (!stack.count) this.slots[index] = null;
     } else if (this.accepts(index, this.cursor.id)) {
-      if (!stack || stack.id === this.cursor.id) {
+      if (!stack || sameStack(stack,this.cursor)) {
         const amount = Math.min(button === 2 ? 1 : this.cursor.count, ITEMS.get(this.cursor.id).maxStack - (stack?.count ?? 0));
-        this.slots[index] = { id: this.cursor.id, count: (stack?.count ?? 0) + amount };
+        this.slots[index] = { ...this.cursor, count: (stack?.count ?? 0) + amount };
         this.cursor.count -= amount;
         if (!this.cursor.count) this.cursor = null;
       } else [this.slots[index], this.cursor] = [this.cursor, stack];
@@ -113,7 +118,7 @@ export class PlayerInventory {
     const plan = new Map();
     if (!this.cursor) return plan;
     const eligible = [...new Set(indices)].filter(i => this.accepts(i, this.cursor.id)
-      && (!this.slots[i] || this.slots[i].id === this.cursor.id) && (this.slots[i]?.count ?? 0) < ITEMS.get(this.cursor.id).maxStack);
+      && (!this.slots[i] || sameStack(this.slots[i],this.cursor)) && (this.slots[i]?.count ?? 0) < ITEMS.get(this.cursor.id).maxStack);
     const share = button === 2 ? 1 : Math.floor(this.cursor.count / (eligible.length || 1));
     let left = this.cursor.count;
     for (const i of eligible) {
@@ -124,7 +129,7 @@ export class PlayerInventory {
   }
   drag(indices, button) {
     for (const [i, count] of this.dragPlan(indices, button)) {
-      this.slots[i] = { id: this.cursor.id, count: (this.slots[i]?.count ?? 0) + count };
+      this.slots[i] = { ...this.cursor, count: (this.slots[i]?.count ?? 0) + count };
       this.cursor.count -= count;
     }
     if (this.cursor?.count === 0) this.cursor = null;
@@ -137,8 +142,8 @@ export class PlayerInventory {
     if (this.furnace && index < 36) {
       if (SMELTING.has(stack.id)) target = [FURNACE_INPUT]; else if (FUELS.has(stack.id)) target = [FURNACE_FUEL];
     }
-    const remaining = this.insert(stack.id, stack.count, target);
-    this.slots[index] = remaining ? { id: stack.id, count: Number(remaining) } : null;
+    const remaining = this.insert(stack.id, stack.count, target, stack);
+    this.slots[index] = remaining ? { ...stack, count: Number(remaining) } : null;
     this.changed();
   }
   shiftMatching(id, fromHotbar, fromCraft = false) {
@@ -146,15 +151,16 @@ export class PlayerInventory {
   }
   collect(id = this.cursor?.id) {
     if (!id || (this.cursor && this.cursor.id !== id)) return;
-    if (!this.cursor) this.cursor = { id, count: 0 };
     for (const i of [...STORAGE, OFFHAND, 36, 37, 38, 39, ...(this.crafting.active ? this.crafting.indices : []), ...(this.furnace ? [FURNACE_INPUT, FURNACE_FUEL, FURNACE_OUTPUT] : [])]) {
       const stack = this.slots[i];
       if (stack?.id !== id) continue;
+      if(!this.cursor)this.cursor={...stack,count:0};
+      if(!sameStack(stack,this.cursor))continue;
       const amount = Math.min(stack.count, ITEMS.get(id).maxStack - this.cursor.count);
       this.cursor.count += amount; stack.count -= amount;
       if (!stack.count) this.slots[i] = null;
     }
-    if (!this.cursor.count) this.cursor = null;
+    if (!this.cursor?.count) this.cursor = null;
     this.changed();
   }
   swap(a, b) {
@@ -167,7 +173,7 @@ export class PlayerInventory {
     const stack = this.slots[index];
     if (!stack) return;
     const count = whole ? stack.count : 1;
-    this.onDrop({ id: stack.id, count }); stack.count -= count;
+    this.onDrop({ ...stack, count }); stack.count -= count;
     if (!stack.count) this.slots[index] = null;
     this.changed();
     return true;
@@ -175,7 +181,7 @@ export class PlayerInventory {
   dropCursor(whole = false) {
     if (!this.cursor) return;
     const count = whole ? this.cursor.count : 1;
-    this.onDrop({ id: this.cursor.id, count }); this.cursor.count -= count;
+    this.onDrop({ ...this.cursor, count }); this.cursor.count -= count;
     if (!this.cursor.count) this.cursor = null;
     this.changed();
   }
@@ -184,8 +190,8 @@ export class PlayerInventory {
     this.crafting.end();
     if (this.cursor) {
       const { id, count } = this.cursor;
-      const remainder = this.insert(id, count);
-      if (remainder) this.onDrop({ id, count: remainder });
+      const remainder = this.insert(id, count, STORAGE, this.cursor);
+      if (remainder) this.onDrop({ ...this.cursor, id, count: remainder });
       this.cursor = null;
     }
     this.changed();
@@ -198,6 +204,22 @@ export class PlayerInventory {
     for (let i=0;i<50;i++) this.slots[i] = null;
     this.cursor = null; this.changed();
     for (const stack of stacks) onDrop(stack);
+  }
+  save() {return {slots:this.slots.slice(0,50).map(copyStack),cursor:copyStack(this.cursor),selected:this.selected};}
+  load(data) {
+    this.closeFurnace();this.crafting.active=false;this.cursor=null;this.slots=Array(50).fill(null);
+    const overflow=[];
+    const read=stack=>{
+      if(!ITEMS.has(stack?.id)||!Number.isSafeInteger(stack.count)||stack.count<=0)return null;
+      const cap=ITEMS.get(stack.id).maxStack,n=Math.min(cap,stack.count),copy={...stack,count:n};
+      if(stack.count>n)overflow.push({...copy,count:stack.count-n});
+      return copy;
+    };
+    for(let i=0;i<50;i++)this.slots[i]=read(data.slots?.[i]);
+    this.cursor=read(data.cursor);this.selected=Number.isInteger(data.selected)?Math.max(0,Math.min(8,data.selected)):0;
+    this.crafting.end();
+    for(const stack of overflow){const left=this.insert(stack.id,stack.count,STORAGE,stack);if(left)this.onDrop({...stack,count:left});}
+    this.changed();
   }
   openFurnace(entity) {
     this.closeFurnace(); this.crafting.end(); this.furnace = entity;
@@ -237,8 +259,8 @@ export class PlayerInventory {
       index = HOTBAR.find(i => !this.slots[i]) ?? this.selected;
       const displaced = this.slots[index]; this.slots[index] = null;
       if (displaced) {
-        const remaining = this.insert(displaced.id, displaced.count, MAIN);
-        if (remaining) this.onDrop({ id: displaced.id, count: remaining });
+        const remaining = this.insert(displaced.id, displaced.count, MAIN, displaced);
+        if (remaining) this.onDrop({ ...displaced, count: remaining });
       }
       this.slots[index] = { id, count: 1 }; this.select(index); return true;
     }

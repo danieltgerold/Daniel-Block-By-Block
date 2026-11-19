@@ -23,7 +23,8 @@ test('/give splits 130 into 64/64/2, handles errors, and preserves arbitrarily l
   c.inventory.insert('dirt', 2304); assert.equal(total(c.inventory), 2304n);
   s.submit('/give dirt 1000000000000000000000');
   assert.equal(c.drops.total(), 1000000000000000000000n); assert.equal(c.drops.piles.length, 1);
-  assert.deepEqual(s.completions('/give di'), ['/give dirt ']);
+  assert.ok(s.completions('/give di').includes('/give dirt '));
+  assert.ok(s.completions('/give di').includes('/give diamond.pickaxe '));
   assert.deepEqual(s.completions('/tp '), ['/tp ~ ~ ~']);
   c.teleport({ x: 10.125, y: 64.5, z: -20.25 }); s.submit('/tp ~ ~1 ~-2');
   assert.deepEqual([c.player.x, c.player.y, c.player.z], [10.125, 65.5, -22.25]);

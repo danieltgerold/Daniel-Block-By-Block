@@ -1,5 +1,6 @@
 // Original, deterministic pixel art. Logical rows run from top to bottom.
 // No per-block textures, external artwork, random speckle or runtime canvases.
+import { registerMiningTextures } from './mining-textures.js';
 export const BLOCK_TEXTURES = new Map();
 function tile(id, palette, paint) {
   const indices = new Uint8Array(256);
@@ -155,6 +156,7 @@ for (const filled of [false, true]) tile(filled ? 'water.bucket' : 'bucket', ['#
 tile('water', ['#508fd4', '#5798dc', '#4787cc'], r => {
   r(1, 3, 5, 1, 1); r(9, 1, 4, 1, 1); r(6, 7, 4, 1, 2); r(1, 12, 5, 1, 2); r(10, 13, 4, 1, 1);
 });
+registerMiningTextures(tile,BLOCK_TEXTURES);
 export const paletteAlpha = color => color.length === 9 ? parseInt(color.slice(7), 16) : 255;
 export const textureHasAlpha = id => Boolean(BLOCK_TEXTURES.get(id)?.palette.some(color => paletteAlpha(color) < 255));
 export function texturePixels(id) {

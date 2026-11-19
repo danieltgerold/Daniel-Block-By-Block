@@ -14,18 +14,22 @@ export function breakingProperties(id) {
     requiresTool, harvestLevel: 0 };
 }
 
-// Item definitions may later provide tool: { type, speed, level }. Ordinary
+// Item definitions provide tool: { type, speed, level }. Ordinary
 // held blocks/items have no tool metadata and always use bare-hand speed.
 export function miningProgress(definition, item, { grounded = true, underwater = false } = {}) {
-  const { hardness, unbreakable, preferredTool, requiresTool, harvestLevel = 0 } = definition;
+  const { hardness, unbreakable, preferredTool } = definition;
   if (unbreakable || hardness < 0) return 0;
   if (hardness === 0) return 1;
   const tool = item?.tool, effective = Boolean(tool && tool.type === preferredTool);
-  const canHarvest = !requiresTool || effective && (tool.level ?? 0) >= harvestLevel;
+  const harvest = canHarvest(definition,item);
   let speed = effective ? tool.speed ?? 1 : 1;
+  if(tool?.type==='sword'&&(definition.tags?.includes('leaves')||definition.tags?.includes('plants')))speed=1.5;
   if (underwater) speed /= 5;
   if (!grounded) speed /= 5;
-  return speed / hardness / (canHarvest ? 30 : 100);
+  return speed / hardness / (harvest ? 30 : 100);
+}
+export function canHarvest(definition,item) {
+  return !definition.requiresTool || Boolean(item?.tool && item.tool.type===definition.preferredTool && (item.tool.level??0)>=(definition.harvestLevel??0));
 }
 
 export function sameBreakingTarget(a, b) {

@@ -46,7 +46,8 @@ test('central hardness metadata and actual Survival clock give the requested bar
     assert.equal(BLOCK_TYPES.get(id).breakTicks,ticks); const f=fixture(id); if(id.endsWith('slab'))f.aim.pitch=-.25;
     f.breaking.press(); f.tick(ticks-1); assert.equal(f.world.blockIdAt(0,1,0),id,`${id} broke early`); f.tick(); assert.equal(f.world.blockIdAt(0,1,0),null,`${id} missed its tick`); assert.equal(f.breaking.target,null);
     if(id.endsWith('door')) assert.equal(f.world.blockIdAt(0,2,0),null);
-    if(['stone','cobblestone','furnace','oak.door'].includes(id)) assert.equal(f.controller.drops.total(),1n);
+    if(['stone','cobblestone','furnace'].includes(id)) assert.equal(f.controller.drops.total(),0n);
+    if(id==='oak.door') assert.equal(f.controller.drops.total(),1n);
   }
   const double=fixture('pine.slab',{type:'double'}); double.breaking.press(); double.tick(60); assert.equal(double.world.blockIdAt(0,1,0),null); assert.equal(double.controller.drops.total(),2n);
 });
