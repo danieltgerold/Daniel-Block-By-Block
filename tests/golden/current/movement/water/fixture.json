@@ -1,0 +1,42 @@
+{
+  "formatVersion": 1,
+  "name": "water",
+  "world": {
+    "baseY": 0,
+    "layers": [
+      "bedrock",
+      "dirt",
+      "dirt",
+      "grass.block"
+    ]
+  },
+  "initial": {
+    "x": 0.5,
+    "y": 4,
+    "z": 0.5
+  },
+  "edits": [
+    {
+      "x": 0,
+      "y": 4,
+      "z": 0,
+      "id": "water",
+      "state": {
+        "level": 0,
+        "falling": false
+      }
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 0,
+      "id": "water",
+      "state": {
+        "level": 0,
+        "falling": false
+      }
+    }
+  ],
+  "ticks": 160,
+  "schedule": "stepPlayer only; world simulation does not tick"
+}

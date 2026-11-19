@@ -1,0 +1,22 @@
+{
+  "formatVersion": 1,
+  "suites": [
+    "movement",
+    "raycast"
+  ],
+  "world": {
+    "depth": 3,
+    "baseY": -3,
+    "layers": [
+      "dirt",
+      "dirt",
+      "dirt"
+    ]
+  },
+  "initial": {
+    "x": 0.5,
+    "y": 0,
+    "z": 0.5
+  },
+  "schedule": "stepPlayer only; world simulation does not tick"
+}
