@@ -1,0 +1,14 @@
+{
+  "formatVersion": 1,
+  "registrySize": 25,
+  "baseCounts": {
+    "defaults": 25,
+    "slabs": 3,
+    "stairs": 40,
+    "doors": 16,
+    "fences": 16,
+    "item-fence": 1
+  },
+  "caseCount": 404,
+  "boxCount": 964
+}

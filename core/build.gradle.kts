@@ -9,6 +9,10 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
+}
+
 tasks.test {
     useJUnitPlatform()
     systemProperty("golden.dir", rootProject.file("tests/golden").path)

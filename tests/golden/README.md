@@ -25,5 +25,16 @@ parity for the newer features.
 
 `trig/` is produced separately by `./gradlew :core:writeTrigGolden`.
 
+`shapes/` isolates block geometry from world mutation. Cases describe the block
+definition, geometry state, query kind, resolved fence connection mask, and
+translation. Coordinate rows identify each case and its ordered box index;
+zero-box cases still appear in the case table. Masks use north/east/south/west
+bits 0..3, with -1 for the no-world item shape. This contract consumes resolved
+stair shapes and fence connections; neighbor discovery and stair recomputation
+belong to the later world integration stage.
+`./gradlew :core:test` replays all 404 shape cases and compares the 964 ordered
+boxes by raw double bits. This proves JVM geometry parity; TeaVM and world-query
+integration remain pending.
+
 When rules change, investigate mismatches before replacing reference values.
 Never use a changed default terrain configuration to silently redefine a fixture.

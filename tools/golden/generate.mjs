@@ -12,6 +12,7 @@ import { BLOCK_REACH, VoxelWorld } from '../../src/voxel-world.js';
 import { jumpVelocityForHeight } from '../../src/player-settings.js';
 import { formatBool, formatNumber } from './format.mjs';
 import { generateCurrent } from './current-fixtures.mjs';
+import { generateShapes } from './shapes.mjs';
 
 const DEFAULT_OUT = new URL('../../tests/golden/', import.meta.url).pathname;
 
@@ -174,6 +175,7 @@ export function generate(outDir = DEFAULT_OUT) {
   writeCsv(dir, 'cases.csv', 'ox,oy,oz,dx,dy,dz,reach', cases.map(c => c.map(formatNumber).join(',')));
   writeCsv(dir, 'expected.csv', 'hit,x,y,z,nx,ny,nz,distance', runRaycast(rayEdits, cases));
   generateCurrent(outDir);
+  generateShapes(outDir);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) generate(process.argv[2] ?? DEFAULT_OUT);
