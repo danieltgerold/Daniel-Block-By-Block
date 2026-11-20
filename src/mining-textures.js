@@ -1,4 +1,4 @@
-import { paintTool, toolPalette } from './tool-art.js';
+import { TOOL_SPRITES } from './tool-art.js';
 import { STONE_MATERIALS, MINERALS, TOOL_DEFINITIONS } from './mining-content.js';
 const shade=(hex,k)=>'#'+hex.slice(1).match(/../g).map(c=>Math.min(255,Math.round(parseInt(c,16)*k)).toString(16).padStart(2,'0')).join('');
 export function registerMiningTextures(tile,tiles) {
@@ -36,7 +36,10 @@ export function registerMiningTextures(tile,tiles) {
       else {r(6,1,4,1,1);r(4,2,8,3,1);r(3,5,10,5,1);r(5,10,6,3,1);r(7,13,2,1,1);r(5,3,6,3,2);r(4,6,8,3,2);r(6,9,4,3,2);r(6,3,2,5,3);r(9,6,2,3,4);}
     });
   }
-  for(const [id,def] of TOOL_DEFINITIONS)tile(id,toolPalette(def),r=>paintTool(r,def.tool.type));
+  for(const id of TOOL_DEFINITIONS.keys()) {
+    const art=TOOL_SPRITES[id];
+    tile(id,art.palette,r=>art.rows.forEach((row,y)=>[...row].forEach((color,x)=>r(x,y,1,1,parseInt(color,36)))));
+  }
   for(const wet of [false,true])tile(wet?'farmland.wet':'farmland.dry',wet?['#69472f','#3f3023','#805638']:['#a47145','#765035','#b38251'],r=>{
     for(let z=1;z<16;z+=4){r(0,z,16,2,1);r(0,z-1,16,1,2);}r(3,5,2,1,0);r(11,13,2,1,0);
   });

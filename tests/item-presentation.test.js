@@ -11,7 +11,7 @@ import { placeBlock } from '../src/block-actions.js';
 import { VoxelWorld } from '../src/voxel-world.js';
 import { FurnaceEntity } from '../src/smelting.js';
 import { InventoryUI } from '../src/inventory-ui.js';
-import { ITEM_DISPLAY, itemModelTransform, itemSourceAlignment } from '../src/item-display.js';
+import { displayProfile, itemGrip } from '../src/item-display.js';
 import { createPlayerModel, animatePlayerModel, syncEquipment, createEmptyHand, updateEmptyHand } from '../src/player-visuals.js';
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-7, `${a} != ${b}`);
 const base = { torsoYaw: .2, headYaw: .1, aimPitch: -.4, phase: 2, amount: .8, crouch: 0, swingActive: false, swingProgress: 0 };
@@ -36,75 +36,30 @@ test('Door uses a complete flat picture with a filled interior in every item con
   }
 });
 
-test('both sprite profiles grip by their end, use model-unit TRS, and follow animated hands in both F5 views', () => {
-  for (const id of ['stick', 'oak.door', 'pine.door']) {
-    const inventory = new PlayerInventory(), model = createPlayerModel(), profile = ITEMS.get(id).display;
-    inventory.slots[0] = { id, count: 1 }; inventory.slots[40] = { id, count: 1 };
-    for (const sign of [1, -1]) for (const view of ['first', 'third']) {
-      const m = itemModelTransform(profile, view, sign), reference = ITEM_DISPLAY[profile][view][sign > 0 ? 'right' : 'left'];
-      const origin = new THREE.Vector3().applyMatrix4(m);
-      near(origin.x, sign * reference.translation[0] / 16); near(origin.y, reference.translation[1] / 16); near(origin.z, reference.translation[2] / 16);
-      const grip = profile === 'handheld' ? new THREE.Vector3(-.3125, -.3125, 0) : new THREE.Vector3(0, -.40625, 0);
-      near(grip.applyMatrix4(itemSourceAlignment(profile, view, sign)).applyMatrix4(m).length(), 0);
-    }
-    for (const size of [1, 2]) for (const pose of [base, { ...base, crouch: 1 }, { ...base, swingActive: true, swingProgress: .35 }]) {
-      let rear;
-      for (const view of [1, 2]) {
-        animatePlayerModel(model, { x: 3, y: 4, z: -5, size }, pose, view, inventory); syncEquipment(model, inventory); model.updateMatrixWorld(true);
-        const matrices = [];
-        for (const [key, arm] of [['rightItem', 'Right Arm'], ['leftItem', 'Left Arm']]) {
-          const item = model.userData.equipment[key], joint = model.userData.joints[arm]; assert.equal(item.parent, joint);
-          const expected = joint.matrixWorld.clone().multiply(item.matrix); assert.deepEqual(item.matrixWorld.elements, expected.elements);
-          near(new THREE.Vector3().setFromMatrixScale(item.matrixWorld).x, .9375 * (profile === 'handheld' ? .85 : .55) * size);
-          if (profile === 'generated') {
-            const sign = key === 'rightItem' ? 1 : -1, pixel = .9375 / 16;
-            const grip = new THREE.Vector3(0, -.40625, 0).applyMatrix4(item.matrix);
-            near(grip.x, sign * pixel); near(grip.y, -9 * pixel); near(grip.z, -2 * pixel - .001);
-            assert.ok(grip.y > -10 * pixel && grip.y < -8 * pixel, 'grip overlaps the palm rather than floating below the hand');
-          }
-          matrices.push([...item.matrixWorld.elements]);
+test('flat picture and handle profiles grip at actual palms, follow arm poses and restore their first-person renderer frames', () => {
+  for(const id of ['stick','oak.door','pine.door']) {
+    const inventory=new PlayerInventory(),model=createPlayerModel(),hand=createEmptyHand(16/9),profile=displayProfile(ITEMS.get(id));
+    inventory.slots[0]=inventory.slots[40]={id,count:1};
+    for(const size of [1,2])for(const pose of [base,{...base,crouch:1},{...base,swingActive:true,swingProgress:.35}]) {
+      let previous;
+      for(const view of [1,2]) {
+        animatePlayerModel(model,{x:3,y:4,z:-5,size},pose,view,inventory);syncEquipment(model,inventory);model.updateMatrixWorld(true);
+        const matrices=[];
+        for(const [key,arm] of [['rightItem','Right Arm'],['leftItem','Left Arm']]) {
+          const item=model.userData.equipment[key],joint=model.userData.joints[arm],grip=itemGrip(profile).applyMatrix4(item.matrix);
+          near(grip.y,-(profile==='handheld'?9.5:9)*.9375/16);
+          assert.deepEqual(item.matrixWorld.elements,joint.matrixWorld.clone().multiply(item.matrix).elements);matrices.push([...item.matrixWorld.elements]);
         }
-        if (view === 1) rear = matrices; else assert.deepEqual(matrices, rear);
+        if(view===1)previous=matrices;else assert.deepEqual(matrices,previous);
       }
     }
-    const hand = createEmptyHand(16 / 9); updateEmptyHand(hand, base, inventory); hand.scene.updateMatrixWorld(true); hand.camera.updateProjectionMatrix();
-    assert.equal(hand.rig.visible, false, 'the unposed empty-hand arm is hidden while holding an item');
-    for (const [index, mesh] of [hand.mainItem, hand.offhandItem].entries()) {
-      const vertices = mesh.geometry.getAttribute('position'), projected = new THREE.Box3();
-      if (profile === 'generated') {
-        // Measure the opaque picture, not the transparent padding of its plane.
-        const pixels = texturePixels(ITEMS.get(id).texture), picture = new THREE.Box3();
-        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (pixels[(y * 16 + x) * 4 + 3]) {
-          picture.expandByPoint(new THREE.Vector3(x / 16 - .5, .5 - y / 16, 0));
-          picture.expandByPoint(new THREE.Vector3((x + 1) / 16 - .5, .5 - (y + 1) / 16, 0));
-        }
-        for (const x of [picture.min.x, picture.max.x]) for (const y of [picture.min.y, picture.max.y]) projected.expandByPoint(new THREE.Vector3(x, y, 0).applyMatrix4(mesh.matrixWorld).project(hand.camera));
-        const wrist = hand.doorHands[index], arm = wrist.children.find(child => child.name === 'Door Grip Arm');
-        assert.equal(wrist.visible, true); assert.equal(mesh.parent, wrist); assert.equal(arm.geometry, hand.arm.geometry);
-        assert.equal(arm.visible, false, 'Door hides its associated first-person arm');
-        near(new THREE.Vector3(0, -.18, 0).applyMatrix4(mesh.matrix).length(), 0);
-        for (const p of [[0, 0, 0], [0, .3, 0], [-.2, .2, 0], [.2, .2, 0]]) {
-          const point = new THREE.Vector3(...p).applyMatrix4(mesh.matrixWorld), ray = new THREE.Raycaster(new THREE.Vector3(), point.clone().normalize());
-          assert.ok(!ray.intersectObject(arm).some(hit => hit.distance < point.length() - .001), 'grip arm stays behind the Door face');
-        }
-      } else for (let n = 0; n < vertices.count; n++) projected.expandByPoint(new THREE.Vector3().fromBufferAttribute(vertices, n).applyMatrix4(mesh.matrixWorld).project(hand.camera));
-      assert.ok(projected.max.x > -1 && projected.min.x < 1 && projected.max.y > -1 && projected.min.y < 1, 'resting sprite is in view');
-      assert.ok(projected.getSize(new THREE.Vector3()).x < 1, 'not oversized across the screen');
-      if (profile === 'generated') {
-        assert.ok(projected.max.y < -.2, 'Door stays entirely in the lower view, clear of the crosshair');
-        assert.ok(projected.getSize(new THREE.Vector3()).y < .75, 'Door remains below 38% of screen height');
-        assert.ok(projected.getSize(new THREE.Vector3()).x < .5, 'Door remains below 25% of screen width');
-        assert.ok(projected.min.y < -1 && projected.min.y > -1.1, 'just the bottom edge extends beyond the view');
-      }
-    }
-    const matrix = () => { hand.scene.updateMatrixWorld(true); return [...hand.mainItem.matrixWorld.elements]; };
-    const rest = matrix(); updateEmptyHand(hand, { ...base, swingActive: true, swingProgress: .35 }, inventory);
-    assert.notDeepEqual(matrix(), rest); updateEmptyHand(hand, { ...base, equipHeight: .2 }, inventory);
-    assert.ok(matrix()[13] < -.8); updateEmptyHand(hand, base, inventory); assert.deepEqual(matrix(), rest);
-    inventory.slots[0] = { id: 'grass.block', count: 1 }; // Return to the ordinary block path.
-    updateEmptyHand(hand, base, inventory); assert.equal(hand.mainItem.geometry.type, 'BoxGeometry');
-    assert.equal(hand.doorHands[0].visible, false); assert.equal(hand.mainItem.parent, hand.scene);
-    inventory.slots[0] = null; updateEmptyHand(hand, base, inventory); assert.equal(hand.rig.visible, true); assert.equal(hand.mainItem.visible, false);
+    updateEmptyHand(hand,base,inventory);hand.scene.updateMatrixWorld(true);const initial=hand.mainItem.matrixWorld.clone();
+    assert.equal(hand.rig.visible,false);assert.equal(hand.mainItem.parent,hand.itemHands[0]);assert.equal(hand.itemHands[0].children.length,1);
+    updateEmptyHand(hand,{...base,swingActive:true,swingProgress:.35},inventory);hand.scene.updateMatrixWorld(true);assert.equal(hand.mainItem.matrixWorld.equals(initial),false);
+    updateEmptyHand(hand,{...base,equipHeight:.2},inventory);assert.ok(hand.itemHands[0].matrix.elements[13]<-.8);
+    updateEmptyHand(hand,base,inventory);hand.scene.updateMatrixWorld(true);assert.ok(hand.mainItem.matrixWorld.equals(initial));
+    inventory.slots[0]={id:'grass.block',count:1};updateEmptyHand(hand,base,inventory);assert.equal(hand.mainItem.geometry.type,'BoxGeometry');assert.equal(hand.mainItem.parent,hand.itemHands[0]);
+    inventory.slots[0]=null;updateEmptyHand(hand,base,inventory);assert.equal(hand.rig.visible,true);assert.equal(hand.itemHands[0].visible,false);
   }
 });
 

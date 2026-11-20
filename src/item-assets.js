@@ -18,14 +18,14 @@ function spriteTexture(id) {
 export function setItemAppearance(mesh, id = 'dirt') {
   const key = `${id}:${mesh.userData.displayContext ?? 'world'}`;
   if (mesh.userData.appearanceKey === key) return;
-  const item = ITEMS.get(id), size = mesh.userData.itemSize ?? 1;
+  // Held models use one unit of source geometry; display transforms own scale.
+  const item = ITEMS.get(id), size = mesh.userData.displayContext === 'firstperson' ? 1 : mesh.userData.itemSize ?? 1;
   if (item?.model === 'flat') {
     const plane=item.spriteDepth===0,materialKey=`${item.texture}:${plane?'plane':'solid'}`;
     if (!flatMaterials.has(materialKey)) flatMaterials.set(materialKey, new THREE.MeshBasicMaterial({
       map: spriteTexture(item.texture), alphaTest: .5, side: plane?THREE.DoubleSide:THREE.FrontSide, vertexColors: !plane, depthWrite: true, depthTest: true,
     }));
-    const spriteSize = mesh.userData.displayContext === 'firstperson' ? 1 : size;
-    mesh.geometry = plane ? spritePlaneGeometry(spriteSize) : spriteGeometry(item.texture, spriteSize); mesh.material = flatMaterials.get(materialKey);
+    mesh.geometry = plane ? spritePlaneGeometry(size) : spriteGeometry(item.texture, size); mesh.material = flatMaterials.get(materialKey);
   } else { mesh.geometry = getItemGeometry(size, id); mesh.material = getItemMaterials(id, mesh.geometry); }
   mesh.userData.appearanceKey = key; mesh.userData.itemId = id; mesh.userData.blockId = item?.block ? id : null;
 }

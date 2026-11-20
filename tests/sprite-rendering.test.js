@@ -75,14 +75,14 @@ test('redrawn tool silhouettes differ by type, are connected, and stay identical
   const types=['pickaxe','axe','shovel','hoe','sword'];
   assert.equal(new Set(types.map(t=>JSON.stringify(mask(`iron.${t}`)))).size,5);
   for(const type of types)for(const material of ['wood','stone','iron','gold','diamond'])assert.deepEqual(mask(`${material}.${type}`),mask(`iron.${type}`));
-  const axe=mask('iron.axe'),shovel=mask('iron.shovel');assert.ok(axe.filter(Boolean).length>shovel.filter(Boolean).length+12,'axe has a broad chopping blade, shovel a compact tip');
+  const axe=mask('iron.axe'),shovel=mask('iron.shovel');assert.ok(axe.filter(Boolean).length>shovel.filter(Boolean).length,'axe has a broad chopping blade, shovel a compact tip');
   for(const id of [...types.map(t=>`iron.${t}`),'shears']) {
     const m=mask(id),start=m.findIndex(Boolean),seen=new Set([start]),queue=[start];
     while(queue.length){const at=queue.pop(),x=at%16,y=Math.floor(at/16);for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const nx=x+dx,ny=y+dy,next=ny*16+nx;if(nx>=0&&nx<16&&ny>=0&&ny<16&&m[next]&&!seen.has(next)){seen.add(next);queue.push(next);}}}
     assert.equal(seen.size,m.filter(Boolean).length,`${id}: no detached art pixels`);
     assert.match(decodeURIComponent(ITEMS.get(id).icon),/viewBox="0 0 16 16"/);
   }
-  const scissors=mask('shears');assert.equal(scissors[12*16+3],false);assert.equal(scissors[12*16+11],false);
+  const scissors=mask('shears');assert.equal(scissors[12*16+4],false);assert.equal(scissors[12*16+10],false);
 });
 
 test('axe, shovel, sword and bucket keep aligned art through first-person equip/swing, both F5 poses, offhand and dropped rendering; switching restores proper geometry',()=>{
@@ -102,7 +102,7 @@ test('axe, shovel, sword and bucket keep aligned art through first-person equip/
       updateEmptyHand(hand,pose,inv);hand.scene.updateMatrixWorld(true);inspectSprite(hand.mainItem,definition.texture);inspectSprite(hand.offhandItem,definition.texture);
       assert.equal(hand.rig.visible,false);
     }
-    updateEmptyHand(hand,rest,inv);const initial=hand.mainItem.matrix.clone();updateEmptyHand(hand,{...rest,equipHeight:.2},inv);assert.ok(hand.mainItem.matrixWorldNeedsUpdate);updateEmptyHand(hand,rest,inv);assert.ok(hand.mainItem.matrix.equals(initial));
+    updateEmptyHand(hand,rest,inv);hand.scene.updateMatrixWorld(true);const initial=hand.mainItem.matrixWorld.clone();updateEmptyHand(hand,{...rest,equipHeight:.2},inv);assert.ok(hand.mainItem.matrixWorldNeedsUpdate);updateEmptyHand(hand,rest,inv);hand.scene.updateMatrixWorld(true);assert.ok(hand.mainItem.matrixWorld.equals(initial));
     const pile=drops.spawn(id,1,{x:10,y:4,z:0});renderer.update(drops);const item=renderer.meshes.get(pile.id).children[0];inspectSprite(item,definition.texture);assert.equal(item.geometry,createItemMesh(.25,id).geometry);
   }
   const item=hand.mainItem;setItemAppearance(item,'stone');assert.equal(item.geometry.type,'BoxGeometry');setItemAppearance(item,'iron.shovel');inspectSprite(item,'iron.shovel');

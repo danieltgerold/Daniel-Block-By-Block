@@ -656,8 +656,8 @@ slot/book icons, hands and dropped piles; placed two-cell doors are unchanged.
 Stick sprites retain shared 1/16-thick generated geometry and edge faces. Door
 items use a shared double-sided flat plane, crisp alpha-cutout silhouettes and a
 filled panel/window pattern with no interior transparent holes. Separate
-generated/handheld display paths adapt Java's model units to the animated hands;
-ordinary block and first-person equip/action paths remain separate. The carried
+door/handheld/item/block profiles adapt model units to the animated hands;
+all first-person held profiles share one equip/action parent per hand. The carried
 stack icon centers on viewport pointer coordinates with percentage transforms,
 keeping the count at lower right and pointer events disabled in every inventory.
 
@@ -666,7 +666,7 @@ irregular clear pixels across the whole tile. Shared binary-cutout textures serv
 world faces, icons, held items and drops; fancy neighboring leaf faces remain
 visible through gaps. Collision, persistence and leaf drop rules are unchanged.
 First-person Door items use a compact, angled 2D picture in the lower right/left,
-with a small part beyond the bottom edge. A shared wrist preserves picture
+with its lower grip near the bottom edge. A shared wrist preserves picture
 equip/action motion; the associated first-person arm is entirely hidden for Door
 items in either hand. Other held items and empty main hands retain their prior paths. Oak has
 wooden panels and Pine has horizontal bands, with no accidental holes. Third-person pictures
@@ -674,18 +674,23 @@ attach their bottom grip directly to the animated arm's actual palm, with player
 render scale applied once. Stick, regular-block and equip/swing behavior remain.
 Internal projection checks keep complete resting Doors clear of the crosshair.
 
-Ordinary flat items use the shared `item` display profile (also the default for
-new flat items), independently of Door and Stick grip profiles. Raw/cooked pork
-and buckets use Java's generated-item display TRS: first person rotation
-`[0,-90,25]`, translation `[1.13,3.2,1.13]/16`, scale 0.68; third person rotation
-zero, translation `[0,3,1]/16`, scale 0.55. Those compose after the wrist/animated
-shoulder, with separate source-axis/palm adaptation and the avatar render scale.
-The former shared alignment canceled the item-model translation and left the
-picture against the forearm; the corrected alignment retains that translation
-and puts an angled sheet forward of the actual palm. Both hands use the same
-shared path and follow walk, crouch, swing and eating poses in both F5 views.
-First person shows the item without an empty-hand arm and returns to the same
-lower-right/left resting pose after equip, swing or eating.
+Held-item transforms now have explicit, independent source, grip, model-display,
+and renderer/hand frames in `item-display.js`. Tools use the supplied Java 1.8.9
+model settings: first `[0,-135,25]`, `[0,4,2]/16`, scale 1.7; third
+`[0,90,-35]`, `[0,1.25,-3.5]/16`, scale .85. First-person renderer translation
+`(.56,-.52,-.72)`, 45-degree Y rotation and .4 scale are applied separately and
+once. Source orientation uses the actual diagonal handle; it never inverse-
+cancels the model's translation. Third-person tool grips lie in the final pixel
+of the real arm (9.5 model pixels below its shoulder) and scale with the avatar.
+
+Ordinary pictures use the `item` profile by default; doors use `door`, handles
+use `handheld`, and full blocks retain their centered 3D display. Pictures grip
+their bottom edge at the palm. Each first-person item is a child of one shared
+animation frame, so equip/swing/use moves it once and switching profiles cannot
+leave it under an old door wrist. Empty hands retain their existing arm path;
+held items, including doors, hide that arm. The offhand mirrors the entire main-
+hand arrangement once, without changing source UVs. Camera mode never alters
+the world attachment. The existing six-tick swing and eating clocks are retained.
 
 Each ordinary item reuses one cached generated sprite mesh: two continuous
 textured faces and 1/16-block thickness before display scaling, with side quads
@@ -941,7 +946,7 @@ with 1.5-block player collision. No flat-world layers or terrain generation chan
 
 IDs use dotted names, such as `stone.bricks`, `mossy.cobblestone.wall`,
 `polished.granite` and `stone.bricks.slab`. Creative and `/give` list every item.
-Original procedural 16-pixel textures feed world, inventory, held and drop visuals.
+Original 16-pixel textures feed world, inventory, held and drop visuals.
 
 Eight ores are available: `coal.ore`, `iron.ore`, `gold.ore`, `lapis.ore`,
 `redstone.ore`, `diamond.ore`, `emerald.ore` and `nether.quartz.ore`.
@@ -960,7 +965,9 @@ smelting recipe takes 200 ticks: iron/gold ore to ingots, cobblestone to stone,
 and stone bricks to cracked stone bricks. Coal burns 1,600 ticks (eight items);
 existing glass, porkchop and wood fuel behavior is retained.
 
-Tools use `<material>.<type>` IDs: wood/stone/iron/gold/diamond and
+The 26 tools use the user-supplied offline sprite artwork, copied losslessly
+into `tool-art.js` as synchronous palette/row data. No external folder or
+asynchronous image fetch is needed. Tools use `<material>.<type>` IDs: wood/stone/iron/gold/diamond and
 pickaxe/axe/shovel/hoe/sword, plus `shears`. All 26 are nonstackable, have original
 sprites and durability bars, and follow the existing mirrored/offset crafting
 system. Wood accepts mixed oak/pine planks. Iron also unlocks the bucket recipe.

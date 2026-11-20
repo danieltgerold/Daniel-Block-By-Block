@@ -105,7 +105,7 @@ test('ordinary sprites share thin silhouette-only geometry, nearest sampling and
 
 test('ordinary main/offhand items keep Java display scales, sit forward at animated palms in both F5 views, and have stable lower-corner first-person equip/swing/eat poses without arms',()=>{
   const inv=new PlayerInventory(),model=createPlayerModel(),hand=createEmptyHand(16/9),base={torsoYaw:0,headYaw:0,aimPitch:0,phase:0,amount:0,crouch:0,swingActive:false,swingProgress:0,equipHeight:1};
-  near(ITEM_DISPLAY.generated.first.right.scale,.68);near(ITEM_DISPLAY.generated.third.right.scale,.55);
+  near(ITEM_DISPLAY.item.first.scale*.4,.5);near(ITEM_DISPLAY.item.third.scale,.55);
   for(const id of ordinary) {
     inv.slots[0]=stack(id);inv.slots[40]=stack(id);
     for(const size of [1,2])for(const pose of [base,{...base,amount:.8,phase:2,crouch:1},{...base,swingActive:true,swingProgress:.35},{...base,eating:true,eatAge:12}]) {
@@ -116,22 +116,22 @@ test('ordinary main/offhand items keep Java display scales, sit forward at anima
         for(const [name,arm] of [['rightItem','Right Arm'],['leftItem','Left Arm']]) {
           const item=model.userData.equipment[name],joint=model.userData.joints[arm];assert.equal(item.parent,joint);assert.deepEqual(item.matrixWorld.elements,joint.matrixWorld.clone().multiply(item.matrix).elements);
           near(new THREE.Vector3().setFromMatrixScale(item.matrixWorld).x,.9375*.55*size);
-          const center=new THREE.Vector3().applyMatrix4(item.matrix);assert.ok(center.y<-.4&&center.y>-.75);assert.ok(center.z<-.18&&center.z>-.4);matrices.push([...item.matrixWorld.elements]);
+          const grip=new THREE.Vector3(0,-5.5/16,0).applyMatrix4(item.matrix);near(grip.y,-9*.9375/16);near(grip.z,-2*.9375/16);matrices.push([...item.matrixWorld.elements]);
         }
         if(mode===1)rear=matrices;else assert.deepEqual(matrices,rear);
       }
     }
-    updateEmptyHand(hand,base,inv);hand.scene.updateMatrixWorld(true);const rest=hand.mainItem.matrix.clone();assert.equal(hand.rig.visible,false);assert.ok(hand.doorHands.every(w=>!w.visible));
+    updateEmptyHand(hand,base,inv);hand.scene.updateMatrixWorld(true);const rest=hand.itemHands[0].matrix.clone();assert.equal(hand.rig.visible,false);assert.ok(hand.itemHands.every(w=>w.visible));
     for(const [i,item] of [hand.mainItem,hand.offhandItem].entries()) {
       const box=new THREE.Box3(),pixels=texturePixels(id);
       for(let y=0;y<16;y++)for(let x=0;x<16;x++)if(pixels[(y*16+x)*4+3])for(const a of [x,x+1])for(const b of [y,y+1])for(const z of [-1/32,1/32])box.expandByPoint(new THREE.Vector3(a/16-.5,.5-b/16,z).applyMatrix4(item.matrixWorld).project(hand.camera));
       assert.ok(i===0?box.getCenter(new THREE.Vector3()).x>.2:box.getCenter(new THREE.Vector3()).x<-.2);assert.ok(box.max.y<-.1);assert.ok(box.min.y<1&&box.max.y>-1);assert.ok(box.getSize(new THREE.Vector3()).x<.8);
     }
-    updateEmptyHand(hand,{...base,swingActive:true,swingProgress:.4},inv);assert.equal(hand.mainItem.matrix.equals(rest),false);updateEmptyHand(hand,{...base,equipHeight:.2},inv);assert.ok(hand.mainItem.matrix.elements[13]<rest.elements[13]);
-    if(ITEMS.get(id).food){updateEmptyHand(hand,{...base,eating:true,eatAge:12},inv);assert.equal(hand.mainItem.matrix.equals(rest),false);}
-    updateEmptyHand(hand,base,inv);assert.ok(hand.mainItem.matrix.equals(rest));
+    updateEmptyHand(hand,{...base,swingActive:true,swingProgress:.4},inv);assert.equal(hand.itemHands[0].matrix.equals(rest),false);updateEmptyHand(hand,{...base,equipHeight:.2},inv);assert.ok(hand.itemHands[0].matrix.elements[13]<rest.elements[13]);
+    if(ITEMS.get(id).food){updateEmptyHand(hand,{...base,eating:true,eatAge:12},inv);assert.equal(hand.itemHands[0].matrix.equals(rest),false);}
+    updateEmptyHand(hand,base,inv);assert.ok(hand.itemHands[0].matrix.equals(rest));
   }
-  for(const id of ['oak.door','pine.door']){inv.slots[0]=stack(id);updateEmptyHand(hand,base,inv);assert.equal(hand.mainItem.geometry.type,'PlaneGeometry');assert.ok(hand.doorHands.every(w=>w.children.every(c=>!c.visible||c===hand.mainItem)));assert.equal(hand.rig.visible,false);}
+  for(const id of ['oak.door','pine.door']){inv.slots[0]=stack(id);updateEmptyHand(hand,base,inv);assert.equal(hand.mainItem.geometry.type,'PlaneGeometry');assert.ok(hand.itemHands.every(w=>w.children.length===1));assert.equal(hand.rig.visible,false);}
   inv.slots[0]=stack('stick');updateEmptyHand(hand,base,inv);assert.equal(displayProfile(ITEMS.get('stick')),'handheld');inv.slots[0]=stack('stone');updateEmptyHand(hand,base,inv);assert.equal(hand.mainItem.geometry.type,'BoxGeometry');
   inv.slots[0]=null;updateEmptyHand(hand,base,inv);assert.equal(hand.rig.visible,true);
 });
