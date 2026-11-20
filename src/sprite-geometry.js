@@ -26,7 +26,11 @@ export function spriteGeometry(texture, size = 1) {
   // cuts out padding; only the silhouette gets side geometry below.
   const z=1/32,faceUv=[[0,0],[1,0],[1,1],[0,1]];
   quad([[-.5,-.5,z],[.5,-.5,z],[.5,.5,z],[-.5,.5,z]],[0,0,1],faceUv);
-  quad([[.5,-.5,-z],[-.5,-.5,-z],[-.5,.5,-z],[.5,.5,-z]],[0,0,-1],faceUv);
+  // Both faces must sample the same texel at the same local X/Y. Reversing
+  // vertex order gives the back its outward winding; do not also mirror its UVs.
+  // A mirrored back image no longer matches the extruded silhouette/hole edges.
+  const backUv=[[1,0],[0,0],[0,1],[1,1]];
+  quad([[.5,-.5,-z],[-.5,-.5,-z],[-.5,.5,-z],[.5,.5,-z]],[0,0,-1],backUv);
   for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (opaque(x, y)) {
     const x0 = x / 16 - .5, x1 = (x + 1) / 16 - .5, y1 = .5 - y / 16, y0 = .5 - (y + 1) / 16, z = 1 / 32;
     const edgeUv = Array(4).fill([(x + .5) / 16, 1 - (y + .5) / 16]);

@@ -89,7 +89,7 @@ test('ordinary sprites share thin silhouette-only geometry, nearest sampling and
     assert.equal(a.geometry,b.geometry);assert.equal(a.material,b.material);near(g.boundingBox.max.z-g.boundingBox.min.z,1/16);
     assert.equal(a.material.map.minFilter,THREE.NearestFilter);assert.equal(a.material.map.magFilter,THREE.NearestFilter);assert.equal(a.material.side,THREE.FrontSide);assert.equal(a.material.alphaTest,.5);
     let faceVertices=0;for(let i=0;i<n.count;i++)if(Math.abs(n.getZ(i))===1)faceVertices++;assert.equal(faceVertices,8);
-    near(p.getX(0),-.5);near(p.getX(4),.5);near(uv.getX(0),0);near(uv.getX(4),0);
+    near(p.getX(0),-.5);near(p.getX(4),.5);near(uv.getX(0),0);near(uv.getX(4),1);
     const pixels=texturePixels(id),solid=(x,y)=>x>=0&&y>=0&&x<16&&y<16&&pixels[(y*16+x)*4+3]>0;
     let edges=0;for(let y=0;y<16;y++)for(let x=0;x<16;x++)if(solid(x,y))for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]])if(!solid(x+dx,y+dy))edges++;
     assert.equal(p.count,8+edges*4,'only exposed opaque boundaries get edge quads');

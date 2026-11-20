@@ -6,6 +6,9 @@ const flatMaterials = new Map(), spriteTextures = new Map();
 function spriteTexture(id) {
   if(!spriteTextures.has(id)) {
     const texture=getFaceTexture(id).clone();
+    // getFaceTexture already stores logical top-down art in bottom-up GPU rows.
+    // Keep that orientation for both picture faces and pixel-center edge UVs.
+    texture.flipY=false;
     texture.minFilter=texture.magFilter=THREE.NearestFilter;texture.generateMipmaps=false;
     texture.wrapS=texture.wrapT=THREE.ClampToEdgeWrapping;texture.needsUpdate=true;
     spriteTextures.set(id,texture);

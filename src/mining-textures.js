@@ -1,3 +1,4 @@
+import { paintTool, toolPalette } from './tool-art.js';
 import { STONE_MATERIALS, MINERALS, TOOL_DEFINITIONS } from './mining-content.js';
 const shade=(hex,k)=>'#'+hex.slice(1).match(/../g).map(c=>Math.min(255,Math.round(parseInt(c,16)*k)).toString(16).padStart(2,'0')).join('');
 export function registerMiningTextures(tile,tiles) {
@@ -35,16 +36,7 @@ export function registerMiningTextures(tile,tiles) {
       else {r(6,1,4,1,1);r(4,2,8,3,1);r(3,5,10,5,1);r(5,10,6,3,1);r(7,13,2,1,1);r(5,3,6,3,2);r(4,6,8,3,2);r(6,9,4,3,2);r(6,3,2,5,3);r(9,6,2,3,4);}
     });
   }
-  for(const [id,def] of TOOL_DEFINITIONS)tile(id,['#00000000','#4d392c','#946b43','#c69a61',shade(def.color,.6),def.color,shade(def.color,1.15)],r=>{
-    const type=def.tool.type;
-    if(type==='shears') {r(3,9,4,5,1);r(9,9,4,5,1);r(4,10,2,3,2);r(10,10,2,3,2);for(let i=0;i<7;i++){r(4+i,2+i,2,2,5);r(10-i,2+i,2,2,5);}r(7,7,2,2,4);r(5,2,1,3,6);return;}
-    for(let i=0;i<8;i++){r(2+i,12-i,2,2,1);r(2+i,12-i,1,1,2);}r(3,12,1,1,3);
-    if(type==='pickaxe'){r(5,2,9,2,4);r(6,1,6,1,4);r(5,2,8,1,5);r(6,2,4,1,6);r(13,4,2,4,4);r(13,4,1,3,5);r(4,3,2,2,5);}
-    if(type==='axe'){r(8,1,5,7,4);r(7,2,7,4,4);r(8,2,5,4,5);r(9,2,3,1,6);r(8,6,3,1,5);}
-    if(type==='shovel'){r(9,1,4,1,4);r(8,2,6,4,4);r(9,6,4,1,4);r(9,2,4,3,5);r(9,2,2,1,6);r(9,5,3,1,5);}
-    if(type==='hoe'){r(5,2,9,2,4);r(6,2,7,1,5);r(12,4,2,3,4);r(12,4,1,2,5);r(7,2,3,1,6);}
-    if(type==='sword'){for(let i=0;i<9;i++){r(5+i,8-i,3,3,4);r(6+i,8-i,1,2,5);r(6+i,8-i,1,1,6);}r(4,8,5,2,1);r(5,8,4,1,5);}
-  });
+  for(const [id,def] of TOOL_DEFINITIONS)tile(id,toolPalette(def),r=>paintTool(r,def.tool.type));
   for(const wet of [false,true])tile(wet?'farmland.wet':'farmland.dry',wet?['#69472f','#3f3023','#805638']:['#a47145','#765035','#b38251'],r=>{
     for(let z=1;z<16;z+=4){r(0,z,16,2,1);r(0,z-1,16,1,2);}r(3,5,2,1,0);r(11,13,2,1,0);
   });

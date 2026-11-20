@@ -978,3 +978,12 @@ pickup and programmatic world snapshots. Damaged tools never merge into stacks
 or common dropped piles. Snapshots now include player inventory and drop lots,
 with quantities and original pickup/despawn deadlines preserved. Older snapshots
 without these fields remain supported. This does not add automatic disk saving.
+
+
+Flat sprites share cached generated geometry with nearest, non-mipmapped,
+clamped textures. Front and back UVs use the same local XY mapping so thin
+silhouette edges and internal transparent holes align on both faces. Back-face
+winding is reversed independently of the UVs. Door pictures keep their existing
+zero-thickness path and hand transforms. Tool artwork uses original material-
+independent silhouettes with distinct pick, axe, spade, hoe, sword and shears
+shapes; the same textures supply every icon and rendered item view.
