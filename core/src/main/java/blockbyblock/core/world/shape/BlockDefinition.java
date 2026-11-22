@@ -1,47 +1,74 @@
 package blockbyblock.core.world.shape;
 
-/** Immutable geometry projection of the current JS registry; no gameplay hooks. */
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Immutable projection of the JS block registry. The table is generated into {@link GeneratedBlocks}
+ * from src/block-types.js; nothing here is edited by hand when a block is added.
+ */
 public final class BlockDefinition {
     public final String id;
     public final Shape shape;
     public final boolean solid;
     public final boolean opaque;
+    public final double hardness;
+    public final double breakTicks;
+    public final boolean requiresTool;
+    /** "pickaxe", "axe", "shovel" or "shears"; null when no tool is preferred. */
+    public final String preferredTool;
+    public final int harvestLevel;
+    public final int maxStack;
+    public final boolean falling;
+    public final DropRule dropRule;
+    /** Item dropped; null when the block drops nothing. For SELF it equals {@link #id}. */
+    public final String dropItem;
+    public final int dropCount;
+    /** Upper bound for RANGE drops; 0 otherwise. */
+    public final int dropMax;
+    private final String[] tags;
 
-    private BlockDefinition(String id, Shape shape, boolean solid, boolean opaque) {
+    BlockDefinition(String id, Shape shape, boolean solid, boolean opaque, double hardness, double breakTicks,
+                    boolean requiresTool, String preferredTool, int harvestLevel, int maxStack, boolean falling,
+                    DropRule dropRule, String dropItem, int dropCount, int dropMax, String[] tags) {
         this.id = id;
         this.shape = shape;
         this.solid = solid;
         this.opaque = opaque;
+        this.hardness = hardness;
+        this.breakTicks = breakTicks;
+        this.requiresTool = requiresTool;
+        this.preferredTool = preferredTool;
+        this.harvestLevel = harvestLevel;
+        this.maxStack = maxStack;
+        this.falling = falling;
+        this.dropRule = dropRule;
+        this.dropItem = dropItem;
+        this.dropCount = dropCount;
+        this.dropMax = dropMax;
+        this.tags = tags.clone();
     }
+
+    public boolean hasTag(String tag) {
+        // Short fixed arrays from the generated table.
+        for (String t : tags) if (t.equals(tag)) return true;
+        return false;
+    }
+
+    private static final Map<String, BlockDefinition> BY_ID = new HashMap<>(); // lookup only; never iterated
+    private static final BlockDefinition[] ALL = GeneratedBlocks.all();
+    static {
+        for (BlockDefinition definition : ALL) BY_ID.put(definition.id, definition);
+    }
+
+    /** Every block in registration order. */
+    public static BlockDefinition[] all() { return ALL.clone(); }
 
     /** Exact known identities only; prefix/suffix guesses must not register new IDs. */
     public static BlockDefinition forId(String id) {
         if (id == null) throw new IllegalArgumentException("Block ID must not be null");
-        return switch (id) {
-            case "bedrock", "stone", "cobblestone", "dirt", "grass.block", "sand", "gravel", "oak.log",
-                 "oak.planks", "pine.log", "pine.planks", "crafting.table", "furnace",
-                 "mossy.cobblestone", "stone.bricks", "mossy.stone.bricks", "cracked.stone.bricks",
-                 "chiseled.stone.bricks", "granite", "diorite", "andesite", "polished.granite",
-                 "polished.diorite", "polished.andesite", "coal.ore", "coal.block", "iron.ore",
-                 "iron.block", "gold.ore", "gold.block", "lapis.ore", "lapis.block", "redstone.ore",
-                 "redstone.block", "diamond.ore", "diamond.block", "emerald.ore", "emerald.block",
-                 "nether.quartz.ore" ->
-                new BlockDefinition(id, Shape.CUBE, true, true);
-            case "glass", "oak.leaves", "pine.leaves" ->
-                new BlockDefinition(id, Shape.CUBE, true, false);
-            case "oak.slab", "pine.slab", "stone.slab", "cobblestone.slab", "mossy.cobblestone.slab",
-                 "stone.bricks.slab", "mossy.stone.bricks.slab" ->
-                new BlockDefinition(id, Shape.SLAB, true, false);
-            case "oak.stairs", "pine.stairs", "stone.stairs", "cobblestone.stairs", "mossy.cobblestone.stairs",
-                 "stone.bricks.stairs", "mossy.stone.bricks.stairs" ->
-                new BlockDefinition(id, Shape.STAIRS, true, false);
-            case "oak.door", "pine.door" -> new BlockDefinition(id, Shape.DOOR, true, false);
-            case "oak.fence", "pine.fence" -> new BlockDefinition(id, Shape.FENCE, true, false);
-            case "stone.wall", "cobblestone.wall", "mossy.cobblestone.wall", "stone.bricks.wall",
-                 "mossy.stone.bricks.wall" -> new BlockDefinition(id, Shape.WALL, true, false);
-            case "farmland" -> new BlockDefinition(id, Shape.FARMLAND, true, false);
-            case "water" -> new BlockDefinition(id, Shape.FLUID, false, false);
-            default -> throw new IllegalArgumentException("Unknown block ID: " + id);
-        };
+        BlockDefinition definition = BY_ID.get(id);
+        if (definition == null) throw new IllegalArgumentException("Unknown block ID: " + id);
+        return definition;
     }
 }
