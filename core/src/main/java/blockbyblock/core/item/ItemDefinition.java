@@ -21,9 +21,10 @@ public final class ItemDefinition {
     /** Hunger restored; -1 when the item is not food. */
     public final int foodHunger;
     public final double foodSaturation;
+    private final String[] tags;
 
     ItemDefinition(String id, int maxStack, boolean isBlock, String toolType, double toolSpeed, int toolLevel,
-                   int durability, int foodHunger, double foodSaturation) {
+                   int durability, int foodHunger, double foodSaturation, String[] tags) {
         this.id = id;
         this.maxStack = maxStack;
         this.isBlock = isBlock;
@@ -33,6 +34,13 @@ public final class ItemDefinition {
         this.durability = durability;
         this.foodHunger = foodHunger;
         this.foodSaturation = foodSaturation;
+        this.tags = tags.clone();
+    }
+
+    public boolean hasTag(String tag) {
+        // Short fixed arrays from the generated table.
+        for (String t : tags) if (t.equals(tag)) return true;
+        return false;
     }
 
     public boolean isTool() { return toolType != null; }

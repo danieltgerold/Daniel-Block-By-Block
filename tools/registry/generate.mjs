@@ -4,7 +4,10 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { BLOCK_TYPES } from '../../src/block-types.js';
 import { ITEMS } from '../../src/inventory.js';
-import { blockRows, blocksCsv, javaBlocksSource, itemRows, itemsCsv, javaItemsSource } from './export.mjs';
+import { RECIPES } from '../../src/recipes.js';
+import { SMELTING, FUELS } from '../../src/smelting.js';
+import { blockRows, blocksCsv, javaBlocksSource, itemRows, itemsCsv, javaItemsSource,
+  recipeRows, recipesCsv, smeltingRows, smeltingCsv, fuelRows, fuelsCsv, javaRecipesSource } from './export.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -20,7 +23,14 @@ export function generateRegistry(rootDir = root) {
   mkdirSync(itemDir, { recursive: true });
   writeFileSync(join(itemDir, 'GeneratedItems.java'), javaItemsSource(items));
   writeFileSync(join(goldenDir, 'items.csv'), itemsCsv(items));
-  return `${rows.length} blocks, ${items.length} items`;
+  const recipes = recipeRows(RECIPES, ITEMS), smelting = smeltingRows(SMELTING), fuels = fuelRows(FUELS);
+  const recipeDir = join(rootDir, 'core/src/main/java/blockbyblock/core/recipe');
+  mkdirSync(recipeDir, { recursive: true });
+  writeFileSync(join(recipeDir, 'GeneratedRecipes.java'), javaRecipesSource(recipes, smelting, fuels));
+  writeFileSync(join(goldenDir, 'recipes.csv'), recipesCsv(recipes));
+  writeFileSync(join(goldenDir, 'smelting.csv'), smeltingCsv(smelting));
+  writeFileSync(join(goldenDir, 'fuels.csv'), fuelsCsv(fuels));
+  return `${rows.length} blocks, ${items.length} items, ${recipes.length} recipes, ${smelting.length} smelting, ${fuels.length} fuels`;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) console.log(`registry: ${generateRegistry(process.argv[2] ?? root)}`);

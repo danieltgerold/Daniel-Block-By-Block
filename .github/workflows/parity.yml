@@ -75,8 +75,8 @@ jobs:
       - run: npm run golden
       - name: Golden traces match the JS rules
         run: |
-          if [ -n "$(git status --porcelain -- tests/golden core/src/main/java/blockbyblock/core/world/shape/GeneratedBlocks.java core/src/main/java/blockbyblock/core/item/GeneratedItems.java)" ]; then
-            git status --short -- tests/golden core/src/main/java/blockbyblock/core/world/shape/GeneratedBlocks.java core/src/main/java/blockbyblock/core/item/GeneratedItems.java
+          if [ -n "$(git status --porcelain -- tests/golden ':(glob)core/src/main/java/**/Generated*.java')" ]; then
+            git status --short -- tests/golden ':(glob)core/src/main/java/**/Generated*.java'
             echo "::error::The JS rules or registry changed. Run 'npm run golden'; for rule changes also port them to core/. Commit both."
             exit 1
           fi

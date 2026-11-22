@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 /** The generated item table must say what the JS registry says (tests/golden/registry/items.csv). */
 class ItemRegistryTest {
-    private static final String HEADER = "id,maxStack,isBlock,toolType,toolSpeed,toolLevel,durability,foodHunger,foodSaturation";
+    private static final String HEADER = "id,maxStack,isBlock,toolType,toolSpeed,toolLevel,durability,foodHunger,foodSaturation,tags";
 
     @Test void everyJsItemMatchesFieldForField() throws Exception {
         var path = GoldenCsv.dir().resolve("registry").resolve("items.csv");
@@ -38,6 +38,8 @@ class ItemRegistryTest {
             assertEquals(Integer.parseInt(r[6]), d.durability, "durability " + r[0]);
             assertEquals(Integer.parseInt(r[7]), d.foodHunger, "foodHunger " + r[0]);
             assertTrue(sameBits(num(r[8]), d.foodSaturation), "foodSaturation " + r[0]);
+            for (String tag : r[9].isEmpty() ? new String[0] : r[9].split("\\|")) assertTrue(d.hasTag(tag), r[0] + " tag " + tag);
+            assertFalse(d.hasTag("not.a.tag"), r[0]);
         }
     }
 
