@@ -19,16 +19,26 @@ class ShapeParityTest {
     @Test void matchesEveryJsBoxInOrderAndByRawBits() throws IOException {
         List<String[]> cases = readFixture("cases.csv", CASE_HEADER);
         List<String[]> boxes = readFixture("boxes.csv", BOX_HEADER);
-        assertEquals(404, cases.size(), "case coverage changed; review the fixture contract");
-        assertEquals(964, boxes.size(), "coordinate coverage changed; review the fixture contract");
+        // The registry grows with main, so the manifest (written by the generator) states the counts;
+        // the files must agree with it exactly, so a truncated or padded fixture still fails.
+        String manifest = Files.readString(GoldenCsv.dir().resolve("shapes").resolve("manifest.json"));
+        assertEquals(manifestInt(manifest, "caseCount"), cases.size(), "case coverage differs from manifest");
+        assertEquals(manifestInt(manifest, "boxCount"), boxes.size(), "coordinate coverage differs from manifest");
+        assertTrue(cases.size() >= 640, "fixture shrank below the reviewed coverage");
         int cursor = 0;
-        // Exactly the 404 recorded cases; each case contributes at most nine boxes.
+        // Exactly the recorded cases; each case contributes at most nine boxes.
         for (int i = 0; i < cases.size(); i++) {
             String[] row = cases.get(i);
             assertEquals(i, Integer.parseInt(row[0]), "duplicate, missing or reordered case");
             cursor = replayCase(row, boxes, cursor);
         }
         assertEquals(boxes.size(), cursor, "orphan coordinate rows");
+    }
+
+    private static int manifestInt(String json, String key) {
+        var matcher = java.util.regex.Pattern.compile("\"" + key + "\"\\s*:\\s*(\\d+)").matcher(json);
+        assertTrue(matcher.find(), "manifest lacks " + key);
+        return Integer.parseInt(matcher.group(1));
     }
 
     private static List<String[]> readFixture(String file, String header) throws IOException {

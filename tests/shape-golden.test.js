@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generateShapes } from '../tools/golden/shapes.mjs';
+import { BLOCK_TYPES } from '../src/block-types.js';
 
 const CASE_FIELDS = 'case,category,id,kind,mask,x,y,z,type,facing,half,stairShape,hinge,open,boxCount,fullCube,opaque,solid,shape,definitionOpaque';
 const BOX_FIELDS = 'case,index,minX,minY,minZ,maxX,maxY,maxZ';
@@ -36,14 +37,16 @@ function withFixtures(check) {
 
 test('shape fixtures preserve case accounting, zero-box cases and ordered box rows', () => {
   withFixtures(({ cases, boxes, boxesFor, dir }) => {
-    const counts = { defaults: 100, slabs: 12, stairs: 160, doors: 64, fences: 64, 'item-fence': 4 };
     const manifest = JSON.parse(readFileSync(join(dir, 'shapes', 'manifest.json'), 'utf8'));
     assert.equal(manifest.formatVersion, 1);
-    assert.equal(manifest.registrySize, 25);
-    assert.deepEqual(manifest.baseCounts, { defaults: 25, slabs: 3, stairs: 40, doors: 16, fences: 16, 'item-fence': 1 });
+    // Registry size follows main; the other categories are fixed by the generator's case tables.
+    assert.equal(manifest.registrySize, BLOCK_TYPES.size);
+    assert.deepEqual(manifest.baseCounts, { defaults: BLOCK_TYPES.size, slabs: 3, stairs: 40, doors: 16, fences: 16,
+      'item-fence': 1, walls: 16, 'item-wall': 1 });
+    const counts = Object.fromEntries(Object.entries(manifest.baseCounts).map(([name, count]) => [name, count * 4]));
     assert.equal(manifest.caseCount, cases.length);
     assert.equal(manifest.boxCount, boxes.length);
-    assert.equal(cases.length, 404);
+    assert.equal(cases.length, Object.values(counts).reduce((sum, count) => sum + count, 0));
     assert.equal(new Set(cases.map(row => row.case)).size, cases.length);
     for (const [category, count] of Object.entries(counts))
       assert.equal(cases.filter(row => row.category === category).length, count, category);

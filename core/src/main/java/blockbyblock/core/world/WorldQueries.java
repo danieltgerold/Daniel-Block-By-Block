@@ -26,11 +26,40 @@ final class WorldQueries {
                 if (n != null && (n.definition.shape == Shape.FENCE || n.opaque())) mask |= 1 << i;
             }
         }
+        else if (b.definition.shape == Shape.WALL) {
+            int[][] directions = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+            // Exactly four horizontal neighbor queries.
+            for (int i = 0; i < 4; i++) {
+                WorldBlock n = storage.blockAt(b.x + directions[i][0], b.y, b.z + directions[i][1]);
+                if (wallLinks(n, directions[i][0], directions[i][1])) mask |= 1 << i;
+            }
+        }
         double[][] local = BlockGeometry.boxes(b.definition, b.state, kind, mask, 0, 0, 0);
         double[] origin = {b.x, b.y, b.z};
         // At most nine boxes with six coordinates. Do not reject JS's huge-coordinate collapse.
         for (double[] box : local) for (int axis = 0; axis < 6; axis++) box[axis] = origin[axis % 3] + box[axis];
         return local;
+    }
+
+    /** JS wallConnections: walls and full cubes link; other shapes link when they fill the face's four sample points. */
+    private static boolean wallLinks(WorldBlock n, int dx, int dz) {
+        if (n == null || n.definition == null) return false;
+        if (n.definition.shape == Shape.WALL) return true;
+        if (BlockGeometry.fullCube(n.definition, n.state)) return true;
+        int axis = dx != 0 ? 0 : 2;
+        int face = dx > 0 || dz > 0 ? 0 : 1;
+        double[][] boxes = BlockGeometry.boxes(n.definition, n.state, QueryKind.SELECTION, -1, 0, 0, 0);
+        double[] samples = {.25, .75};
+        // Four fixed sample points.
+        for (double y : samples) for (double u : samples) {
+            boolean covered = false;
+            for (double[] box : boxes) {
+                if (box[axis] <= face && box[axis + 3] >= face && y > box[1] && y < box[4]
+                    && u > box[axis == 0 ? 2 : 0] && u < box[axis == 0 ? 5 : 3]) { covered = true; break; }
+            }
+            if (!covered) return false;
+        }
+        return true;
     }
 
     List<double[]> collisionBoxes(double[] min, double[] max) {

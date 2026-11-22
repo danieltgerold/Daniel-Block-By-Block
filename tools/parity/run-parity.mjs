@@ -133,7 +133,8 @@ async function trig(context, core, read) {
 }
 
 async function shapes(context, core, read, cases) {
-  const boxes = await table(read, 'shapes/boxes.csv', BOX, 964);
+  const manifest = JSON.parse(await read('shapes/manifest.json'));
+  const boxes = await table(read, 'shapes/boxes.csv', BOX, manifest.boxCount);
   let cursor = 0;
   for (let i = 0; i < cases.length; i++) {
     const r = cases[i];
@@ -184,11 +185,14 @@ async function world(context, core, read) {
 /** Throws on malformed references; numerical divergence is returned with location. */
 export async function runParity(core, readText) {
   requireValue(core && typeof readText === 'function', 'Core and fixture reader are required');
-  const shapeCases = await table(readText, 'shapes/cases.csv', SHAPE, 404);
+  // The registry grows with main, so the generator's manifest states the expected counts; each fixture
+  // is a case per (base case x kind x translation) = 4 rows.
+  const manifest = JSON.parse(await readText('shapes/manifest.json'));
+  const shapeCases = await table(readText, 'shapes/cases.csv', SHAPE, manifest.caseCount);
   const registry = new Set(shapeCases.filter(row => row[1] === 'defaults').map(row => row[2]));
-  requireValue(registry.size === 25, 'Registry coverage mismatch');
-  for (const [category, count] of Object.entries({ defaults: 100, slabs: 12, stairs: 160, doors: 64, fences: 64, 'item-fence': 4 }))
-    requireValue(shapeCases.filter(row => row[1] === category).length === count, `Shape category coverage: ${category}`);
+  requireValue(registry.size === manifest.registrySize, 'Registry coverage mismatch');
+  for (const [category, count] of Object.entries(manifest.baseCounts))
+    requireValue(shapeCases.filter(row => row[1] === category).length === count * 4, `Shape category coverage: ${category}`);
   const context = { checked: 0, mismatchCount: 0, mismatches: [], registry };
   await shapes(context, core, readText, shapeCases);
   for (const [name, ticks] of LEGACY) await movement(context, core, readText, name, false, ticks);

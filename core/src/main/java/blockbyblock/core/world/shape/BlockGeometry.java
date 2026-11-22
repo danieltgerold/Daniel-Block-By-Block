@@ -55,6 +55,8 @@ public final class BlockGeometry {
             case STAIRS -> stairs(state);
             case DOOR -> door(state);
             case FENCE -> fence(kind, mask);
+            case WALL -> wall(kind, mask);
+            case FARMLAND -> new double[][] {{0, 0, 0, 1, 15.0 / 16, 1}};
             case CUBE -> cube();
             case FLUID -> new double[0][];
         };
@@ -127,6 +129,32 @@ public final class BlockGeometry {
             case 3 -> new double[] {0, .4375, .375, .5625};
             default -> throw new IllegalStateException("Invalid fence direction");
         };
+    }
+
+    private static double[] wallRange(int direction) {
+        return switch (direction) {
+            case 0 -> new double[] {.3125, 0, .6875, .5};
+            case 1 -> new double[] {.5, .3125, 1, .6875};
+            case 2 -> new double[] {.3125, .5, .6875, 1};
+            case 3 -> new double[] {0, .3125, .5, .6875};
+            default -> throw new IllegalStateException("Invalid wall direction");
+        };
+    }
+
+    /** Post plus one arm per linked side; with no world (mask -1) JS links east and west. */
+    private static double[][] wall(QueryKind kind, int mask) {
+        boolean collision = kind == QueryKind.COLLISION;
+        double[][] boxes = new double[5][];
+        boxes[0] = new double[] {.25, 0, .25, .75, collision ? 1.5 : 1, .75};
+        int count = 1;
+        int[] directions = mask == -1 ? new int[] {1, 3} : new int[] {0, 1, 2, 3};
+        // At most four directions, one arm box each.
+        for (int direction : directions) {
+            if (mask != -1 && (mask & (1 << direction)) == 0) continue;
+            double[] range = wallRange(direction);
+            boxes[count++] = new double[] {range[0], 0, range[1], range[2], collision ? 1.5 : .8125, range[3]};
+        }
+        return Arrays.copyOf(boxes, count);
     }
 
     private static double[][] fence(QueryKind kind, int mask) {

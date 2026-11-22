@@ -16,7 +16,7 @@ const DIRECTIONS = [[0, 0, -1], [1, 0, 0], [0, 0, 1], [-1, 0, 0]];
 function baseCases() {
   const cases = [];
   const add = (category, id, state = {}, mask = -1) => cases.push({ category, id, state, mask });
-  // Finite registry snapshot, currently 25 definitions.
+  // Finite registry snapshot of every registered definition.
   for (const definition of BLOCK_TYPES.values()) add('defaults', definition.id, definition.defaultState);
   for (const type of ['bottom', 'top', 'double']) add('slabs', 'oak.slab', { type });
   // 4 facings × 2 halves × 5 resolved stair shapes.
@@ -27,7 +27,10 @@ function baseCases() {
     for (const open of [false, true]) add('doors', 'oak.door', { facing, hinge, open });
   for (let mask = 0; mask < 16; mask++) add('fences', 'oak.fence', {}, mask);
   add('item-fence', 'oak.fence');
-  assert.equal(cases.length, BLOCK_TYPES.size + 3 + 40 + 16 + 16 + 1);
+  // Walls link by neighbour; stone neighbours on each mask exercise every arm combination.
+  for (let mask = 0; mask < 16; mask++) add('walls', 'cobblestone.wall', {}, mask);
+  add('item-wall', 'cobblestone.wall');
+  assert.equal(cases.length, BLOCK_TYPES.size + 3 + 40 + 16 + 16 + 1 + 16 + 1);
   return cases;
 }
 
@@ -91,7 +94,7 @@ export function shapeCases() {
         opaque: blockOpaque(block), solid: definition.solid,
         shape: definition.collisionShape, definitionOpaque: definition.opaque });
     }
-  assert.equal(result.length, (BLOCK_TYPES.size + 3 + 40 + 16 + 16 + 1) * 4);
+  assert.equal(result.length, (BLOCK_TYPES.size + 3 + 40 + 16 + 16 + 1 + 16 + 1) * 4);
   return result;
 }
 
@@ -109,7 +112,7 @@ function writeCsv(dir, name, fields, rows) {
 
 export function generateShapes(outDir) {
   const cases = shapeCases(), boxes = [];
-  const baseCounts = Object.fromEntries(['defaults', 'slabs', 'stairs', 'doors', 'fences', 'item-fence']
+  const baseCounts = Object.fromEntries(['defaults', 'slabs', 'stairs', 'doors', 'fences', 'item-fence', 'walls', 'item-wall']
     .map(category => [category, cases.filter(row => row.category === category).length / 4]));
   // Finite case table; each case contributes zero to nine coordinate rows.
   for (const row of cases) boxesFor(row).forEach((box, index) => boxes.push({

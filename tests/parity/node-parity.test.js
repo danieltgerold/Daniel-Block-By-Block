@@ -24,7 +24,7 @@ function editCell(text, line, field, value) {
 
 test('compiled TeaVM core matches all reference suites by raw bits', async () => {
   const result = await runParity(core, readText);
-  assert.equal(result.checked, 163_982, 'all six suites must contribute their full field coverage');
+  assert.equal(result.checked, 167_638, 'all six suites must contribute their full field coverage');
   assert.equal(result.mismatchCount, 0);
   assert.deepEqual(result.mismatches, []);
 });

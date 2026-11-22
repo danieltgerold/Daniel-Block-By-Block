@@ -28,7 +28,7 @@ test('compiled Java core matches every reference in this browser engine', async 
   expect(pageErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
   expect(failedResponses).toEqual([]);
-  expect(result.checked).toBe(163_982);
+  expect(result.checked).toBe(167_638);
   expect(result.mismatchCount).toBe(0);
   expect(result.mismatches).toEqual([]);
 });
