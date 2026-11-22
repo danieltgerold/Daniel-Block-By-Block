@@ -26,6 +26,9 @@ test('issue names the commit, the changed rules and the failing jobs; no raw com
   assert.match(issue.body, /core\/src\/main\/java\/blockbyblock\/core\/world\//);
   assert.match(issue.body, /core, golden/);
   assert.match(issue.body, /npm run golden/);
+  const needsHand = driftIssue({ sha: 'abcdef0', runUrl: 'u', failedJobs: ['golden', 'sync-generated'], changed: changedRuleFiles(['src/movement.js'], rules), author: 'x', repo: 'o/r' });
+  assert.match(needsHand.body, /automatic sync could not fix this/i);
+  assert.doesNotMatch(issue.body, /automatic sync could not fix this/i, 'only mentioned when the sync job itself failed');
   const unknown = driftIssue({ sha: 'abcdef0', runUrl: 'u', failedJobs: ['golden'], changed: [], author: 'x', repo: 'o/r' });
   assert.match(unknown.body, /No listed rule file changed/);
 });

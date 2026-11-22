@@ -20,8 +20,11 @@ export function driftIssue({ sha, runUrl, failedJobs, changed, author, repo }) {
     '**Rule files changed**',
     rows,
     '',
+    failedJobs.includes('sync-generated')
+      ? 'The automatic sync could not fix this: regenerating the golden files and Java tables did not give a passing build, so a rule changed and the Java port needs hand work.\n'
+      : '',
     '**To fix**',
-    '1. Update the Java counterpart so the same inputs give the same bits.',
+    '1. Update the Java counterpart so the same inputs give the same bits. Registry files (blocks, items, recipes) only need `npm run golden`, which regenerates the Java tables; hand work is needed only if the generator stops with an error or the tests still fail.',
     '2. Run `npm run golden`, then `./gradlew :core:test` and `npm run test:parity`.',
     '3. Open a pull request with the Java change and the regenerated golden files.',
     '',

@@ -5,6 +5,7 @@ set -euo pipefail
 jobs=()
 [ "${CORE:-}" = failure ] && jobs+=(core)
 [ "${GOLDEN:-}" = failure ] && jobs+=(golden)
+[ "${SYNC:-}" = failure ] && jobs+=(sync-generated)
 node tools/ci/drift-report.mjs "$BEFORE" "$SHA" "$RUN_URL" "$AUTHOR" "$REPO" "${jobs[@]}" > report.json
 node -e "const r=require('./report.json');require('fs').writeFileSync('title.txt',r.title);require('fs').writeFileSync('body.md',r.body)"
 gh label create java-drift --color D93F0B --description "Java core is behind the JS rules" >/dev/null 2>&1 || true
