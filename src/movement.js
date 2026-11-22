@@ -7,6 +7,8 @@ import { PlayerInventory } from './inventory.js';
 import { DroppedItems } from './dropped-items.js';
 import { PlayerVitals } from './player-vitals.js';
 import { FoodUse } from './food-use.js';
+import { PlayerReactions } from './player-reactions.js';
+import { canEscapeWater, WATER_EDGE } from './water-edge.js';
 export { DEFAULT_WALK_SPEED };
 export const MOVEMENT = Object.freeze({
   ticksPerSecond: 20,
@@ -78,6 +80,7 @@ export function stepPlayer(player, input = {}, world = null) {
   if (!input.jump) player.jumpCooldown = 0;
   const size = player.size ?? 1;
   const launchVelocity = input.jumpVelocity ?? MOVEMENT.jumpVelocity * size;
+  const swimJumpScale = launchVelocity / (MOVEMENT.jumpVelocity * size);
   const takeoff = !flying && !wet && Boolean(input.jump) && launchVelocity > 0 && startedGrounded && player.jumpCooldown === 0;
   const yaw = input.yaw || 0;
   const sinYaw = Math.sin(yaw);
@@ -100,7 +103,7 @@ export function stepPlayer(player, input = {}, world = null) {
   }
   if (flying) player.vy += (Number(Boolean(input.jump)) - Number(Boolean(input.crouch))) * MOVEMENT.flyingVerticalAcceleration * size;
   if (wet) {
-    if (input.jump) player.vy += .04 * size * (launchVelocity / (MOVEMENT.jumpVelocity * size));
+    if (input.jump) player.vy += .04 * size * swimJumpScale;
     player.vx += medium.x * .014 * size; player.vy += medium.y * .014 * size; player.vz += medium.z * .014 * size;
   }
 
@@ -127,6 +130,7 @@ export function stepPlayer(player, input = {}, world = null) {
   player.vz += (-right * sinYaw - forward * cosYaw) * acceleration;
 
   // 3. Move, resolve the floor, then apply drag using the PREVIOUS grounded state.
+  let waterCollision = null;
   if (world) {
     let requested = { x: player.vx, z: player.vz };
     if (input.crouch && !wet && !flying && !takeoff && player.vy <= 0 && (startedGrounded || world.supportProbe(player))) {
@@ -134,6 +138,7 @@ export function stepPlayer(player, input = {}, world = null) {
     }
     const motion = world.movePlayer(player, { ...requested, y: player.vy }, 0.3 * size,
       (player.crouching ? MOVEMENT.crouchHeight : MOVEMENT.playerHeight) * size);
+    if(wet && (motion.blocked.x || motion.blocked.z))waterCollision={x:requested.x,z:requested.z,blocked:motion.blocked};
     player.x = motion.x; player.y = motion.y; player.z = motion.z;
     if (motion.blocked.x || requested.x !== player.vx) player.vx = 0;
     if (motion.blocked.y) player.vy = 0;
@@ -192,6 +197,16 @@ export function stepPlayer(player, input = {}, world = null) {
   player.vz *= drag;
   player.vy = wet ? player.vy * .8 - .02 * size : flying ? player.vy * MOVEMENT.flyingVerticalDrag : (player.vy - MOVEMENT.gravity * size) * MOVEMENT.verticalDrag;
   if (player.grounded && player.vy < 0) player.vy = 0;
+  // Java 1.12's edge impulse happens AFTER water retention/gravity. Setting it
+  // once (rather than adding .3 before drag) preserves its intended strength.
+  if(waterCollision && swimJumpScale>0 && canEscapeWater(world,player,previousY,
+    {x:waterCollision.x*drag,z:waterCollision.z*drag},.3*size,(player.crouching?MOVEMENT.crouchHeight:MOVEMENT.playerHeight)*size)) {
+    player.vy=Math.max(player.vy,WATER_EDGE.velocity*size*swimJumpScale);
+    // Collision clipped this tick's displacement, not a legal pending escape's
+    // momentum. Retain it with normal water drag so the next tick can clear the lip.
+    if(waterCollision.blocked.x)player.vx=waterCollision.x*drag;
+    if(waterCollision.blocked.z)player.vz=waterCollision.z*drag;
+  }
   const fovTarget = (player.sprinting ? MOVEMENT.sprintFovMultiplier : 1) * (player.flying ? MOVEMENT.flyingFovMultiplier : 1);
   player.fovMultiplier += (fovTarget - player.fovMultiplier) * 0.5;
   tickPlayerAnimation(player.animation, { dx: player.x - previousX, dz: player.z - previousZ,
@@ -222,7 +237,7 @@ export class MovementController {
     this.inventory = new PlayerInventory({ onDrop: stack => this.throwItem(stack) });
     this.drops = new DroppedItems(world, this.inventory);
     if (world) {
-      world.onDrop = (stack, at) => this.drops.spawn(stack.id, stack.count, at);
+      world.onDrop = (stack, at) => this.drops.spawn(stack.id, stack.count, at,{stack});
       world.getGameMode = () => this.gameMode;
       world.getPlayers = () => [this.player];
       for (const drop of world.pendingDrops?.splice(0) ?? []) world.onDrop(drop.stack, drop.at);
@@ -234,6 +249,8 @@ export class MovementController {
     this.developerMode = false;
     this.gameMode = 'survival';
     this.vitals = new PlayerVitals(); this.eating = new FoodUse(this); this.deathHandled = false;
+    this.reactions = new PlayerReactions(); this.deathEquipment = null;
+    this.vitals.onDamage = () => this.reactions.hurt();
     if (world) {
       world.getPlayerData = () => this.savePlayer();
       const previousLoad = world.onLoad;
@@ -310,7 +327,7 @@ export class MovementController {
     const ray = this.interactionRay(this.player, yaw, pitch);
     const angle = random() * Math.PI * 2, spread = random() * .02;
     this.drops.spawn(stack.id, stack.count, { x: this.player.x, y: ray.origin.y - .3, z: this.player.z },
-      { thrown: true, velocity: { x: ray.direction.x * .3 + Math.cos(angle) * spread,
+      { thrown: true, stack, velocity: { x: ray.direction.x * .3 + Math.cos(angle) * spread,
         y: ray.direction.y * .3 + .1, z: ray.direction.z * .3 + Math.sin(angle) * spread } });
   }
   pickBlock(yaw, pitch) {
@@ -369,15 +386,25 @@ export class MovementController {
   }
 
   update(frameSeconds, input = {}) {
-    if (this.vitals.dead) { this.die(); this.accumulator = 0; return; }
-    const gameplay = input.gameplayEnabled !== false;
+    if (this.vitals.dead) this.die();
+    const gameplay = input.gameplayEnabled !== false && !this.vitals.dead;
     if (!gameplay) this.clearHeldInputs();
     // Keep every active game tick, including slow rendering frames: dropping
-    // elapsed time would silently discard fluid/furnace work. Focus loss and
-    // the Escape menu pause separately, without simulating unattended input.
+    // elapsed time would silently discard fluid/furnace work. Menus release
+    // controls while the world and the living player's carried physics continue.
     this.accumulator += Number.isFinite(frameSeconds) ? Math.max(0, frameSeconds) : 0;
     // Sub-nanosecond rounding must not postpone a tick at a clock boundary.
     while (this.accumulator + 1e-9 >= MOVEMENT.fixedStep) {
+      if(this.vitals.dead) {
+        this.previous=snapshot(this.player);
+        this.accumulator-=MOVEMENT.fixedStep;this.totalSteps++;
+        this.world?.step?.(MOVEMENT.fixedStep);
+        this.reactions.advanceDeath(MOVEMENT.fixedStep);
+        this.particles?.step();
+        this.drops.step(this.player,{pickup:false});
+        continue;
+      }
+      this.reactions.tick();
       this.previous = snapshot(this.player);
       const wasFlying = this.player.flying;
       const before = { x: this.player.x, y: this.player.y, z: this.player.z, jumpCount: this.player.jumpCount, sprintImpulseCount: this.player.sprintImpulseCount };
@@ -402,10 +429,10 @@ export class MovementController {
       this.vitals.tick({ player: this.player, creative: this.gameMode === 'creative',
         distance: Math.hypot(this.player.x-before.x,this.player.z-before.z),
         swimDistance: Math.hypot(this.player.x-before.x,this.player.y-before.y,this.player.z-before.z),
-        jumped: this.player.jumpCount !== before.jumpCount, sprintJump: this.player.sprintImpulseCount !== before.sprintImpulseCount });
+        jumped: this.player.jumpCount !== before.jumpCount, sprintJump: this.player.sprintImpulseCount !== before.sprintImpulseCount, settings:this.settings });
       if (this.gameMode === 'survival' && this.vitals.hunger <= 6) this.player.sprinting = false;
-      if (this.vitals.dead) { this.die(); this.accumulator = 0; break; }
-      this.drops.step(this.player);
+      if (this.vitals.dead) this.die();
+      this.drops.step(this.player,{pickup:!this.vitals.dead});
     }
     this.accumulator = Math.max(0, this.accumulator);
   }
@@ -429,8 +456,13 @@ export class MovementController {
     this.player = { ...createPlayer(), ...position, size: this.size };
     this.player.eyeOffset = this.eyeHeight;
     this.player.animation = createPlayerAnimation(aimYaw, aimPitch);
-    if (resetVitals) { this.vitals.reset(); this.deathHandled = false; }
+    if (resetVitals) { this.vitals.reset(); this.deathHandled = false; this.deathEquipment = null; }
+    this.reactions.reset();
     this.pause();
+    if(resetVitals) {
+      if(this.world)this.world.playerData=this.savePlayer();
+      this.onRespawn?.();
+    }
   }
 
   teleport(position) {
@@ -474,15 +506,31 @@ export class MovementController {
   }
   die() {
     if (!this.vitals.dead || this.deathHandled) return false;
-    this.deathHandled = true; this.pause();
+    const remainingWorldTime=this.accumulator;
+    this.deathHandled = true;
+    this.deathEquipment = {mainHand:this.inventory.mainHand?{...this.inventory.mainHand}:null,
+      offhand:this.inventory.offhand?{...this.inventory.offhand}:null,slots:this.inventory.slots.slice(0,41).map(s=>s?{...s}:null)};
+    this.reactions.die(); this.pause();
     const at = {x:this.player.x,y:this.player.y+.2,z:this.player.z};
-    this.inventory.dropCarried(stack => this.drops.spawn(stack.id,stack.count,at,{thrown:true}));
-    this.onDeath?.(); return true;
+    this.inventory.dropCarried(stack => this.drops.spawn(stack.id,stack.count,at,{thrown:true,stack}));
+    this.onDeath?.();
+    // Input/camera cleanup in the death-screen transition must not discard
+    // unprocessed world ticks from this render frame.
+    if(this.vitals.dead)this.accumulator=remainingWorldTime;
+    return true;
   }
-  savePlayer() { return { x:this.player.x,y:this.player.y,z:this.player.z,...this.vitals.toJSON() }; }
+  savePlayer() { return { x:this.player.x,y:this.player.y,z:this.player.z,...this.vitals.toJSON(),settings:{...this.settings},inventory:this.inventory.save(),drops:this.drops.save() }; }
   loadPlayer(data = {}) {
     if (['x','y','z'].every(axis=>Number.isFinite(data[axis]))) this.teleport(data);
+    if(data.settings) {
+      const settings=Object.fromEntries(Object.entries(data.settings).filter(([key,value])=>Object.hasOwn(DEFAULT_SETTINGS,key)&&Number.isFinite(value)&&(key==='size'?value>0:value>=0)));
+      const result=this.configureSettings(settings);
+      if(!result.ok && settings.falldamage!==undefined)this.configure('falldamage',settings.falldamage);
+    }
+    if(data.drops)this.drops.load(data.drops);
+    if(data.inventory)this.inventory.load(data.inventory);
     this.vitals.restore(data.vitals ?? data); this.deathHandled = false;
+    this.reactions.reset(); this.deathEquipment=null;
     if (this.vitals.dead) this.die();
   }
 }

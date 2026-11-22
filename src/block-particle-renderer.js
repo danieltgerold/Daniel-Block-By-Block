@@ -62,7 +62,7 @@ export class BlockParticleRenderer {
       const settings = system.settings;
       for (const id of system.active) {
         const p = system.pool[id], x = p.px + (p.x - p.px) * alpha, y = p.py + (p.y - p.py) * alpha, z = p.pz + (p.z - p.pz) * alpha;
-        this.positions.set([x, y, z], id * 3);
+        this.positions[id*3]=x;this.positions[id*3+1]=y;this.positions[id*3+2]=z;
         this.distances[id] = (x - this.view.position.x) ** 2 + (y - this.view.position.y) ** 2 + (z - this.view.position.z) ** 2;
         this.sphere.center.set(x, y, z); this.sphere.radius = Math.SQRT2 * p.halfSize;
         if (this.distances[id] <= settings.particleDistance ** 2 && this.frustum.intersectsSphere(this.sphere)) this.indices.push(id);

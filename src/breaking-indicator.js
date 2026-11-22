@@ -26,7 +26,7 @@ export class BreakingIndicator extends THREE.Group {
     // the center of a stair box's top can be inside its next step.
     if (this.target !== target || this.boxes !== boxes) {
       this.target = target; this.boxes = boxes;
-      this.faces = shapeQuads(target, target.definition.collisionShape === 'fence' ? world : null).map(q => ({ axis: 'xyz'[q.axis], sign: q.sign,
+      this.faces = shapeQuads(target, ['fence','wall'].includes(target.definition.collisionShape) ? world : null).map(q => ({ axis: 'xyz'[q.axis], sign: q.sign,
         min: Object.fromEntries(['x','y','z'].map((a,i)=>[a,target[a]+Math.min(...q.corners.map(p=>p[i]))])),
         max: Object.fromEntries(['x','y','z'].map((a,i)=>[a,target[a]+Math.max(...q.corners.map(p=>p[i]))])) }));
     }

@@ -17,6 +17,8 @@ export class ChunkRenderer {
     this.chunks = new Map();
     this.frustum = new THREE.Frustum();
     this.projectionView = new THREE.Matrix4();
+    this.lastProjectionView = new THREE.Matrix4(); this.needsVisibilityUpdate = true; this.pendingWork = true;
+    this.terrainLayers = world.layers; this.terrainBaseY = world.baseY;
     this.box = new THREE.Box3();
     this.stats = { visibleChunks: 0, visibleQuads: 0, loadedChunks: 0, lods: [0, 0, 0] };
     this.unsubscribe = world.subscribe(change => this.worldChanged(change));
@@ -32,8 +34,10 @@ export class ChunkRenderer {
     if (!chunk) return;
     if (!chunk.waterDirty) chunk.waterSince = this.frame;
     chunk.waterDirty = true;
+    this.needsVisibilityUpdate = true;
   }
   worldChanged({ x, y, z, id, previousId, state, previousState }) {
+    this.needsVisibilityUpdate = true;
     const next = BLOCK_TYPES.get(id), previous = BLOCK_TYPES.get(previousId);
     const opaqueChanged = blockOpaque(next ? { definition: next, state: state ?? next.defaultState } : null)
       !== blockOpaque(previous ? { definition: previous, state: previousState ?? previous.defaultState } : null);
@@ -53,6 +57,7 @@ export class ChunkRenderer {
     for (const key of affected) this.markWater(this.chunks.get(key));
   }
   invalidateBlock(x, z, immediate = false, fluid = false, neighbors = true) {
+    this.needsVisibilityUpdate = true;
     for (const [cx, cz] of neighbors ? this.affectedChunks(x, z, fluid) : [[Math.floor(x / 16), Math.floor(z / 16)]]) {
       const chunk = this.chunks.get(chunkKey(cx, cz));
       if (chunk) {
@@ -112,6 +117,16 @@ export class ChunkRenderer {
     this.frame++;
     camera.updateMatrixWorld();
     this.projectionView.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    if(this.terrainLayers!==this.world.layers || this.terrainBaseY!==this.world.baseY) {
+      this.terrainLayers=this.world.layers;this.terrainBaseY=this.world.baseY;this.needsVisibilityUpdate=true;
+      for(const chunk of this.chunks.values()){chunk.terrainDirty=true;chunk.waterDirty=true;}
+    }
+    // A stationary camera and unchanged world need no repeated chunk search,
+    // sorting, bounds queries or mesh visibility writes. Drain budgets first.
+    if(!this.needsVisibilityUpdate && !this.pendingWork && this.lastViewDistance===this.viewDistance
+      && this.lastProjectionView.equals(this.projectionView))return;
+    this.needsVisibilityUpdate=false;this.pendingWork=false;this.lastViewDistance=this.viewDistance;
+    this.lastProjectionView.copy(this.projectionView);
     this.frustum.setFromProjectionMatrix(this.projectionView);
     const cx = Math.floor(camera.position.x / CHUNK_SIZE), cz = Math.floor(camera.position.z / CHUNK_SIZE);
     const radius = Math.ceil(this.viewDistance / CHUNK_SIZE);
@@ -147,7 +162,7 @@ export class ChunkRenderer {
           if (!chunk) { chunk = this.createEntry(item.x, item.z, level); this.chunks.set(chunkKey(item.x, item.z), chunk); }
           this.rebuildTerrain(item.x, item.z, level, chunk);
           builds++;
-        }
+        } else this.pendingWork=true;
       }
       if (chunk) {
         if (chunk.waterDirty) waterJobs.push({ ...item, chunk });
@@ -163,7 +178,7 @@ export class ChunkRenderer {
     waterJobs.sort((a, b) => (a.distance - (this.frame - a.chunk.waterSince) * 2) - (b.distance - (this.frame - b.chunk.waterSince) * 2));
     const started = performance.now(); let waterBuilds = 0;
     for (const job of waterJobs) {
-      if (waterBuilds >= this.waterBuildsPerFrame || waterBuilds > 0 && performance.now() - started >= this.waterMillisecondsPerFrame) break;
+      if (waterBuilds >= this.waterBuildsPerFrame || waterBuilds > 0 && performance.now() - started >= this.waterMillisecondsPerFrame) {this.pendingWork=true;break;}
       const previous = job.chunk.waterQuads; this.rebuildWater(job.x, job.z, job.chunk);
       this.stats.visibleQuads += job.chunk.waterQuads - previous; waterBuilds++;
     }

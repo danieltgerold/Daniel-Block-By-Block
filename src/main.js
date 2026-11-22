@@ -13,6 +13,8 @@ import { getBlockAssets } from './block-assets.js';
 import { BlockParticles } from './block-particles.js';
 import { BlockParticleRenderer } from './block-particle-renderer.js';
 import { AdaptiveVisualQuality } from './visual-quality.js';
+import { RenderPreferences } from './render-preferences.js';
+import { applyCameraReaction } from './player-reactions.js';
 import { BlockPlacement, bindPlacementInput } from './block-placement.js';
 import { BlockBreaking } from './block-breaking.js';
 import { BreakingIndicator } from './breaking-indicator.js';
@@ -26,6 +28,9 @@ const intro = document.querySelector('#intro');
 const startButton = document.querySelector('#start');
 const startNote = document.querySelector('#start-note');
 const crosshair = document.querySelector('#crosshair');
+let profileStorage = null;
+try { profileStorage = window.localStorage; } catch { /* Session settings still work. */ }
+const renderPreferences = new RenderPreferences(document,profileStorage,()=>resizeRenderer());
 const world = new VoxelWorld();
 const controller = new MovementController(world);
 controller.respawn(world.findSpawn());
@@ -38,7 +43,7 @@ let cameraMode = 0;
 let hitboxesVisible = false;
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(renderPreferences.pixelRatio(window.devicePixelRatio));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
@@ -109,11 +114,8 @@ function renderInputMode(mode) {
   document.body.classList.toggle('world-view', mode !== 'menu');
   hud.root.hidden = mode === 'menu' || mode === 'death';
   inventoryUI.hotbar.hidden = !['playing', 'ready', 'chat'].includes(mode);
-  previousTime = null;
 }
 
-let profileStorage = null;
-try { profileStorage = window.localStorage; } catch { /* Session identity still works without browser storage. */ }
 const hud = new GameplayHUD(document, profileStorage);
 const inventoryUI = new InventoryUI({ inventory: controller.inventory, document, window,
   getGameMode: () => controller.gameMode,
@@ -122,7 +124,7 @@ inventoryUI.preview = new InventoryPreview(document.getElementById('inventory-pr
 const chatUI = new ChatUI({ document, window, controller, clearInput, requestCapture: captureMouse,
   requestUnlock: () => { if (document.pointerLockElement === canvas) document.exitPointerLock(); },
   onModeChange: renderInputMode, inventoryUI,
-  onCameraCycle: () => { cameraMode = nextCameraMode(cameraMode); },
+  onCameraCycle: () => { controller.reactions.clearHurt(); cameraMode = nextCameraMode(cameraMode); },
   onHitboxToggle: () => { hitboxesVisible = !hitboxesVisible; }, storage: profileStorage });
 controller.onTeleport = () => {
   breaking.cancel();
@@ -130,6 +132,11 @@ controller.onTeleport = () => {
   refreshWorldView();
 };
 controller.onDeath = () => chatUI.showDeath();
+controller.onRespawn = () => {
+  previousTime=null;
+  hud.updateVitals(controller,chatUI.mode);
+  refreshWorldView();
+};
 document.getElementById('respawn').addEventListener('click', () => chatUI.respawn());
 
 async function captureMouse() {
@@ -165,15 +172,16 @@ function releaseMouse() {
   chatUI.pause();
 }
 window.addEventListener('blur', releaseMouse);
-document.addEventListener('visibilitychange', () => { if (document.hidden) releaseMouse(); });
-window.addEventListener('resize', () => {
+document.addEventListener('visibilitychange', () => { previousTime=null; if (document.hidden) releaseMouse(); });
+function resizeRenderer() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   emptyHand.camera.aspect = camera.aspect;
   emptyHand.camera.updateProjectionMatrix();
+  renderer.setPixelRatio(renderPreferences.pixelRatio(window.devicePixelRatio));
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-});
+}
+window.addEventListener('resize', resizeRenderer);
 
 function animate(time) {
   visualQuality.recordFrame(time, { active: gameSimulationRunning(chatUI.mode) && !document.hidden && document.hasFocus() });
@@ -193,11 +201,15 @@ function animate(time) {
 
 function refreshWorldView() {
   const position = controller.renderState();
+  const reaction = controller.reactions.pose(controller.accumulator/.05);
+  position.animation.deathProgress = reaction.deathProgress;
+  const visibleInventory = controller.deathEquipment ?? controller.inventory;
   updateCrosshair(crosshair, chatUI.mode, cameraMode);
-  animatePlayerModel(playerModel, position, position.animation, cameraMode, controller.inventory);
-  syncEquipment(playerModel, controller.inventory);
-  updateEmptyHand(emptyHand, position.animation, controller.inventory);
+  animatePlayerModel(playerModel, position, position.animation, cameraMode, visibleInventory);
+  syncEquipment(playerModel, visibleInventory);
+  updateEmptyHand(emptyHand, position.animation, visibleInventory);
   updatePlayerCamera(camera, cameraMode, position, yaw, pitch, world);
+  applyCameraReaction(camera,emptyHand.camera,reaction,cameraMode,renderPreferences.damageTilt);
   document.body.classList.toggle('underwater', world.fluids.submerged(camera.position));
   const fov = baseFov * position.fovMultiplier;
   if (Math.abs(camera.fov - fov) > 1e-8) {
@@ -212,10 +224,10 @@ function refreshWorldView() {
   const target = active ? targetBlock() : null;
   selection.update(target, world);
   breakingIndicator.update(breaking, target, world, camera);
-  hitboxes.update([{ id: chatUI.profile.player.id, ...position, local: true }, ...controller.drops.piles.map(p => ({
+  if(hitboxesVisible)hitboxes.update([{ id: chatUI.profile.player.id, ...position, local: true }, ...controller.drops.piles.map(p => ({
     id: `drop:${p.id}`, bounds: { min: { x: p.x - .125, y: p.y, z: p.z - .125 }, max: { x: p.x + .125, y: p.y + .25, z: p.z + .125 } },
   }))], cameraMode, hitboxesVisible);
-  hud.updatePosition(position);
+  else if(hitboxes.group.visible)hitboxes.update([],cameraMode,false);
   return position;
 }
 renderer.setAnimationLoop(animate);

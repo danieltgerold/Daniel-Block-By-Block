@@ -13,3 +13,13 @@ export const grassBehavior = Object.freeze({
     if (world.blockIdAt(x, y, z) === 'dirt' && !world.isOpaqueSolid(x, y + 1, z)) world.setBlock(x, y, z, 'grass.block');
   },
 });
+export const farmlandBehavior = Object.freeze({
+  neighborChanged(world,b) {if(world.isOpaqueSolid(b.x,b.y+1,b.z))world.setBlock(b.x,b.y,b.z,'dirt');},
+  tick(world,b) {
+    if(world.isOpaqueSolid(b.x,b.y+1,b.z)){world.setBlock(b.x,b.y,b.z,'dirt');return;}
+    let wet=false;
+    for(let x=-4;x<=4&&!wet;x++)for(let z=-4;z<=4&&!wet;z++)for(let y=0;y<=1;y++)if(world.blockIdAt(b.x+x,b.y+y,b.z+z)==='water'){wet=true;break;}
+    const moisture=wet?7:Math.max(0,b.state.moisture-1),dryTicks=wet||moisture?0:(b.state.dryTicks??0)+1;
+    world.setBlock(b.x,b.y,b.z,dryTicks>=30?'dirt':'farmland',dryTicks>=30?{}:{moisture,dryTicks});
+  },
+});

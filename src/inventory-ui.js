@@ -3,7 +3,7 @@ import { RecipeBookUI } from './recipe-book-ui.js';
 import { CreativeInventoryUI } from './creative-inventory-ui.js';
 
 export function drawStack(document, element, stack, extra = 0) {
-  const signature = stack ? `${stack.id}:${stack.count + extra}` : '';
+  const signature = stack ? `${stack.id}:${stack.count + extra}:${stack.damage??0}` : '';
   if (element.dataset.stack === signature) return;
   element.dataset.stack = signature;
   element.replaceChildren();
@@ -17,6 +17,10 @@ export function drawStack(document, element, stack, extra = 0) {
   const count = document.createElement('span'); count.className = 'stack-count';
   count.textContent = stack.count + extra === 1 ? '' : String(stack.count + extra);
   element.append(icon, count);
+  if(item.durability && stack.damage>0) {
+    const ratio=Math.max(0,(item.durability+1-stack.damage)/(item.durability+1)),bar=document.createElement('span'),fill=document.createElement('span');
+    bar.className='durability-bar';fill.style.width=`${ratio*100}%`;fill.style.backgroundColor=`hsl(${ratio*120} 75% 48%)`;bar.append(fill);element.append(bar);
+  }
 }
 
 export class InventoryUI {
@@ -209,7 +213,7 @@ export class InventoryUI {
         button.disabled = !this.inventory.crafting.active;
       }
       const stack = this.stackAt(index), extra = plan.get(index) ?? 0;
-      drawStack(this.document, button, stack ?? (extra ? { id: this.inventory.cursor.id, count: 0 } : null), extra);
+      drawStack(this.document, button, stack ?? (extra ? { ...this.inventory.cursor, count: 0 } : null), extra);
       button.classList.toggle('drag-preview', extra > 0);
       button.classList.toggle('selected-slot', index === this.inventory.selected);
     }
@@ -218,7 +222,7 @@ export class InventoryUI {
       button.classList.toggle('selected-slot', index === this.inventory.selected);
     }
     const remaining = this.inventory.cursor ? this.inventory.cursor.count - (cloneDrag ? 0 : [...plan.values()].reduce((a, b) => a + b, 0)) : 0;
-    drawStack(this.document, this.cursorView, remaining ? { id: this.inventory.cursor.id, count: remaining } : null);
+    drawStack(this.document, this.cursorView, remaining ? { ...this.inventory.cursor, count: remaining } : null);
     this.cursorView.style.left = `${this.pointer.x}px`; this.cursorView.style.top = `${this.pointer.y}px`;
     this.cursorView.hidden = !this.isOpen || remaining === 0;
     this.updateTooltip();

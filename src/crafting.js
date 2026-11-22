@@ -1,12 +1,13 @@
 import { RECIPES, ingredientMatches, recipeLayout } from './recipes.js';
+import { sameStack } from './stack-data.js';
 const copy = stack => stack ? { ...stack } : null;
 // Only explicit storage indices participate; armor/offhand are never book supplies.
 export function insertItemStacks(slots, indices, stack, items) {
   let left = stack.count; const cap = items.get(stack.id).maxStack;
   for (const empty of [false, true]) for (const i of indices) {
-    const at = slots[i]; if (empty ? Boolean(at) : !at || at.id !== stack.id) continue;
+    const at = slots[i]; if (empty ? Boolean(at) : !sameStack(at,stack)) continue;
     const n = Math.min(left, cap - (at?.count ?? 0));
-    if (n) slots[i] = { id: stack.id, count: (at?.count ?? 0) + n };
+    if (n) slots[i] = { ...stack, count: (at?.count ?? 0) + n };
     left -= n; if (!left) return 0;
   }
   return left;
@@ -34,7 +35,7 @@ export class CraftingSession {
     const slots = this.inventory.slots.map(copy), overflow = [];
     for (let i = this.start; i < this.start + 9; i++) {
       const stack = slots[i]; slots[i] = null;
-      if (stack) { const left = insert(slots, this.storage, stack, this.items); if (left) overflow.push({ id: stack.id, count: left }); }
+      if (stack) { const left = insert(slots, this.storage, stack, this.items); if (left) overflow.push({ ...stack, count: left }); }
     }
     this.inventory.slots = slots; this.active = false; this.ghostRecipe = null;
     for (const stack of overflow) this.inventory.onDrop(stack);

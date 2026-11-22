@@ -1,3 +1,4 @@
+import { fallDamage } from './player-settings.js';
 const clamp = (value, max) => Math.max(0, Math.min(max, value));
 export const STARTING_VITALS = Object.freeze({ health: 20, hunger: 20, saturation: 5, exhaustion: 0 });
 // Simulation only. Damage sources, food and tools can call these methods without
@@ -9,9 +10,13 @@ export class PlayerVitals {
     this.health = clamp(this.health,20); this.hunger = clamp(this.hunger,20); this.saturation = clamp(this.saturation,this.hunger);
     this.regenTicks = 0; this.regenMode = null; this.voidTicks = 0;
   }
-  reset() { this.restore(); }
+  reset() { this.restore(STARTING_VITALS); }
   get dead() { return this.health <= 0; }
-  damage(amount) { if (amount > 0) this.health = Math.max(0,this.health-amount); }
+  damage(amount,source='other') {
+    const before=this.health;
+    if (amount > 0) this.health = Math.max(0,this.health-amount);
+    if(this.health<before)this.onDamage?.({amount:before-this.health,source});
+  }
   exhaust(amount) {
     if (amount > 0) this.exhaustion = Math.min(Number.MAX_VALUE,this.exhaustion+amount);
   }
@@ -33,16 +38,16 @@ export class PlayerVitals {
     this.saturation = Math.min(this.hunger,this.saturation+food.saturation);
     return true;
   }
-  tick({ player, creative = false, distance = 0, swimDistance = distance, jumped = false, sprintJump = false } = {}) {
+  tick({ player, creative = false, distance = 0, swimDistance = distance, jumped = false, sprintJump = false, settings } = {}) {
     if (this.dead) return;
-    if (player.y < -64) { if (++this.voidTicks >= 10) { this.voidTicks = 0; this.damage(4); } }
+    if (player.y < -64) { if (++this.voidTicks >= 10) { this.voidTicks = 0; this.damage(4,'void'); } }
     else this.voidTicks = 0;
     if (this.dead || creative) { this.regenTicks = 0; this.regenMode = null; return; }
     if (player.inWater) this.exhaust(swimDistance*.01);
     else if (player.grounded && player.sprinting) this.exhaust(distance*.1);
     if (jumped) this.exhaust(sprintJump ? .2 : .05);
     const fall = player.landingDamageDistance ?? 0;
-    if (fall > 3) this.damage(Math.max(0,Math.ceil(fall-3-1e-9)));
+    if (fall > 0) this.damage(fallDamage(fall,settings ?? {size:player.size??1}),'fall');
     if (this.dead) return;
     this.processExhaustion();
     const mode = this.health < 20 && this.hunger >= 18

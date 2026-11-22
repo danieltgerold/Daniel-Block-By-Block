@@ -11,7 +11,7 @@ const ticks = (entity, count) => { for (let n = 0; n < count; n++) entity.tick()
 function furnace(fuel = 'oak.planks', count = 1, sand = 2) { return new FurnaceEntity({ slots: [stack('sand', sand), stack(fuel, count), null] }); }
 
 test('smelting/fuel registries use exact tick values and a plank cooks once plus 100 ticks of the next Sand', () => {
-  assert.equal(SMELTING.size, 2); assert.equal(SMELTING.get('sand').ticks, 200);
+  assert.equal(SMELTING.size, 6); assert.equal(SMELTING.get('sand').ticks, 200);
   for (const wood of ['oak', 'pine']) for (const [part, duration] of [['log', 300], ['planks', 300], ['fence', 300], ['door', 200], ['slab', 150]]) assert.equal(FUELS.get(`${wood}.${part}`), duration);
   assert.equal(FUELS.get('crafting.table'), 300); assert.equal(FUELS.get('stick'), 100); assert.equal(FUELS.has('pine.leaves'), false);
   const f = furnace(); ticks(f, 199); assert.equal(f.slots[2], null); assert.equal(f.cookTime, 199);
@@ -60,7 +60,7 @@ test('furnaces are independent and breaking drops actual slots exactly once, exc
     first.slots = [stack('sand', 3), stack('oak.planks', 2), stack('glass', 2)]; second.slots = [stack('sand'), stack('stick'), null];
     for (let tick = 0; tick < 50; tick++) w.step(.05);
     assert.equal(first.slots[1].count, 1); assert.equal(first.cookTime, 50); assert.equal(second.cookTime, 50);
-    w.destroyBlock(0, 0, 0, { gameMode: mode }); assert.equal(w.furnaceAt(0, 0, 0), undefined);
+    w.destroyBlock(0, 0, 0, { gameMode: mode, tool: stack('wood.pickaxe') }); assert.equal(w.furnaceAt(0, 0, 0), undefined);
     assert.equal(c.drops.total(), mode === 'creative' ? 6n : 7n); assert.ok(first.slots.every(s => !s));
     assert.equal(w.destroyBlock(0, 0, 0, { gameMode: mode }), false); assert.equal(c.drops.total(), mode === 'creative' ? 6n : 7n);
     assert.equal(second.slots[0].count, 1); assert.equal(second.slots[1], null); assert.equal(second.burnTime, 51);

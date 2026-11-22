@@ -31,7 +31,7 @@ test('Door arms stay hidden through equip/swing in both hands; buckets use indep
     c.inventory.slots[0] = stack(id); c.inventory.slots[OFFHAND] = stack(id);
     const pose = { swingActive: p > 0, swingProgress: p, equipHeight: .4, phase: 0, amount: 0, crouch: 0, torsoYaw: 0, headYaw: 0, aimPitch: 0 };
     updateEmptyHand(hand, pose, c.inventory); assert.equal(hand.rig.visible, false);
-    for (const wrist of hand.doorHands) assert.equal(wrist.children.find(child => child.name === 'Door Grip Arm').visible, false);
+    for (const wrist of hand.itemHands) assert.equal(wrist.children.length, 1, 'held item has no duplicate arm');
     animatePlayerModel(model, { x: 0, y: 0, z: 0 }, pose, 1, c.inventory); syncEquipment(model, c.inventory);
     assert.equal(model.userData.parts['Right Arm'].visible, true); assert.equal(model.userData.parts['Left Arm'].visible, true);
   }
@@ -39,10 +39,10 @@ test('Door arms stay hidden through equip/swing in both hands; buckets use indep
   for (const [id, cap] of [['bucket', 16], ['water.bucket', 1]]) {
     assert.equal(ITEMS.get(id).maxStack, cap); assert.ok(commandCompletions('/give ').includes(`/give ${id} `));
     c.inventory.slots[0] = stack(id); updateEmptyHand(hand, { swingActive: false }, c.inventory);
-    assert.equal(hand.mainItem.geometry.type, 'PlaneGeometry'); assert.equal(hand.doorHands[0].visible, false);
+    assert.equal(hand.mainItem.geometry.type, 'BufferGeometry'); near(hand.mainItem.geometry.boundingBox.max.z-hand.mainItem.geometry.boundingBox.min.z,1/16); assert.equal(hand.itemHands[0].visible, true);
   }
   assert.notEqual(ITEMS.get('bucket').icon, ITEMS.get('water.bucket').icon);
-  assert.equal(RECIPES.recipes.has('bucket'), false); assert.deepEqual(BUCKET_RECIPE.output, stack('bucket'));
+  assert.equal(RECIPES.recipes.has('bucket'), true); assert.deepEqual(BUCKET_RECIPE.output, stack('bucket'));
 });
 
 test('bucket use exchanges exactly one item, drops full-inventory overflow, obeys reach/obstruction and old Creative rules', () => {

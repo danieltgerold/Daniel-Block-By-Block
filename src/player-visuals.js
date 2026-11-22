@@ -4,7 +4,7 @@ import { swingCurves } from './player-animation.js';
 import { ITEMS, ARMOR } from './inventory.js';
 import { createSharedBlock } from './block-assets.js';
 import { createItemMesh, setItemAppearance } from './item-assets.js';
-import { displayProfile, firstPersonDoorAttachment, thirdPersonItemTransform, itemModelTransform, itemSourceAlignment } from './item-display.js';
+import { displayProfile, firstPersonItemTransform, thirdPersonItemTransform } from './item-display.js';
 
 export const MODEL_SCALE = 0.9375 / 16;
 export const PLAYER_RENDER_SCALE = 0.9375;
@@ -82,6 +82,9 @@ export function animatePlayerModel(model, feet, pose, cameraMode = 0, inventory 
   model.scale.setScalar(feet.size ?? 1);
   model.position.set(feet.x, feet.y, feet.z);
   model.rotation.set(0, pose.torsoYaw, 0);
+  const deathAngle = (pose.deathProgress??0)*Math.PI/2;
+  model.rotation.z = deathAngle;
+  model.position.y += Math.sin(deathAngle)*8*MODEL_SCALE*(feet.size??1);
   model.visible = cameraMode !== 0;
   const j = model.userData.joints;
   j.Head.visible = cameraMode !== 0;
@@ -160,19 +163,12 @@ export function createEmptyHand(aspect = 1) {
   hand.mainItem.userData.displayContext = hand.offhandItem.userData.displayContext = 'firstperson';
   hand.mainItem.visible = hand.offhandItem.visible = false;
   hand.equipHeight = 1;
-  hand.doorHands = [1, -1].map(sign => {
-    const wrist = new THREE.Group(); wrist.name = sign > 0 ? 'Door Right Wrist' : 'Door Left Wrist'; wrist.matrixAutoUpdate = false;
-    const material = arm.material.clone(); material.color.set(PLAYER_COLORS[sign > 0 ? 'Right Arm' : 'Left Arm']);
-    const forearm = new THREE.Mesh(arm.geometry, material); forearm.name = 'Door Grip Arm'; forearm.matrixAutoUpdate = false;
-    // Reuse the existing arm, pivoting its palm at the wrist. It extends below
-    // and behind the picture, with its front face touching the lower grip.
-    forearm.matrix.makeTranslation(sign * .02, 0, -.13)
-      .multiply(new THREE.Matrix4().makeRotationZ(sign * .25)).multiply(new THREE.Matrix4().makeRotationX(.12))
-      .multiply(new THREE.Matrix4().makeTranslation(0, -16 * MODEL_SCALE, 0));
-    forearm.visible = false; // Door items hide their entire first-person arm.
-    wrist.add(forearm); wrist.visible = false; scene.add(wrist); return wrist;
+  // One animation parent per hand, shared by every held-item profile.
+  // Empty-hand rendering remains on its existing independent rig.
+  hand.itemHands = [hand.mainItem, hand.offhandItem].map((item, i) => {
+    const wrist = new THREE.Group(); wrist.name = i === 0 ? 'Main Hand Item Frame' : 'Offhand Item Frame';
+    wrist.matrixAutoUpdate = false; wrist.visible = false; wrist.add(item); scene.add(wrist); return wrist;
   });
-  scene.add(hand.mainItem, hand.offhandItem);
   updateEmptyHand(hand, { swingActive: false, swingProgress: 0 });
   return hand;
 }
@@ -183,31 +179,27 @@ const fixedArmAlignment = new THREE.Matrix4().makeTranslation(-1, 3.6, 3.5)
   .multiply(new THREE.Matrix4().makeRotationY(-135 * Math.PI / 180))
   .multiply(new THREE.Matrix4().makeTranslation(5.6, 0, 0));
 const handRotation = new THREE.Matrix4(), eatingTransform = new THREE.Matrix4();
-function spriteInFirstPerson(mesh, item, sign, pose, equipHeight, wrist) {
-  const p = pose.swingActive ? pose.swingProgress : 0, { inward: q, vertical: r, reach: a } = swingCurves(p, pose.swingActive);
-  const b = Math.sin(Math.PI * p * p), profile = displayProfile(item);
-  if (profile === 'generated') {
-    // One shared wrist drives both the actual arm and angled flat picture.
-    // The item-local grip pose is composed once; no second hand transform.
-    if (mesh.parent !== wrist) wrist.add(mesh);
-    wrist.visible = true;
-    wrist.position.set(sign * (.70 - .22 * q), -.48 + .12 * r - .6 * (1 - equipHeight), -.84 - .14 * a);
-    wrist.matrix.makeTranslation(...wrist.position.toArray())
-      .multiply(handRotation.makeRotationY(-sign * .15 * q)).multiply(handRotation.makeRotationZ(-sign * .3 * q));
-    wrist.matrixWorldNeedsUpdate = true;
-    mesh.matrixAutoUpdate = false;
-    mesh.matrix.copy(firstPersonDoorAttachment(sign));
-    mesh.matrixWorldNeedsUpdate = true; return;
+const handMirror = new THREE.Matrix4().makeScale(-1, 1, 1);
+function updateHeldItemFrame(frame, profile, sign, pose, equipHeight) {
+  const p = pose.swingActive ? pose.swingProgress : 0;
+  const { inward: q, vertical: r, reach: a } = swingCurves(p, pose.swingActive);
+  const b = Math.sin(Math.PI * p * p), door = profile === 'door';
+  // Java renderer-level rest pose + one swing/equip layer. The .4 scale and
+  // model-local pose live in firstPersonItemTransform, never on the source mesh.
+  frame.matrix.makeTranslation((door ? .70 : .56) - (door ? .22 : .4) * q,
+    (door ? -.48 : -.52) + (door ? .12 : .2) * r - .6 * (1 - equipHeight),
+    (door ? -.84 : -.72) - (door ? .14 : .2) * a);
+  if (door) frame.matrix.multiply(handRotation.makeRotationY(-.15 * q)).multiply(handRotation.makeRotationZ(-.3 * q));
+  else frame.matrix.multiply(handRotation.makeRotationY((45 - 20 * b) * Math.PI / 180))
+    .multiply(handRotation.makeRotationZ(-20 * q * Math.PI / 180)).multiply(handRotation.makeRotationX(-80 * q * Math.PI / 180));
+  if (pose.eating) {
+    const approach = Math.min(1, pose.eatAge / 3), chew = Math.abs(Math.sin(pose.eatAge * Math.PI / 4));
+    frame.matrix.premultiply(eatingTransform.makeTranslation(-.23 * approach, .28 * approach + .045 * chew, .20 * approach));
   }
-  // The camera-space hand/swing/equip parent is separate from item model units.
-  // Sprite items sit a little farther forward to fit comfortably in the view.
-  mesh.matrixAutoUpdate = false; mesh.position.set(sign * (.44 - .4 * q), -.54 + .2 * r - .6 * (1 - equipHeight), -.9 - .2 * a);
-  mesh.matrix.makeTranslation(...mesh.position.toArray())
-    .multiply(handRotation.makeRotationY(sign * (45 - 20 * b) * Math.PI / 180))
-    .multiply(handRotation.makeRotationZ(-sign * 20 * q * Math.PI / 180))
-    .multiply(handRotation.makeRotationX(-80 * q * Math.PI / 180)).multiply(handRotation.makeRotationY(-sign * Math.PI / 4))
-    .multiply(itemModelTransform(profile, 'first', sign)).multiply(itemSourceAlignment(profile, 'first', sign));
-  mesh.matrixWorldNeedsUpdate = true;
+  // Conjugate only the animation frame; the local item supplies the one actual
+  // reflection. Together these produce a precise mirror of the full right pose.
+  if (sign < 0) frame.matrix.premultiply(handMirror).multiply(handMirror);
+  frame.position.setFromMatrixPosition(frame.matrix); frame.matrixWorldNeedsUpdate = true;
 }
 export function updateEmptyHand(hand, pose, inventory = null) {
   const p = pose.swingActive ? pose.swingProgress : 0;
@@ -221,35 +213,18 @@ export function updateEmptyHand(hand, pose, inventory = null) {
     .multiply(handRotation.makeRotationZ(-20 * b * Math.PI / 180))
     .multiply(fixedArmAlignment);
   hand.rig.matrixWorldNeedsUpdate = true;
-  const main = pose.equipInitialized ? pose.equippedItem : inventory?.mainHand, offhand = inventory?.offhand;
-  for (const [i, mesh] of [hand.mainItem, hand.offhandItem].entries()) {
-    hand.doorHands[i].visible = false;
-    const held = i === 0 ? main : offhand;
-    const definition = ITEMS.get(typeof held === 'string' ? held : held?.id);
-    if (definition?.display !== 'generated' && mesh.parent !== hand.scene) hand.scene.add(mesh);
-  }
+  const main = pose.equipInitialized ? pose.equippedItem : inventory?.mainHand;
+  const held = [main, inventory?.offhand];
   hand.rig.visible = !main;
-  hand.mainItem.visible = Boolean(main); hand.offhandItem.visible = Boolean(offhand);
-  if (main) setItemAppearance(hand.mainItem, typeof main === 'string' ? main : main.id);
-  if (offhand) setItemAppearance(hand.offhandItem, offhand.id);
-  const mainDefinition = ITEMS.get(typeof main === 'string' ? main : main?.id);
-  if (main && mainDefinition?.model === 'flat') spriteInFirstPerson(hand.mainItem, mainDefinition, 1, pose, equipHeight, hand.doorHands[0]);
-  else if (main) {
-    hand.mainItem.position.set(.56 - .4 * q, -.52 + .2 * r - .6 * (1 - equipHeight), -.72 - .2 * a);
-    hand.mainItem.matrixAutoUpdate = false;
-    hand.mainItem.matrix.makeTranslation(...hand.mainItem.position.toArray())
-      .multiply(handRotation.makeRotationY((45 - 20 * b) * Math.PI / 180))
-      .multiply(handRotation.makeRotationZ(-20 * q * Math.PI / 180))
-      .multiply(handRotation.makeRotationX(-80 * q * Math.PI / 180))
-      .multiply(handRotation.makeRotationY(-45 * Math.PI / 180));
-    hand.mainItem.matrixWorldNeedsUpdate = true;
-  }
-  if (offhand && ITEMS.get(offhand.id)?.model === 'flat') spriteInFirstPerson(hand.offhandItem, ITEMS.get(offhand.id), -1, { swingActive: false }, 1, hand.doorHands[1]);
-  else if (offhand) { hand.offhandItem.matrixAutoUpdate = true; hand.offhandItem.position.set(-.56, -.52, -.72); hand.offhandItem.rotation.set(.12, -.35, 0); }
-  if (pose.eating && mainDefinition?.food) {
-    const approach = Math.min(1,pose.eatAge/3), chew = Math.abs(Math.sin(pose.eatAge*Math.PI/4));
-    hand.mainItem.matrix.premultiply(eatingTransform.makeTranslation(-.23*approach,.28*approach+.045*chew,.20*approach));
-    hand.mainItem.matrixWorldNeedsUpdate = true;
+  for (const [i, mesh] of [hand.mainItem, hand.offhandItem].entries()) {
+    const stack = held[i], frame = hand.itemHands[i], id = typeof stack === 'string' ? stack : stack?.id;
+    frame.visible = mesh.visible = Boolean(id);
+    if (!id) continue;
+    const profile = displayProfile(ITEMS.get(id)), sign = i === 0 ? 1 : -1;
+    setItemAppearance(mesh, id);
+    mesh.matrixAutoUpdate = false; mesh.matrix.copy(firstPersonItemTransform(profile, sign));
+    mesh.userData.displayProfile = profile; mesh.matrixWorldNeedsUpdate = true;
+    updateHeldItemFrame(frame, profile, sign, i === 0 ? pose : { swingActive: false }, i === 0 ? equipHeight : 1);
   }
 }
 

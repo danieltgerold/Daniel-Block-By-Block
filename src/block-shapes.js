@@ -46,9 +46,29 @@ export function fenceConnections(block, world) {
     return [name, neighbor?.definition.collisionShape === 'fence' || blockOpaque(neighbor)];
   }));
 }
+export function wallConnections(block,world) {
+  return Object.fromEntries(Object.entries(DIRECTIONS).map(([name,[x,,z]])=>{
+    const neighbor=world?.blockAt(block.x+x,block.y,block.z+z);
+    if(neighbor?.definition.collisionShape==='wall')return [name,true];
+    if(fullCube(neighbor))return [name,true];
+    const axis=x?0:2,face=x>0||z>0?0:1,boxes=blockBoxes(neighbor,'selection',null);
+    const solid=[.25,.75].every(y=>[.25,.75].every(u=>boxes.some(b=>b[axis]<=face&&b[axis+3]>=face&&y>b[1]&&y<b[4]&&u>b[axis===0?2:0]&&u<b[axis===0?5:3])));
+    return [name,solid];
+  }));
+}
 export function blockBoxes(block, kind = 'collision', world = null) {
   if (!block?.definition.solid) return [];
   const shape = block.definition.collisionShape, state = block.state ?? {};
+  if(shape==='farmland')return [[0,0,0,1,15/16,1]];
+  if(shape==='wall') {
+    const links=world?wallConnections(block,world):{east:true,west:true},collision=kind==='collision';
+    const boxes=[[.25,0,.25,.75,collision?1.5:1,.75]];
+    for(const [name,on] of Object.entries(links))if(on){
+      const range={north:[.3125,0,.6875,.5],south:[.3125,.5,.6875,1],west:[0,.3125,.5,.6875],east:[.5,.3125,1,.6875]}[name];
+      boxes.push([range[0],0,range[1],range[2],collision?1.5:.8125,range[3]]);
+    }
+    return boxes;
+  }
   if (shape === 'slab') return state.type === 'double' ? CUBE : state.type === 'top' ? [[0, .5, 0, 1, 1, 1]] : [[0, 0, 0, 1, .5, 1]];
   if (shape === 'stairs') return stairBoxes(state);
   if (shape === 'door') {

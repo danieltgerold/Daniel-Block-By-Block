@@ -78,7 +78,7 @@ export class VoxelWorld {
     for (const entries of index.values()) for (const e of entries.values()) if (matches(e)) yield e;
   }
   boxesFor(block, kind = 'collision') {
-    if (block.definition.collisionShape === 'fence') return worldBoxes(block, kind, this);
+    if (['fence','wall'].includes(block.definition.collisionShape)) return worldBoxes(block, kind, this);
     const cache = this.boxCaches[kind]; if (!cache.has(block)) cache.set(block, worldBoxes(block, kind, this));
     return cache.get(block);
   }
@@ -248,7 +248,7 @@ export class VoxelWorld {
   destroyBlock(x, y, z, context = {}) {
     const block = this.blockAt(x, y, z); if (!block || block.definition.unbreakable && context.gameMode !== 'creative') return false;
     if (block.definition.collisionShape === 'door') this.removeDoor(block); else this.setBlock(x, y, z, false);
-    for (const drop of blockDrops(block, context)) this.emitDrop(drop, { x: x + .5, y: y + .25, z: z + .5 });
+    for (const drop of blockDrops(block, {random:this.random,...context})) this.emitDrop(drop, { x: x + .5, y: y + .25, z: z + .5 });
     return true;
   }
   updateArea(min = { x: -Infinity, y: -Infinity, z: -Infinity }, max = { x: Infinity, y: Infinity, z: Infinity }) {

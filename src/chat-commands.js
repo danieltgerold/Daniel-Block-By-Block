@@ -8,6 +8,7 @@ export const COMMANDS = Object.freeze([
   { name: '/reach', setting: 'reach', label: 'Reach', unit: 'blocks', min: 0, max: 255, description: 'eye-to-hit interaction distance at size 1' },
   { name: '/jump', setting: 'jump', label: 'Jump apex', unit: 'blocks', min: 0, max: 255, description: 'jump apex above takeoff at size 1' },
   { name: '/size', setting: 'size', label: 'Size', unit: 'multiplier', min: 0.1, max: 4, description: 'player size multiplier' },
+  { name: '/falldamage', setting: 'falldamage', label: 'Fall damage', unit: 'multiplier', min: 0, max: 255, description: 'Fall damage multiplier' },
   { name: '/default', action: 'defaults', description: 'Reset all player settings' },
   { name: '/tp', action: 'teleport', usage: '/tp <x> <y> <z>', description: 'Teleport feet (~ for relative)' },
   { name: '/give', action: 'give', usage: '/give <item> [quantity]', description: 'Give items' },
@@ -16,7 +17,7 @@ export const COMMANDS = Object.freeze([
 ].map(Object.freeze));
 export const numberText = value => String(Number(value.toPrecision(8)));
 export function commandHelp() {
-  const labels = { speed: 'Walking speed', reach: 'Interaction distance', jump: 'Jump height', size: 'Player size' };
+  const labels = { speed: 'Walking speed', reach: 'Interaction distance', jump: 'Jump height', size: 'Player size', falldamage:'Fall damage multiplier' };
   return 'Commands\n' + COMMANDS.map(command => command.setting
     ? `${command.name} <value> — ${labels[command.setting]}`
     : `${command.usage ?? command.name} — ${command.description}`).join('\n')
@@ -77,7 +78,7 @@ export function applyCommand(service, text) {
     if (args.length) service.reply(`Usage: ${command.name}. See /help for commands.`);
     else if (command.action === 'defaults') {
       const result = service.controller.resetAllSettings();
-      service.reply(result.ok ? 'Speed, reach, jump height, and size reset to default.' : result.error);
+      service.reply(result.ok ? 'Speed, reach, jump height, size, and fall damage reset to default.' : result.error);
     } else service.reply(commandHelp());
     return;
   }
@@ -97,7 +98,7 @@ export function applyCommand(service, text) {
   let reply = `${command.label} ${reset ? 'reset to default' : 'set to'} ${numberText(value)} ${command.unit}.`;
   if (command.setting === 'size') {
     reply += ` Effective speed ${numberText(result.effective.speed)} blocks/s, reach ${numberText(result.effective.reach)} blocks, jump ${numberText(result.effective.jump)} blocks.`;
-  } else if (service.controller.size !== 1) {
+  } else if (command.setting !== 'falldamage' && service.controller.size !== 1) {
     reply += ` Effective ${numberText(result.effective[command.setting])} ${command.unit} at size ${numberText(service.controller.size)}.`;
   }
   service.reply(reply);

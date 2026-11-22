@@ -1,5 +1,6 @@
 ﻿import { playerBounds } from './voxel-world.js';
-import { quantity } from './inventory.js';
+import { quantity, ITEMS } from './inventory.js';
+import { sameStack, stackKey } from './stack-data.js';
 const position = p => ({ x: p.x, y: p.y, z: p.z });
 const lotCount = (lots, time) => lots.reduce((sum, lot) => sum + (lot.expires > time + 1e-8 ? lot.count : 0n), 0n);
 export function pickupBounds(player) {
@@ -12,22 +13,24 @@ export class DroppedItems {
   constructor(world, inventory) {
     Object.assign(this, { world, inventory }); this.time = 0; this.piles = []; this.serial = 0; this.transitions = [];
   }
-  spawn(id, count, location, { thrown = false, velocity = {} } = {}) {
+  spawn(id, count, location, { thrown = false, velocity = {}, stack = {} } = {}) {
     count = quantity(count);
     if (count <= 0n) return;
-    const pile = { id: ++this.serial, item: id, ...location, previous: position(location), born: this.time,
+    const stackData=stack.damage!==undefined?{damage:stack.damage}:{};
+    const pile = { id: ++this.serial, item: id, stackData, ...location, previous: position(location), born: this.time,
       phase: (this.serial * 2.3999632297) % (2 * Math.PI), count, thrown,
       vx: velocity.x ?? 0, vy: velocity.y ?? .08, vz: velocity.z ?? 0,
       lots: [{ count, expires: this.time + 300, pickup: this.time + (thrown ? 2 : 0) }] };
     // Thrown items get their launch physics before joining a nearby pile.
-    const target = !thrown && this.piles.filter(p => p.item === id && Math.hypot(p.x - pile.x, p.y - pile.y, p.z - pile.z) <= 2)
+    const target = !thrown && !ITEMS.get(id)?.durability && this.piles.filter(p => sameStack({id:p.item,...p.stackData},{id,...stackData}) && Math.hypot(p.x - pile.x, p.y - pile.y, p.z - pile.z) <= 2)
       .sort((a, b) => a.count > b.count ? -1 : a.count < b.count ? 1 : a.id - b.id)[0];
     this.piles.push(pile);
     if (target) return pile.count > target.count ? this.merge(target, pile) : this.merge(pile, target);
     return pile;
   }
   merge(source, target) {
-    if (source === target || !this.piles.includes(source) || !this.piles.includes(target) || source.item !== target.item) return target;
+    if (source === target || !this.piles.includes(source) || !this.piles.includes(target) || ITEMS.get(source.item)?.durability
+      || !sameStack({id:source.item,...source.stackData},{id:target.item,...target.stackData})) return target;
     // Authoritative ownership transfers exactly once, immediately. Effects only
     // reference the transferred lots for their current visual count.
     for (const effect of this.transitions) if (effect.targetId === source.id && effect.ends > this.time) {
@@ -61,9 +64,9 @@ export class DroppedItems {
     this.piles = this.piles.filter(p => p !== source);
     return target;
   }
-  step(player) {
+  step(player, {pickup=true}={}) {
     this.time += .05;
-    const bounds = pickupBounds(player);
+    const bounds = pickup ? pickupBounds(player) : null;
     for (const pile of this.piles) {
       pile.lots = pile.lots.filter(l => l.expires > this.time + 1e-8);
       pile.count = lotCount(pile.lots, this.time);
@@ -79,11 +82,11 @@ export class DroppedItems {
       pile.vz = motion.blocked.z ? 0 : pile.vz * (motion.grounded ? .6 : .98);
       const bounce = oldVy < 0 ? -oldVy * .2 : 0;
       pile.vy = motion.blocked.y ? (bounce >= .02 ? bounce : 0) : (oldVy - .04) * .98;
-      const touches = pile.x + .125 > bounds.min.x && pile.x - .125 < bounds.max.x
+      const touches = bounds && pile.x + .125 > bounds.min.x && pile.x - .125 < bounds.max.x
         && pile.y + .25 > bounds.min.y && pile.y < bounds.max.y
         && pile.z + .125 > bounds.min.z && pile.z - .125 < bounds.max.z;
-      if (touches && this.inventory.capacity(pile.item)) {
-        for (const lot of pile.lots) if (lot.pickup <= this.time + 1e-8 && lot.count) lot.count = this.inventory.insert(pile.item, lot.count);
+      if (touches && this.inventory.capacity(pile.item,undefined,pile.stackData)) {
+        for (const lot of pile.lots) if (lot.pickup <= this.time + 1e-8 && lot.count) lot.count = this.inventory.insert(pile.item, lot.count,undefined,pile.stackData);
         pile.lots = pile.lots.filter(l => l.count > 0n); pile.count = lotCount(pile.lots, this.time);
       }
     }
@@ -93,14 +96,15 @@ export class DroppedItems {
     const buckets = new Map();
     const sorted = [...this.piles].sort((a, b) => a.count > b.count ? -1 : a.count < b.count ? 1 : a.id - b.id);
     for (const pile of sorted) {
+      if(ITEMS.get(pile.item)?.durability)continue;
       const cx = Math.floor(pile.x / 2), cy = Math.floor(pile.y / 2), cz = Math.floor(pile.z / 2);
       let target;
       for (let x = cx - 1; x <= cx + 1 && !target; x++) for (let y = cy - 1; y <= cy + 1 && !target; y++) for (let z = cz - 1; z <= cz + 1 && !target; z++) {
-        target = buckets.get(`${pile.item}:${x},${y},${z}`)?.find(p => Math.hypot(p.x - pile.x, p.y - pile.y, p.z - pile.z) <= 2);
+        target = buckets.get(`${stackKey({id:pile.item,...pile.stackData})}:${x},${y},${z}`)?.find(p => Math.hypot(p.x - pile.x, p.y - pile.y, p.z - pile.z) <= 2);
       }
       if (target) this.merge(pile, target);
       else {
-        const key = `${pile.item}:${cx},${cy},${cz}`;
+        const key = `${stackKey({id:pile.item,...pile.stackData})}:${cx},${cy},${cz}`;
         if (!buckets.has(key)) buckets.set(key, []);
         buckets.get(key).push(pile);
       }
@@ -112,4 +116,11 @@ export class DroppedItems {
     });
   }
   total() { return this.piles.reduce((sum, p) => sum + p.lots.reduce((n, l) => n + l.count, 0n), 0n); }
+  save() {
+    return {time:this.time,serial:this.serial,piles:this.piles.map(p=>({...p,stackData:{...p.stackData},previous:{...p.previous},count:String(p.count),lots:p.lots.map(l=>({...l,count:String(l.count)}))}))};
+  }
+  load(data) {
+    this.time=data.time??0;this.serial=data.serial??0;this.transitions=[];
+    this.piles=(data.piles??[]).filter(p=>ITEMS.has(p.item)).map(p=>({...p,stackData:{...p.stackData},previous:{...p.previous},count:BigInt(p.count),lots:p.lots.map(l=>({...l,count:BigInt(l.count)}))}));
+  }
 }

@@ -6,7 +6,7 @@ export const CREATIVE_CATEGORIES = [
 // Explicit kind/material metadata wins; conventional <material>.<kind> IDs
 // supply useful defaults. Unknown kinds/items remain visible after known ones.
 export const CREATIVE_KIND_ORDER = ['bedrock', 'stone', 'cobblestone', 'dirt', 'grass.block', 'sand', 'gravel',
-  'planks', 'log', 'slab', 'stairs', 'fence', 'door', 'leaves', 'glass', 'crafting.table', 'furnace', 'stick'];
+  'planks', 'log', 'slab', 'stairs', 'wall', 'fence', 'door', 'leaves', 'glass', 'ore', 'storage', 'crafting.table', 'furnace', 'stick', 'mineral', 'pickaxe', 'axe', 'shovel', 'hoe', 'sword', 'shears'];
 export const CREATIVE_MATERIAL_ORDER = ['oak', 'pine'];
 export function creativeOrder(item) {
   const parts = item.id.split('.');
@@ -60,7 +60,7 @@ export class CreativeInventory {
   clone(index) {
     const inv = this.inventory, stack = inv.slots[index];
     if (!this.enabled() || index < 0 || index > OFFHAND || inv.cursor || !stack) return false;
-    inv.cursor = { id: stack.id, count: ITEMS.get(stack.id).maxStack }; inv.changed(); return true;
+    inv.cursor = { ...stack, count: ITEMS.get(stack.id).maxStack }; inv.changed(); return true;
   }
   fillPlan(indices) {
     const plan = new Map(), inv = this.inventory;
@@ -73,7 +73,7 @@ export class CreativeInventory {
     return plan;
   }
   fill(indices) {
-    for (const [i, count] of this.fillPlan(indices)) this.inventory.slots[i] = { id: this.inventory.cursor.id, count: (this.inventory.slots[i]?.count ?? 0) + count };
+    for (const [i, count] of this.fillPlan(indices)) this.inventory.slots[i] = { ...this.inventory.cursor, count: (this.inventory.slots[i]?.count ?? 0) + count };
     if (this.enabled()) this.inventory.changed();
   }
   remove(index) {

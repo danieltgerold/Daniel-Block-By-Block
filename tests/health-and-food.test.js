@@ -82,8 +82,8 @@ function fall(height,{size=1,obstacle=null,mode='survival'}={}) {
   const c=new MovementController(w);c.configure('size',size);c.setGameMode(mode);c.teleport({x:.25,y:height,z:.25});
   for(let i=0;i<150&&!c.player.grounded&&!c.vitals.dead;i++)c.update(.05);return c;
 }
-test('fall damage uses the complete descent to full/partial landing surfaces, ignores size, water of any kind and Creative',()=>{
-  near(fall(3).vitals.health,20);near(fall(4).vitals.health,19);near(fall(4,{size:2}).vitals.health,19);
+test('fall damage uses the complete descent to full/partial landing surfaces, scales its safe distance, and ignores water and Creative',()=>{
+  near(fall(3).vitals.health,20);near(fall(4).vitals.health,19);near(fall(4,{size:2}).vitals.health,20);
   const slab=fall(4.5,{obstacle:'oak.slab'});near(slab.player.y,.5);near(slab.vitals.health,19);
   const stairs=fall(5,{obstacle:'oak.stairs'});near(stairs.player.y,1);near(stairs.vitals.health,19);
   near(fall(12,{mode:'creative'}).vitals.health,20);
@@ -112,7 +112,7 @@ test('vitals survive teleport and helper world snapshots; old player data gets s
   c.teleport({x:5,y:8,z:5});near(c.vitals.health,8.25);near(c.vitals.hunger,19);assert.equal(c.player.damageFallDistance,0);
   const saved=JSON.parse(JSON.stringify(w.save())),r=new VoxelWorld(),rc=new MovementController(r);r.load(saved);assert.deepEqual(rc.vitals.toJSON(),c.vitals.toJSON());near(rc.player.y,8);
   rc.loadPlayer({x:0,y:4,z:0});assert.deepEqual(rc.vitals.toJSON(),{health:20,hunger:20,saturation:5,exhaustion:0});
-  rc.vitals.health=10;ticks(rc,10,{gameplayEnabled:false});assert.ok(rc.vitals.health>10);assert.equal(gameSimulationRunning('inventory'),true);assert.equal(gameSimulationRunning('death'),false);assert.equal(gameSimulationRunning('menu'),false);
+  rc.vitals.health=10;ticks(rc,10,{gameplayEnabled:false});assert.ok(rc.vitals.health>10);assert.equal(gameSimulationRunning('inventory'),true);assert.equal(gameSimulationRunning('death'),true);assert.equal(gameSimulationRunning('menu'),true);
 });
 
 test('HUD full/half/empty icons, developer saturation, food motion and death/menu routing work without opening a browser',t=>{

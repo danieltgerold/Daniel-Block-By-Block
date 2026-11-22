@@ -86,6 +86,8 @@ body.world-view .wordmark { visibility: hidden; }
 .crafting-grid { display: grid; grid-template-columns: repeat(var(--craft-size, 2), 40px); gap: 3px; }
 .slot-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; }
 .inventory-hotbar { margin-top: 12px; }
+.durability-bar { position: absolute; left: 5px; right: 5px; bottom: 3px; height: 4px; padding: 1px; background: #18211b; }
+.durability-bar > span { display: block; height: 2px; }
 button.inventory-slot { position: relative; display: block; width: 100%; min-width: 0; height: 44px; padding: 3px; border: 2px solid #8b9f8c; border-radius: 0; background: #b8c7b3; box-shadow: inset 2px 2px #81927d; }
 button.inventory-slot:hover { background: #d9e4cf; }
 .armor-slots .inventory-slot, .offhand-area .inventory-slot, .crafting-area .inventory-slot { width: 40px; height: 40px; }

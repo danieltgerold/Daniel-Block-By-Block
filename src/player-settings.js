@@ -1,7 +1,7 @@
 ﻿import { BLOCK_REACH } from './voxel-world.js';
 export const DEFAULT_WALK_SPEED = 0.098 / (1 - 0.546) * 20;
 export const DEFAULT_JUMP_HEIGHT = 1.252203352512;
-export const DEFAULT_SETTINGS = Object.freeze({ speed: DEFAULT_WALK_SPEED, reach: BLOCK_REACH, jump: DEFAULT_JUMP_HEIGHT, size: 1 });
+export const DEFAULT_SETTINGS = Object.freeze({ speed: DEFAULT_WALK_SPEED, reach: BLOCK_REACH, jump: DEFAULT_JUMP_HEIGHT, size: 1, falldamage: 1 });
 
 // Peak of the actual tick recurrence: move by vy, then vy=(vy-0.08)*0.98.
 export function jumpApex(velocity) {
@@ -25,5 +25,9 @@ export function jumpVelocityForHeight(height) {
 
 export function effectiveSettings(settings) {
   return { speed: settings.speed * settings.size, reach: settings.reach * settings.size,
-    jump: settings.jump * settings.size, size: settings.size };
+    jump: settings.jump * settings.size, size: settings.size, falldamage: settings.falldamage ?? 1 };
+}
+export function fallDamage(distance, { size=1, jump=DEFAULT_JUMP_HEIGHT, falldamage=1 } = {}) {
+  const safe=Math.max(3,jump), extra=Math.max(0,distance/size-safe-1e-7*Math.max(1,safe));
+  return falldamage===0 ? 0 : Math.max(0,Math.ceil(extra*falldamage-1e-9));
 }
