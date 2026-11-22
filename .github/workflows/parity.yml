@@ -80,3 +80,31 @@ jobs:
             echo "::error::The JS rules changed. Run 'npm run golden', port the change to core/, and commit both."
             exit 1
           fi
+
+  # Pushes to main skip pull requests, so a rule change can land without the Java port. When that
+  # breaks parity, open (or add to) one issue so it is seen and fixed by a pull request.
+  report-drift:
+    needs: [core, golden]
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.core.result == 'failure' || needs.golden.result == 'failure') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Open or update the drift issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          AUTHOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+          CORE: ${{ needs.core.result }}
+          GOLDEN: ${{ needs.golden.result }}
+        run: bash tools/ci/report-drift.sh
