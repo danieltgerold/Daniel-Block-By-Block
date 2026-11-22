@@ -9,6 +9,47 @@ A local JavaScript / Three.js / Vite first-person block test.
 - `npm run build` creates the production site in `dist/`.
 - `npm run preview -- --host 127.0.0.1 --port 4173 --strictPort` serves the build.
 
+## Shared Java core and parity
+
+`core/` contains shared numeric movement, typed block geometry, and static-world
+collision, support, water sampling and raycasting. `web-core/` compiles those same
+classes to an ES module through TeaVM. The shipped browser game continues to use
+its JS rules during this port; protocol, worker hosting, persistence, inventory,
+vitals, crafting and world simulation ticks are later integration work.
+
+JDK 21 is needed for Java work. The Gradle wrapper pins Gradle and TeaVM versions.
+Frontend commands (`npm test`, `npm run dev`, `npm run build`) work without Java.
+The full parity checks are separate:
+
+```sh
+npm ci
+./gradlew :core:test :web-core:generateJavaScript
+npm run test:parity
+npx playwright install chromium firefox webkit
+npm run test:browsers
+```
+
+On Linux, Playwright may also require system libraries; CI installs these with
+`npx playwright install --with-deps chromium firefox webkit`.
+
+The shared replay compares 163,982 values against recorded JS references in Node,
+Chromium, Firefox and WebKit. It checks raw double bits, including signed zero,
+and rejects empty, truncated and malformed reference files. JVM tests separately
+cover movement, geometry and typed-world queries. Current movement includes
+flight, crouching, slab stepping, flowing/falling water and fall-distance state.
+These are static snapshots: fluid propagation and other world ticks do not run.
+
+After a rules change, run `npm run golden`, explain the reference differences,
+and update the Java port in the same change. Historical three-layer fixtures are
+explicit, independently of the current four-layer world. See
+[the fixture contract](tests/golden/README.md) for schemas and scope.
+Simulation trig uses arithmetic-only `Trig`, and vector normalization uses
+explicit square-root sums instead of runtime-dependent `hypot`. Preserve operation
+order when porting: algebraically equivalent expressions can round differently.
+
+CI keeps frontend-only, shared-core parity, and golden-freshness jobs separate.
+Browser reports and traces are uploaded when the shared-core job fails.
+
 ## GitHub and VS Code
 
 This project is connected to https://github.com/danieltgerold/Daniel-Block-By-Block

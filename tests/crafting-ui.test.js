@@ -38,7 +38,10 @@ test('real inventory input slots support drag/split/output, and recipe search, f
   click(CRAFT_OUTPUT, 0, true); assert.equal(i.slots[C], null); assert.equal(i.slots[0].count, 4);
   const node = view.hudViews.get(0).firstChild; i.changed(); assert.equal(view.hudViews.get(0).firstChild, node, 'Unchanged icons are reused');
   document.getElementById('recipe-book-toggle').click(); assert.equal(view.book.root.hidden, false);
-  assert.equal([...view.book.buttons.values()].filter(b => !b.hidden).length, 4);
+  // The book lists every recipe that fits the 2x2 grid; stone, polished, ore-unpack and shears recipes joined the original four.
+  const visibleRecipes = [...view.book.buttons.entries()].filter(([, b]) => !b.hidden).map(([id]) => id);
+  for (const id of ['oak.planks', 'pine.planks', 'sticks', 'crafting.table']) assert.ok(visibleRecipes.includes(id), `${id} stays in the 2x2 book`);
+  assert.equal(visibleRecipes.length, 17);
   const before = JSON.stringify(i.slots); view.book.buttons.get('pine.planks').click();
   assert.equal(JSON.stringify(i.slots), before); assert.equal(i.cursor.count, 4); assert.equal(i.crafting.output, null);
   assert.equal(view.book.ghost.hidden, false); assert.ok(view.book.ghostSlots[0].classList.contains('missing'));

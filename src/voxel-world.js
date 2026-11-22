@@ -366,11 +366,11 @@ export class VoxelWorld {
   }
   raycast(origin, direction, reach = BLOCK_REACH, options = {}) {
     const hit = this.raycastRaw(origin, direction, reach, options);
-    if (hit) { const length = Math.hypot(direction.x, direction.y, direction.z); hit.point = Object.fromEntries(AXES.map(a => [a, origin[a] + direction[a] / length * hit.distance])); }
+    if (hit) { const length = Math.sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z); hit.point = Object.fromEntries(AXES.map(a => [a, origin[a] + direction[a] / length * hit.distance])); }
     return hit;
   }
   raycastRaw(origin, direction, reach = BLOCK_REACH, options = {}) {
-    const length = Math.hypot(direction.x, direction.y, direction.z);
+    const length = Math.sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z);
     if (!length || reach < 0) return null;
     const d = Object.fromEntries(AXES.map(a => [a, direction[a] / length]));
     let best = null;

@@ -1,0 +1,82 @@
+# Checks every pull request. Three independent jobs:
+#   web    - the game's own tests and build, with no Java installed (frontend work never needs a JDK)
+#   core   - JVM, TeaVM/Node and three-browser bit-exact parity
+#   golden - regenerates the golden traces from the current JS rules; a diff means a rule changed
+#            (usually via a merge from main) and the Java port must be updated to match
+name: parity
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: parity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v5 # also validates the committed Gradle wrapper jar
+      - run: npm ci
+      - run: ./gradlew :core:test :web-core:generateJavaScript
+      - run: npm run test:parity
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run test:browsers
+      - name: Trig golden file is current
+        run: |
+          ./gradlew :core:writeTrigGolden
+          git diff --exit-code -- tests/golden/trig
+      - uses: actions/upload-artifact@v7.0.2
+        if: failure()
+        with:
+          name: parity-browser-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+
+  golden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run golden
+      - name: Golden traces match the JS rules
+        run: |
+          if [ -n "$(git status --porcelain -- tests/golden)" ]; then
+            git status --short -- tests/golden
+            echo "::error::The JS rules changed. Run 'npm run golden', port the change to core/, and commit both."
+            exit 1
+          fi

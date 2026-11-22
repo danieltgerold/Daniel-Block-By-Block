@@ -88,7 +88,8 @@ test('creative catalog UI clicks, numbered slots, Q, tooltips and search focus c
   hover(catalog('pine.door')); const event = key('Digit9', view.creative.search); assert.equal(event.defaultPrevented, true); assert.equal(c.inventory.slots[8].id, 'pine.door');
   key('KeyW', view.creative.search); key('Space', view.creative.search); key('Slash', view.creative.search); assert.equal(c.heldKeys.size, 0); assert.equal(f.ui.mode, 'inventory');
   view.creative.search.value = 'no such item'; view.creative.search.dispatchEvent(new window.Event('input')); assert.ok(view.creative.cells.every(cell => !cell.dataset.catalog));
-  view.creative.search.value = ''; view.creative.search.dispatchEvent(new window.Event('input')); assert.equal(view.creative.scroll.disabled, true);
+  assert.equal(view.creative.scroll.disabled, true, 'a result list that fits one page does not scroll');
+  view.creative.search.value = ''; view.creative.search.dispatchEvent(new window.Event('input')); assert.equal(view.creative.scroll.disabled, false, 'the full catalog is longer than one page');
   key('Escape', view.creative.search); assert.equal(view.isOpen, false);
 });
 
@@ -123,7 +124,9 @@ test('catalog scrolls by rows without recreating cells and resets after filterin
 });
 
 test('blank creative catalog clicks delete the cursor without drops, exclude controls/real slots, and preserve outside/Survival behavior', t => {
-  const f = fixture(t), { inventoryUI: view, c, click, document, key, ui } = f, inv = c.inventory;
+  const f = fixture(t), { inventoryUI: view, c, click, document, key, ui, window } = f, inv = c.inventory;
+  // The full catalog now fills every visible cell, so an empty search result supplies the blank cells.
+  key('KeyT'); view.creative.search.value = 'no such item'; view.creative.search.dispatchEvent(new window.Event('input'));
   const empty = view.creative.cells.find(cell => !cell.dataset.catalog);
   assert.equal(empty.disabled, false, 'empty cells must receive real mouse presses');
   const dropped = c.drops.total();

@@ -9,8 +9,14 @@ const base = { torsoYaw: .2, headYaw: .1, aimPitch: -.4, phase: 2, amount: .8, c
 // Independent point-transform oracle: apply the written MC operations from
 // right to left. Only the shoulder/output basis is MC Y-down; block model
 // vertices already use Y-up, so a second source-basis flip would invert them.
+// The left hand is one mirror of the complete right-hand attachment (x negated, y and z equal), as in
+// src/item-display.js mirrored(); it is no longer built from a separately rotated left grip.
 function expected(point, sign) {
-  const x = new THREE.Vector3(1, 0, 0), y = new THREE.Vector3(0, 1, 0);
+  const right = expectedRight(point);
+  return sign < 0 ? right.set(-right.x, right.y, right.z) : right;
+}
+function expectedRight(point) {
+  const sign = 1, x = new THREE.Vector3(1, 0, 0), y = new THREE.Vector3(0, 1, 0);
   return point.clone().multiplyScalar(.375)
     .applyAxisAngle(y, sign * Math.PI / 4).applyAxisAngle(x, 75 * Math.PI / 180)
     .add(new THREE.Vector3(0, 2.5 / 16, 0)).add(new THREE.Vector3(sign / 16, 2 / 16, -10 / 16))

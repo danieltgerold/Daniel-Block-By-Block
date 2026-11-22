@@ -101,8 +101,10 @@ test('all block kinds place/consume, break/drop their own item, retain Creative 
     assert.equal(breakTargetBlock({ controller: c, world, yaw: Math.PI / 2, pitch: 0 }), true);
     assert.equal(c.particles.active.length, 64);
     assert.ok(c.particles.pool.every(p => p.texture === BLOCK_TYPES.get(id).particleTexture));
-    assert.equal(c.drops.total(), mode === 'survival' ? 1n : 0n);
-    if (mode === 'survival') assert.equal(c.drops.piles[0].item, id === 'grass.block' ? 'dirt' : id);
+    // Stone, cobblestone and the furnace require a pickaxe, so bare-hand breaking drops nothing.
+    const harvested = mode === 'survival' && !['stone', 'cobblestone', 'furnace'].includes(id);
+    assert.equal(c.drops.total(), harvested ? 1n : 0n);
+    if (harvested) assert.equal(c.drops.piles[0].item, id === 'grass.block' ? 'dirt' : id);
     c.inventory.slots[0] = null; c.inventory.slots[9] = stack(id, 7);
     assert.equal(c.pickBlock(Math.PI / 2, 0), true); assert.equal(c.inventory.mainHand.id, id);
     assert.equal(c.inventory.mainHand.count, mode === 'survival' ? 7 : 1);

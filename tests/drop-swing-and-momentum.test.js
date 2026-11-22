@@ -61,13 +61,13 @@ test('only successful gameplay Q/Ctrl+Q requests a swing, ignores repeats and ob
   f.key('KeyQ'); assert.equal(c.inventory.mainHand.count, 4); assert.equal(f.requests(), 1);
   tick(c); assert.equal(c.player.animation.swingAge, 0); assert.equal(c.player.animation.swingSerial, 1);
   const hand = createEmptyHand(); updateEmptyHand(hand, { ...c.renderState().animation, swingActive: false }, c.inventory);
-  const resting = hand.mainItem.matrix.clone();
+  const resting = hand.itemHands[0].matrix.clone(); // swing and equip motion drive the item's frame; the mesh keeps a fixed grip
   f.key('KeyQ', { repeat: true }); assert.equal(c.inventory.mainHand.count, 4); assert.equal(f.requests(), 1);
   f.key('KeyQ'); tick(c); assert.equal(c.player.animation.swingSerial, 1);
   tick(c); f.key('KeyQ'); tick(c); assert.equal(c.player.animation.swingSerial, 2);
   assert.equal(c.player.animation.equipHeight, 1, 'Stack count changes do not unequip the block');
   tick(c); c.update(.025); updateEmptyHand(hand, c.renderState().animation, c.inventory);
-  assert.equal(hand.mainItem.visible, true); assert.notDeepEqual(hand.mainItem.matrix.elements, resting.elements);
+  assert.equal(hand.mainItem.visible, true); assert.notDeepEqual(hand.itemHands[0].matrix.elements, resting.elements);
   f.key('KeyQ', { ctrlKey: true }); assert.equal(c.inventory.mainHand, null); assert.equal(f.requests(), 4);
   assert.equal(c.drops.total(), 5n); f.key('KeyQ'); assert.equal(f.requests(), 4);
   f.key('KeyE'); c.inventory.slots[9] = block(2); f.inventoryUI.hovered = 9;

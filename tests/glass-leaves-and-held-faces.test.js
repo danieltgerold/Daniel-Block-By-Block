@@ -145,7 +145,7 @@ test('placed/grown grass drops dirt, glass/leaves drop no blocks, and Creative n
   c.drops.spawn('dirt', 2, { x: .5, y: 1.25, z: .5 });
   assert.equal(breakTargetBlock({ controller: c, world: w, yaw: Math.PI / 2, pitch: 0 }), true);
   assert.equal(c.drops.piles.length, 1); assert.equal(c.drops.piles[0].item, 'dirt'); assert.equal(c.drops.total(), 3n);
-  const custom = { definition: { drops: ({ tool }) => tool ? [{ id: 'stone', count: 1 }] : [] } };
+  const custom = { definition: { tags: [], drops: ({ tool }) => tool ? [{ id: 'stone', count: 1 }] : [] } };
   assert.deepEqual(blockDrops(custom, { tool: null }), []); assert.deepEqual(blockDrops(custom, { tool: stack('stone') }), [{ id: 'stone', count: 1 }]);
 });
 

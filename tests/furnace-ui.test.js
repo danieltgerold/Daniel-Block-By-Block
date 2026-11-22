@@ -49,7 +49,7 @@ test('breaking an open furnace closes the view, drops each real stack once, and 
   const { c, ui, f } = fixture(t), i = c.inventory;
   f.slots = [stack('sand', 2), stack('stick'), stack('glass', 3)]; i.cursor = stack('oak.planks'); i.changed();
   c.world.destroyBlock(0, 0, 0, { gameMode: 'survival' });
-  assert.equal(ui.mode, 'ready'); assert.equal(i.furnace, null); assert.equal(i.cursor, null); assert.equal(c.drops.total(), 7n);
+  assert.equal(ui.mode, 'ready'); assert.equal(i.furnace, null); assert.equal(i.cursor, null); assert.equal(c.drops.total(), 6n);
   assert.equal(i.slots[0].id, 'oak.planks'); assert.ok(f.slots.every(s => s === null));
-  assert.equal(c.world.destroyBlock(0, 0, 0, { gameMode: 'survival' }), false); assert.equal(c.drops.total(), 7n);
+  assert.equal(c.world.destroyBlock(0, 0, 0, { gameMode: 'survival' }), false); assert.equal(c.drops.total(), 6n);
 });

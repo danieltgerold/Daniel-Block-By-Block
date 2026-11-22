@@ -103,7 +103,7 @@ export class FluidSystem {
         : !n && isWater(below) ? (below.state.falling ? 0 : below.state.level) + 8 - level : 0;
       vx += dx * delta; vz += dz * delta;
     }
-    const vy = b.state.falling ? -6 : 0, length = Math.hypot(vx, vy, vz) || 1;
+    const vy = b.state.falling ? -6 : 0, length = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
     return { x: vx / length, y: vy / length, z: vz / length };
   }
   sample(min, max) {

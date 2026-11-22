@@ -1,0 +1,4 @@
+world,baseY,layers
+current,0,bedrock|dirt|dirt|grass.block
+negative,-4,bedrock|dirt|dirt|grass.block
+ties,0,

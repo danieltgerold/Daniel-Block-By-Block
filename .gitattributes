@@ -1,0 +1,2 @@
+# Keep the generated Windows launcher portable while storing canonical Git text.
+gradlew.bat text eol=crlf
