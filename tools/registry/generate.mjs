@@ -3,7 +3,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { BLOCK_TYPES } from '../../src/block-types.js';
-import { blockRows, blocksCsv, javaBlocksSource } from './export.mjs';
+import { ITEMS } from '../../src/inventory.js';
+import { blockRows, blocksCsv, javaBlocksSource, itemRows, itemsCsv, javaItemsSource } from './export.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -15,7 +16,11 @@ export function generateRegistry(rootDir = root) {
   mkdirSync(goldenDir, { recursive: true });
   writeFileSync(join(javaDir, 'GeneratedBlocks.java'), javaBlocksSource(rows));
   writeFileSync(join(goldenDir, 'blocks.csv'), blocksCsv(rows));
-  return rows.length;
+  const items = itemRows(ITEMS), itemDir = join(rootDir, 'core/src/main/java/blockbyblock/core/item');
+  mkdirSync(itemDir, { recursive: true });
+  writeFileSync(join(itemDir, 'GeneratedItems.java'), javaItemsSource(items));
+  writeFileSync(join(goldenDir, 'items.csv'), itemsCsv(items));
+  return `${rows.length} blocks, ${items.length} items`;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) console.log(`registry: ${generateRegistry(process.argv[2] ?? root)} blocks`);
+if (import.meta.url === pathToFileURL(process.argv[1]).href) console.log(`registry: ${generateRegistry(process.argv[2] ?? root)}`);
