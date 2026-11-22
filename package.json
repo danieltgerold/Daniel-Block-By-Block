@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "golden": "node tools/golden/generate.mjs",
+    "golden": "node tools/golden/generate.mjs && node tools/registry/generate.mjs",
     "test:parity": "node --test tests/parity/*.test.js",
     "test:browsers": "playwright test"
   },
