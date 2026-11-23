@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { VoxelWorld } from '../../src/voxel-world.js';
 import { formatNumber } from './format.mjs';
 
-const lcg = seed => () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+export const lcg = seed => () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
 const LAYERS = ['bedrock', 'dirt', 'dirt', 'grass.block'];
 const parseProps = text => text === '-' ? {} : Object.fromEntries(text.split('|').map(kv => {
   const [k, v] = kv.split('='); return [k, v === 'true' ? true : v === 'false' ? false : /^\d+$/.test(v) ? Number(v) : v];
@@ -65,7 +65,7 @@ export function worldText(ctx) {
 }
 
 const DIRS = ['north', 'east', 'south', 'west'];
-function randomOp(rand) {
+export function randomOp(rand) {
   const pick = list => list[Math.floor(rand() * list.length)];
   const n = max => Math.floor(rand() * max);
   const at = () => `${n(5) - 2}:${3 + n(4)}:${n(5) - 2}`;

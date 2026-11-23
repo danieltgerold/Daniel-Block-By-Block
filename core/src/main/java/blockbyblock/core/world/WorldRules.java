@@ -43,6 +43,7 @@ public final class WorldRules {
     private final List<ChangeListener> listeners = new ArrayList<>();
     private DropListener drops = (stack, x, y, z) -> {};
     private BooleanSupplier creative = () -> false;
+    private blockbyblock.core.mining.RandomSource random = () -> 0.5;
     /** True while a save is being loaded: no furnace drops and no stair reshaping. */
     public boolean loading;
     private boolean changingDoors;
@@ -67,7 +68,12 @@ public final class WorldRules {
 
     private static String furnaceKey(double x, double y, double z) { return x + "," + y + "," + z; }
 
-    private void emitDrop(ItemStack stack, double x, double y, double z) { drops.onDrop(stack, x, y, z); }
+    void emitDrop(ItemStack stack, double x, double y, double z) { drops.onDrop(stack, x, y, z); }
+
+    /** The source of random numbers for random-range drops (the JS world's {@code random}). */
+    public void setRandom(blockbyblock.core.mining.RandomSource random) { this.random = random; }
+
+    public blockbyblock.core.mining.RandomSource random() { return random; }
 
     public boolean isOpaqueSolid(double x, double y, double z) {
         WorldBlock block = storage.blockAt(x, y, z);

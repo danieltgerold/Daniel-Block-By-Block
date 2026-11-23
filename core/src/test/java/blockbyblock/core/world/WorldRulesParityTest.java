@@ -19,21 +19,25 @@ import org.junit.jupiter.api.Test;
 
 /** Replays every recorded JS edit and compares all edits, furnaces and drops after each one. */
 class WorldRulesParityTest {
-    private static final class Ctx {
+    static final class Ctx {
         WorldRules rules;
         boolean creative;
         final List<Object[]> drops = new ArrayList<>();
     }
 
-    private static Ctx fresh() {
+    private static final double[] RANDOMS = {0, 0.15, 0.5, 0.85, 0.999999};
+
+    static Ctx fresh() {
         Ctx c = new Ctx();
         c.rules = new WorldRules(new VoxelWorld(0, new String[] {"bedrock", "dirt", "dirt", "grass.block"}));
         c.rules.setDropListener((stack, x, y, z) -> c.drops.add(new Object[] {stack.copy(), x, y, z}));
         c.rules.setCreativeMode(() -> c.creative);
+        int[] n = {0};
+        c.rules.setRandom(() -> RANDOMS[n[0]++ % RANDOMS.length]);
         return c;
     }
 
-    private static BlockState stateFor(String id, String props) {
+    static BlockState stateFor(String id, String props) {
         BlockState state = BlockState.defaults(BlockDefinition.forId(id));
         if (props.equals("-")) return state;
         for (String kv : props.split("\\|")) {
@@ -43,7 +47,7 @@ class WorldRulesParityTest {
         return state;
     }
 
-    private static String apply(Ctx c, String op) {
+    static String apply(Ctx c, String op) {
         String[] a = op.split(":", -1);
         switch (a[0]) {
             case "set": {
@@ -90,7 +94,7 @@ class WorldRulesParityTest {
         try { BlockDefinition.forId(id); return true; } catch (IllegalArgumentException e) { return false; }
     }
 
-    private static String editsText(Ctx c) {
+    static String editsText(Ctx c) {
         List<WorldBlock> edits = new ArrayList<>(c.rules.world().storage().allEdits());
         edits.sort(Comparator.<WorldBlock>comparingDouble(b -> b.x).thenComparingDouble(b -> b.y).thenComparingDouble(b -> b.z));
         StringBuilder text = new StringBuilder();
@@ -103,7 +107,7 @@ class WorldRulesParityTest {
         return text.length() == 0 ? "-" : text.toString();
     }
 
-    private static String furnacesText(Ctx c) {
+    static String furnacesText(Ctx c) {
         List<String> entries = new ArrayList<>();
         for (WorldBlock b : c.rules.world().storage().allEdits()) {
             if (!"furnace".equals(b.id)) continue;
