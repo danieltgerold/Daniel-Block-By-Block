@@ -8,6 +8,8 @@ test('every registered item is exported once, in order, with its gameplay fields
   assert.equal(rows.length, ITEMS.size);
   assert.deepEqual(rows.map(r => r.id), [...ITEMS.keys()]);
   const byId = id => rows.find(r => r.id === id);
+  assert.equal(byId('stone').name, 'Stone');
+  assert.equal(byId('stone.pickaxe').name, 'Stone Pickaxe');
   assert.equal(byId('stone').isBlock, true); assert.equal(byId('stone').maxStack, 64);
   assert.equal(byId('water'), undefined, 'water is not an inventory item');
   assert.equal(byId('stick').isBlock, false);

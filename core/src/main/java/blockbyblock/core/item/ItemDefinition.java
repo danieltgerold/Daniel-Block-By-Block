@@ -9,6 +9,8 @@ import java.util.Map;
  */
 public final class ItemDefinition {
     public final String id;
+    /** The name shown to players, as in server replies ("Gave 5 Stone."). */
+    public final String name;
     public final int maxStack;
     /** True when the item places a block of the same id. */
     public final boolean isBlock;
@@ -23,9 +25,10 @@ public final class ItemDefinition {
     public final double foodSaturation;
     private final String[] tags;
 
-    ItemDefinition(String id, int maxStack, boolean isBlock, String toolType, double toolSpeed, int toolLevel,
+    ItemDefinition(String id, String name, int maxStack, boolean isBlock, String toolType, double toolSpeed, int toolLevel,
                    int durability, int foodHunger, double foodSaturation, String[] tags) {
         this.id = id;
+        this.name = name;
         this.maxStack = maxStack;
         this.isBlock = isBlock;
         this.toolType = toolType;
