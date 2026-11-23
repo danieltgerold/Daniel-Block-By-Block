@@ -1,0 +1,192 @@
+input	result
+""	err:Enter a name; it cannot be blank.
+" "	err:Enter a name; it cannot be blank.
+"a"	ok:a
+"Steve"	ok:Steve
+"steve"	ok:steve
+"STEVE"	ok:STEVE
+"Alex1"	ok:Alex1
+"player1"	ok:player1
+"Player1"	ok:Player1
+"PLAYER1"	ok:PLAYER1
+"player2"	ok:player2
+"1234567890123456"	ok:1234567890123456
+"12345678901234567"	err:Names must be 16 characters or fewer.
+"abcdefghijklmnop"	ok:abcdefghijklmnop
+"abcdefghijklmnopq"	err:Names must be 16 characters or fewer.
+"two words"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+"tab\there"	err:Spaces are not allowed in player names.
+"new\nline"	err:Spaces are not allowed in player names.
+"nb sp"	err:Spaces are not allowed in player names.
+" em"	err:Spaces are not allowed in player names.
+"zero​width"	err:Use only letters and numbers.
+"café"	err:Use only letters and numbers.
+"naïve"	err:Use only letters and numbers.
+"Über"	err:Use only letters and numbers.
+"under_score"	err:Use only letters and numbers.
+"dash-ed"	err:Use only letters and numbers.
+"dot.ted"	err:Use only letters and numbers.
+"emoji😀"	err:Use only letters and numbers.
+"server"	err:The name server is reserved for system messages.
+"Server"	err:The name server is reserved for system messages.
+"SERVER"	err:The name server is reserved for system messages.
+"sErVeR"	err:The name server is reserved for system messages.
+"server1"	ok:server1
+"Servers"	ok:Servers
+" server "	err:Spaces are not allowed in player names.
+"ser ver"	err:Spaces are not allowed in player names.
+"ſandy"	err:Use only letters and numbers.
+"KKKK"	err:Use only letters and numbers.
+"xxxxxxxxxxxxxxxx"	ok:xxxxxxxxxxxxxxxx
+"xxxxxxxxxxxxxxxxx"	err:Names must be 16 characters or fewer.
+"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"	err:Names must be 16 characters or fewer.
+"﻿bom"	err:Spaces are not allowed in player names.
+"a b"	err:Spaces are not allowed in player names.
+"ab"	err:Use only letters and numbers.
+"a᠎b"	err:Use only letters and numbers.
+"ABC123xyz"	ok:ABC123xyz
+"0"	ok:0
+"O0o0"	ok:O0o0
+null	err:Enter a name; it cannot be blank.
+"__undefined__"	err:Enter a name; it cannot be blank.
+42	err:Enter a name; it cannot be blank.
+{}	err:Enter a name; it cannot be blank.
+[]	err:Enter a name; it cannot be blank.
+"mid\tdle"	err:Spaces are not allowed in player names.
+"\tlead"	err:Spaces are not allowed in player names.
+"trail\t"	err:Spaces are not allowed in player names.
+"\t"	err:Enter a name; it cannot be blank.
+"mid\ndle"	err:Spaces are not allowed in player names.
+"\nlead"	err:Spaces are not allowed in player names.
+"trail\n"	err:Spaces are not allowed in player names.
+"\n"	err:Enter a name; it cannot be blank.
+"mid\u000bdle"	err:Spaces are not allowed in player names.
+"\u000blead"	err:Spaces are not allowed in player names.
+"trail\u000b"	err:Spaces are not allowed in player names.
+"\u000b"	err:Enter a name; it cannot be blank.
+"mid\fdle"	err:Spaces are not allowed in player names.
+"\flead"	err:Spaces are not allowed in player names.
+"trail\f"	err:Spaces are not allowed in player names.
+"\f"	err:Enter a name; it cannot be blank.
+"mid\rdle"	err:Spaces are not allowed in player names.
+"\rlead"	err:Spaces are not allowed in player names.
+"trail\r"	err:Spaces are not allowed in player names.
+"\r"	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid dle"	err:Spaces are not allowed in player names.
+" lead"	err:Spaces are not allowed in player names.
+"trail "	err:Spaces are not allowed in player names.
+" "	err:Enter a name; it cannot be blank.
+"mid　dle"	err:Spaces are not allowed in player names.
+"　lead"	err:Spaces are not allowed in player names.
+"trail　"	err:Spaces are not allowed in player names.
+"　"	err:Enter a name; it cannot be blank.
+"mid﻿dle"	err:Spaces are not allowed in player names.
+"﻿lead"	err:Spaces are not allowed in player names.
+"trail﻿"	err:Spaces are not allowed in player names.
+"﻿"	err:Enter a name; it cannot be blank.
+"mid\u0000dle"	err:Use only letters and numbers.
+"\u0000lead"	err:Use only letters and numbers.
+"trail\u0000"	err:Use only letters and numbers.
+"mid\bdle"	err:Use only letters and numbers.
+"\blead"	err:Use only letters and numbers.
+"trail\b"	err:Use only letters and numbers.
+"mid\u000edle"	err:Use only letters and numbers.
+"\u000elead"	err:Use only letters and numbers.
+"trail\u000e"	err:Use only letters and numbers.
+"mid\u001fdle"	err:Use only letters and numbers.
+"\u001flead"	err:Use only letters and numbers.
+"trail\u001f"	err:Use only letters and numbers.
+"middle"	err:Use only letters and numbers.
+"lead"	err:Use only letters and numbers.
+"trail"	err:Use only letters and numbers.
+"mid᠎dle"	err:Use only letters and numbers.
+"᠎lead"	err:Use only letters and numbers.
+"trail᠎"	err:Use only letters and numbers.
+"mid​dle"	err:Use only letters and numbers.
+"​lead"	err:Use only letters and numbers.
+"trail​"	err:Use only letters and numbers.
+"mid‌dle"	err:Use only letters and numbers.
+"‌lead"	err:Use only letters and numbers.
+"trail‌"	err:Use only letters and numbers.
+"mid‍dle"	err:Use only letters and numbers.
+"‍lead"	err:Use only letters and numbers.
+"trail‍"	err:Use only letters and numbers.
+"mid⁠dle"	err:Use only letters and numbers.
+"⁠lead"	err:Use only letters and numbers.
+"trail⁠"	err:Use only letters and numbers.
+"mid、dle"	err:Use only letters and numbers.
+"、lead"	err:Use only letters and numbers.
+"trail、"	err:Use only letters and numbers.
+"mid￾dle"	err:Use only letters and numbers.
+"￾lead"	err:Use only letters and numbers.
+"trail￾"	err:Use only letters and numbers.

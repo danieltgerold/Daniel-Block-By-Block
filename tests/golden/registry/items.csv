@@ -1,106 +1,106 @@
-id,maxStack,isBlock,toolType,toolSpeed,toolLevel,durability,foodHunger,foodSaturation,tags
-bedrock,64,1,,0,0,0,-1,0,
-stone,64,1,,0,0,0,-1,0,
-cobblestone,64,1,,0,0,0,-1,0,
-dirt,64,1,,0,0,0,-1,0,
-grass.block,64,1,,0,0,0,-1,0,
-sand,64,1,,0,0,0,-1,0,
-gravel,64,1,,0,0,0,-1,0,
-oak.log,64,1,,0,0,0,-1,0,wood.logs|wood.oak
-oak.planks,64,1,,0,0,0,-1,0,wood.planks|wood.oak
-glass,64,1,,0,0,0,-1,0,
-oak.leaves,64,1,,0,0,0,-1,0,leaves|wood.oak
-pine.log,64,1,,0,0,0,-1,0,wood.logs|wood.pine
-pine.planks,64,1,,0,0,0,-1,0,wood.planks|wood.pine
-pine.leaves,64,1,,0,0,0,-1,0,leaves|wood.pine
-crafting.table,64,1,,0,0,0,-1,0,
-oak.slab,64,1,,0,0,0,-1,0,
-oak.fence,64,1,,0,0,0,-1,0,
-oak.stairs,64,1,,0,0,0,-1,0,
-oak.door,64,1,,0,0,0,-1,0,
-pine.slab,64,1,,0,0,0,-1,0,
-pine.fence,64,1,,0,0,0,-1,0,
-pine.stairs,64,1,,0,0,0,-1,0,
-pine.door,64,1,,0,0,0,-1,0,
-furnace,64,1,,0,0,0,-1,0,
-mossy.cobblestone,64,1,,0,0,0,-1,0,
-stone.bricks,64,1,,0,0,0,-1,0,
-mossy.stone.bricks,64,1,,0,0,0,-1,0,
-cracked.stone.bricks,64,1,,0,0,0,-1,0,
-chiseled.stone.bricks,64,1,,0,0,0,-1,0,
-granite,64,1,,0,0,0,-1,0,
-diorite,64,1,,0,0,0,-1,0,
-andesite,64,1,,0,0,0,-1,0,
-polished.granite,64,1,,0,0,0,-1,0,
-polished.diorite,64,1,,0,0,0,-1,0,
-polished.andesite,64,1,,0,0,0,-1,0,
-stone.slab,64,1,,0,0,0,-1,0,
-stone.stairs,64,1,,0,0,0,-1,0,
-stone.wall,64,1,,0,0,0,-1,0,
-cobblestone.slab,64,1,,0,0,0,-1,0,
-cobblestone.stairs,64,1,,0,0,0,-1,0,
-cobblestone.wall,64,1,,0,0,0,-1,0,
-mossy.cobblestone.slab,64,1,,0,0,0,-1,0,
-mossy.cobblestone.stairs,64,1,,0,0,0,-1,0,
-mossy.cobblestone.wall,64,1,,0,0,0,-1,0,
-stone.bricks.slab,64,1,,0,0,0,-1,0,
-stone.bricks.stairs,64,1,,0,0,0,-1,0,
-stone.bricks.wall,64,1,,0,0,0,-1,0,
-mossy.stone.bricks.slab,64,1,,0,0,0,-1,0,
-mossy.stone.bricks.stairs,64,1,,0,0,0,-1,0,
-mossy.stone.bricks.wall,64,1,,0,0,0,-1,0,
-coal.ore,64,1,,0,0,0,-1,0,
-coal.block,64,1,,0,0,0,-1,0,
-iron.ore,64,1,,0,0,0,-1,0,
-iron.block,64,1,,0,0,0,-1,0,
-gold.ore,64,1,,0,0,0,-1,0,
-gold.block,64,1,,0,0,0,-1,0,
-lapis.ore,64,1,,0,0,0,-1,0,
-lapis.block,64,1,,0,0,0,-1,0,
-redstone.ore,64,1,,0,0,0,-1,0,
-redstone.block,64,1,,0,0,0,-1,0,
-diamond.ore,64,1,,0,0,0,-1,0,
-diamond.block,64,1,,0,0,0,-1,0,
-emerald.ore,64,1,,0,0,0,-1,0,
-emerald.block,64,1,,0,0,0,-1,0,
-nether.quartz.ore,64,1,,0,0,0,-1,0,
-farmland,64,1,,0,0,0,-1,0,
-stick,64,0,,0,0,0,-1,0,
-raw.porkchop,64,0,,0,0,0,3,1.8,
-cooked.porkchop,64,0,,0,0,0,8,12.8,
-bucket,16,0,,0,0,0,-1,0,
-water.bucket,1,0,,0,0,0,-1,0,
-coal,64,0,,0,0,0,-1,0,
-iron.ingot,64,0,,0,0,0,-1,0,
-gold.ingot,64,0,,0,0,0,-1,0,
-lapis.lazuli,64,0,,0,0,0,-1,0,
-redstone.dust,64,0,,0,0,0,-1,0,
-diamond,64,0,,0,0,0,-1,0,
-emerald,64,0,,0,0,0,-1,0,
-nether.quartz,64,0,,0,0,0,-1,0,
-wood.pickaxe,1,0,pickaxe,2,0,59,-1,0,
-wood.axe,1,0,axe,2,0,59,-1,0,
-wood.shovel,1,0,shovel,2,0,59,-1,0,
-wood.hoe,1,0,hoe,2,0,59,-1,0,
-wood.sword,1,0,sword,2,0,59,-1,0,
-stone.pickaxe,1,0,pickaxe,4,1,131,-1,0,
-stone.axe,1,0,axe,4,1,131,-1,0,
-stone.shovel,1,0,shovel,4,1,131,-1,0,
-stone.hoe,1,0,hoe,4,1,131,-1,0,
-stone.sword,1,0,sword,4,1,131,-1,0,
-iron.pickaxe,1,0,pickaxe,6,2,250,-1,0,
-iron.axe,1,0,axe,6,2,250,-1,0,
-iron.shovel,1,0,shovel,6,2,250,-1,0,
-iron.hoe,1,0,hoe,6,2,250,-1,0,
-iron.sword,1,0,sword,6,2,250,-1,0,
-gold.pickaxe,1,0,pickaxe,12,0,32,-1,0,
-gold.axe,1,0,axe,12,0,32,-1,0,
-gold.shovel,1,0,shovel,12,0,32,-1,0,
-gold.hoe,1,0,hoe,12,0,32,-1,0,
-gold.sword,1,0,sword,12,0,32,-1,0,
-diamond.pickaxe,1,0,pickaxe,8,3,1561,-1,0,
-diamond.axe,1,0,axe,8,3,1561,-1,0,
-diamond.shovel,1,0,shovel,8,3,1561,-1,0,
-diamond.hoe,1,0,hoe,8,3,1561,-1,0,
-diamond.sword,1,0,sword,8,3,1561,-1,0,
-shears,1,0,shears,15,0,238,-1,0,
+id,maxStack,isBlock,toolType,toolSpeed,toolLevel,durability,foodHunger,foodSaturation,tags,name
+bedrock,64,1,,0,0,0,-1,0,,Bedrock
+stone,64,1,,0,0,0,-1,0,,Stone
+cobblestone,64,1,,0,0,0,-1,0,,Cobblestone
+dirt,64,1,,0,0,0,-1,0,,Dirt
+grass.block,64,1,,0,0,0,-1,0,,Grass Block
+sand,64,1,,0,0,0,-1,0,,Sand
+gravel,64,1,,0,0,0,-1,0,,Gravel
+oak.log,64,1,,0,0,0,-1,0,wood.logs|wood.oak,Oak Log
+oak.planks,64,1,,0,0,0,-1,0,wood.planks|wood.oak,Oak Planks
+glass,64,1,,0,0,0,-1,0,,Glass
+oak.leaves,64,1,,0,0,0,-1,0,leaves|wood.oak,Oak Leaves
+pine.log,64,1,,0,0,0,-1,0,wood.logs|wood.pine,Pine Log
+pine.planks,64,1,,0,0,0,-1,0,wood.planks|wood.pine,Pine Planks
+pine.leaves,64,1,,0,0,0,-1,0,leaves|wood.pine,Pine Leaves
+crafting.table,64,1,,0,0,0,-1,0,,Crafting Table
+oak.slab,64,1,,0,0,0,-1,0,,Oak Slab
+oak.fence,64,1,,0,0,0,-1,0,,Oak Fence
+oak.stairs,64,1,,0,0,0,-1,0,,Oak Stairs
+oak.door,64,1,,0,0,0,-1,0,,Oak Door
+pine.slab,64,1,,0,0,0,-1,0,,Pine Slab
+pine.fence,64,1,,0,0,0,-1,0,,Pine Fence
+pine.stairs,64,1,,0,0,0,-1,0,,Pine Stairs
+pine.door,64,1,,0,0,0,-1,0,,Pine Door
+furnace,64,1,,0,0,0,-1,0,,Furnace
+mossy.cobblestone,64,1,,0,0,0,-1,0,,Mossy Cobblestone
+stone.bricks,64,1,,0,0,0,-1,0,,Stone Bricks
+mossy.stone.bricks,64,1,,0,0,0,-1,0,,Mossy Stone Bricks
+cracked.stone.bricks,64,1,,0,0,0,-1,0,,Cracked Stone Bricks
+chiseled.stone.bricks,64,1,,0,0,0,-1,0,,Chiseled Stone Bricks
+granite,64,1,,0,0,0,-1,0,,Granite
+diorite,64,1,,0,0,0,-1,0,,Diorite
+andesite,64,1,,0,0,0,-1,0,,Andesite
+polished.granite,64,1,,0,0,0,-1,0,,Polished Granite
+polished.diorite,64,1,,0,0,0,-1,0,,Polished Diorite
+polished.andesite,64,1,,0,0,0,-1,0,,Polished Andesite
+stone.slab,64,1,,0,0,0,-1,0,,Stone Slab
+stone.stairs,64,1,,0,0,0,-1,0,,Stone Stairs
+stone.wall,64,1,,0,0,0,-1,0,,Stone Wall
+cobblestone.slab,64,1,,0,0,0,-1,0,,Cobblestone Slab
+cobblestone.stairs,64,1,,0,0,0,-1,0,,Cobblestone Stairs
+cobblestone.wall,64,1,,0,0,0,-1,0,,Cobblestone Wall
+mossy.cobblestone.slab,64,1,,0,0,0,-1,0,,Mossy Cobblestone Slab
+mossy.cobblestone.stairs,64,1,,0,0,0,-1,0,,Mossy Cobblestone Stairs
+mossy.cobblestone.wall,64,1,,0,0,0,-1,0,,Mossy Cobblestone Wall
+stone.bricks.slab,64,1,,0,0,0,-1,0,,Stone Bricks Slab
+stone.bricks.stairs,64,1,,0,0,0,-1,0,,Stone Bricks Stairs
+stone.bricks.wall,64,1,,0,0,0,-1,0,,Stone Bricks Wall
+mossy.stone.bricks.slab,64,1,,0,0,0,-1,0,,Mossy Stone Bricks Slab
+mossy.stone.bricks.stairs,64,1,,0,0,0,-1,0,,Mossy Stone Bricks Stairs
+mossy.stone.bricks.wall,64,1,,0,0,0,-1,0,,Mossy Stone Bricks Wall
+coal.ore,64,1,,0,0,0,-1,0,,Coal Ore
+coal.block,64,1,,0,0,0,-1,0,,Block of Coal
+iron.ore,64,1,,0,0,0,-1,0,,Iron Ore
+iron.block,64,1,,0,0,0,-1,0,,Block of Iron
+gold.ore,64,1,,0,0,0,-1,0,,Gold Ore
+gold.block,64,1,,0,0,0,-1,0,,Block of Gold
+lapis.ore,64,1,,0,0,0,-1,0,,Lapis Lazuli Ore
+lapis.block,64,1,,0,0,0,-1,0,,Block of Lapis Lazuli
+redstone.ore,64,1,,0,0,0,-1,0,,Redstone Dust Ore
+redstone.block,64,1,,0,0,0,-1,0,,Block of Redstone
+diamond.ore,64,1,,0,0,0,-1,0,,Diamond Ore
+diamond.block,64,1,,0,0,0,-1,0,,Block of Diamond
+emerald.ore,64,1,,0,0,0,-1,0,,Emerald Ore
+emerald.block,64,1,,0,0,0,-1,0,,Block of Emerald
+nether.quartz.ore,64,1,,0,0,0,-1,0,,Nether Quartz Ore
+farmland,64,1,,0,0,0,-1,0,,Farmland
+stick,64,0,,0,0,0,-1,0,,Stick
+raw.porkchop,64,0,,0,0,0,3,1.8,,Raw Porkchop
+cooked.porkchop,64,0,,0,0,0,8,12.8,,Cooked Porkchop
+bucket,16,0,,0,0,0,-1,0,,Bucket
+water.bucket,1,0,,0,0,0,-1,0,,Water Bucket
+coal,64,0,,0,0,0,-1,0,,Coal
+iron.ingot,64,0,,0,0,0,-1,0,,Iron Ingot
+gold.ingot,64,0,,0,0,0,-1,0,,Gold Ingot
+lapis.lazuli,64,0,,0,0,0,-1,0,,Lapis Lazuli
+redstone.dust,64,0,,0,0,0,-1,0,,Redstone Dust
+diamond,64,0,,0,0,0,-1,0,,Diamond
+emerald,64,0,,0,0,0,-1,0,,Emerald
+nether.quartz,64,0,,0,0,0,-1,0,,Nether Quartz
+wood.pickaxe,1,0,pickaxe,2,0,59,-1,0,,Wooden Pickaxe
+wood.axe,1,0,axe,2,0,59,-1,0,,Wooden Axe
+wood.shovel,1,0,shovel,2,0,59,-1,0,,Wooden Shovel
+wood.hoe,1,0,hoe,2,0,59,-1,0,,Wooden Hoe
+wood.sword,1,0,sword,2,0,59,-1,0,,Wooden Sword
+stone.pickaxe,1,0,pickaxe,4,1,131,-1,0,,Stone Pickaxe
+stone.axe,1,0,axe,4,1,131,-1,0,,Stone Axe
+stone.shovel,1,0,shovel,4,1,131,-1,0,,Stone Shovel
+stone.hoe,1,0,hoe,4,1,131,-1,0,,Stone Hoe
+stone.sword,1,0,sword,4,1,131,-1,0,,Stone Sword
+iron.pickaxe,1,0,pickaxe,6,2,250,-1,0,,Iron Pickaxe
+iron.axe,1,0,axe,6,2,250,-1,0,,Iron Axe
+iron.shovel,1,0,shovel,6,2,250,-1,0,,Iron Shovel
+iron.hoe,1,0,hoe,6,2,250,-1,0,,Iron Hoe
+iron.sword,1,0,sword,6,2,250,-1,0,,Iron Sword
+gold.pickaxe,1,0,pickaxe,12,0,32,-1,0,,Gold Pickaxe
+gold.axe,1,0,axe,12,0,32,-1,0,,Gold Axe
+gold.shovel,1,0,shovel,12,0,32,-1,0,,Gold Shovel
+gold.hoe,1,0,hoe,12,0,32,-1,0,,Gold Hoe
+gold.sword,1,0,sword,12,0,32,-1,0,,Gold Sword
+diamond.pickaxe,1,0,pickaxe,8,3,1561,-1,0,,Diamond Pickaxe
+diamond.axe,1,0,axe,8,3,1561,-1,0,,Diamond Axe
+diamond.shovel,1,0,shovel,8,3,1561,-1,0,,Diamond Shovel
+diamond.hoe,1,0,hoe,8,3,1561,-1,0,,Diamond Hoe
+diamond.sword,1,0,sword,8,3,1561,-1,0,,Diamond Sword
+shears,1,0,shears,15,0,238,-1,0,,Shears
