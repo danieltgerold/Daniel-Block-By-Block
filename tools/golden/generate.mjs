@@ -17,6 +17,7 @@ import { generateVitals } from './vitals.mjs';
 import { generateMining } from './mining.mjs';
 import { generateDrops } from './drops.mjs';
 import { generateWorldRules } from './worldrules.mjs';
+import { generateBlockActions } from './blockactions.mjs';
 import { generateCurrent } from './current-fixtures.mjs';
 import { generateShapes } from './shapes.mjs';
 import { generateWorld } from './world.mjs';
@@ -187,6 +188,7 @@ export function generate(outDir = DEFAULT_OUT) {
   generateMining(outDir);
   generateDrops(outDir);
   generateWorldRules(outDir);
+  generateBlockActions(outDir);
   generateCurrent(outDir);
   generateShapes(outDir);
   generateWorld(outDir);
