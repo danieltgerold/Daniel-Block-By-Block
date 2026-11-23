@@ -60,14 +60,7 @@ final class WorldStorage {
         WorldBlock b = blockAt(x, y, z); return b == null ? null : b.id;
     }
 
-    static BlockState defaults(BlockDefinition d) {
-        return switch (d.shape) {
-            case SLAB -> BlockState.of(d, "bottom", "", "", "", "", false);
-            case STAIRS -> BlockState.of(d, "", "north", "bottom", "straight", "", false);
-            case DOOR -> BlockState.of(d, "", "north", "", "", "left", false);
-            default -> BlockState.of(d, "", "", "", "", "", false);
-        };
-    }
+    static BlockState defaults(BlockDefinition d) { return BlockState.defaults(d); }
 
     boolean setBlock(double x, double y, double z, String id, BlockState state, int level, boolean falling) {
         if (!safe(x) || !safe(y) || !safe(z)) return false;
@@ -85,11 +78,7 @@ final class WorldStorage {
         return true;
     }
 
-    private static boolean sameState(BlockState a, BlockState b) {
-        return a == b || a != null && b != null && a.shape == b.shape && a.type.equals(b.type)
-            && a.facing.equals(b.facing) && a.half.equals(b.half) && a.stairShape.equals(b.stairShape)
-            && a.hinge.equals(b.hinge) && a.open == b.open;
-    }
+    private static boolean sameState(BlockState a, BlockState b) { return a == b || a != null && a.equals(b); }
 
     private static boolean same(WorldBlock a, WorldBlock b) {
         if (a == null || a.id == null) return b == null || b.id == null;
@@ -184,7 +173,7 @@ final class WorldStorage {
             if (!isStair(b)) continue;
             String shape = stairShape(b);
             if (shape.equals(b.state.stairShape)) continue;
-            BlockState s = BlockState.of(b.definition, "", b.state.facing, b.state.half, shape, "", false);
+            BlockState s = b.state.with("shape", shape);
             setInternal(new WorldBlock(b.x, b.y, b.z, b.id, s, b.level, b.falling), b);
         }
     }
