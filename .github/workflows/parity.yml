@@ -80,3 +80,75 @@ jobs:
             echo "::error::The JS rules or registry changed. Run 'npm run golden'; for rule changes also port them to core/. Commit both."
             exit 1
           fi
+
+  # Pushes to main skip pull requests, so generated data (blocks, items, recipes) can go stale. When the
+  # golden check fails, regenerate it; if the whole gate is then green, open a pull request with the
+  # result. No model and no secrets: the generators are deterministic.
+  sync-generated:
+    needs: [golden]
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.golden.result == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v5
+      - run: npm ci
+      - name: Regenerate
+        run: |
+          npm run golden
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "::error::Golden failed but regenerating changed nothing; this needs a human."
+            exit 1
+          fi
+          git status --short
+      # The same gate a pull request gets. If a rule changed, these fail and the drift issue opens instead.
+      - run: npm test
+      - run: ./gradlew :core:test :web-core:generateJavaScript
+      - run: npm run test:parity
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run test:browsers
+      - name: Open the sync pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: bash tools/ci/open-sync-pr.sh
+
+  # When sync could not fix the failure (or the core job failed on its own), open or update one issue.
+  report-drift:
+    needs: [core, golden, sync-generated]
+    if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (needs.core.result == 'failure' || needs.golden.result == 'failure') && needs.sync-generated.result != 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Open or update the drift issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          AUTHOR: ${{ github.actor }}
+          REPO: ${{ github.repository }}
+          CORE: ${{ needs.core.result }}
+          GOLDEN: ${{ needs.golden.result }}
+          SYNC: ${{ needs.sync-generated.result }}
+        run: bash tools/ci/report-drift.sh
