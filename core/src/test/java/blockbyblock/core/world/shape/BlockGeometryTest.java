@@ -30,7 +30,9 @@ class BlockGeometryTest {
         assertThrows(IllegalArgumentException.class, () -> BlockState.of(STAIRS, "", "north", "middle", "straight", "", false));
         assertThrows(IllegalArgumentException.class, () -> BlockState.of(STAIRS, "", "north", "bottom", "curved", "", false));
         assertThrows(IllegalArgumentException.class, () -> BlockState.of(DOOR, "", "north", "", "", "center", false));
-        assertThrows(IllegalArgumentException.class, () -> BlockState.of(DOOR, "", "north", "upper", "", "left", false));
+        assertThrows(IllegalArgumentException.class, () -> BlockState.of(DOOR, "", "north", "middle", "", "left", false));
+        assertThrows(IllegalArgumentException.class, () -> BlockState.of(DOOR, "", "north", "bottom", "", "left", false)); // stairs vocabulary
+        assertEquals("upper", BlockState.of(DOOR, "", "north", "upper", "", "left", false).half, "doors have upper and lower halves");
         assertThrows(IllegalArgumentException.class, () -> BlockState.of(STONE, "", "", "", "", "", true));
         assertThrows(IllegalArgumentException.class, () -> BlockState.of(STONE, null, "", "", "", "", false));
     }

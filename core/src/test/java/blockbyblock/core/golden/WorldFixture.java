@@ -28,12 +28,18 @@ public final class WorldFixture {
 
     public static BlockState state(String id, String[] row, int offset) {
         BlockDefinition d = BlockDefinition.forId(id);
-        String type = d.shape == Shape.SLAB ? or(row[offset], "bottom") : "";
-        String facing = d.shape == Shape.STAIRS || d.shape == Shape.DOOR ? or(row[offset + 1], "north") : "";
-        String half = d.shape == Shape.STAIRS ? or(row[offset + 2], "bottom") : "";
-        String stair = d.shape == Shape.STAIRS ? or(row[offset + 3], "straight") : "";
-        String hinge = d.shape == Shape.DOOR ? or(row[offset + 4], "left") : "";
-        return BlockState.of(d, type, facing, half, stair, hinge, flag(row[offset + 5]));
+        BlockState state = BlockState.defaults(d);
+        // Columns: type, facing, half, shape, hinge, open. Empty means "the block's default".
+        if (d.shape == Shape.SLAB) state = state.with("type", or(row[offset], "bottom"));
+        if (d.shape == Shape.STAIRS) {
+            state = state.with("facing", or(row[offset + 1], "north")).with("half", or(row[offset + 2], "bottom"))
+                .with("shape", or(row[offset + 3], "straight"));
+        }
+        if (d.shape == Shape.DOOR) {
+            state = state.with("facing", or(row[offset + 1], "north")).with("half", or(row[offset + 2], "lower"))
+                .with("hinge", or(row[offset + 4], "left")).with("open", flag(row[offset + 5]));
+        }
+        return state;
     }
 
     public static boolean flag(String s) {

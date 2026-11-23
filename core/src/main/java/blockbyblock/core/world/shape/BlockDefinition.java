@@ -27,10 +27,13 @@ public final class BlockDefinition {
     /** Upper bound for RANGE drops; 0 otherwise. */
     public final int dropMax;
     private final String[] tags;
+    private final String[] stateKeys;
+    private final String[] stateDefaults;
 
     BlockDefinition(String id, Shape shape, boolean solid, boolean opaque, double hardness, double breakTicks,
                     boolean requiresTool, String preferredTool, int harvestLevel, int maxStack, boolean falling,
-                    DropRule dropRule, String dropItem, int dropCount, int dropMax, String[] tags) {
+                    DropRule dropRule, String dropItem, int dropCount, int dropMax, String[] tags,
+                    String[] stateKeys, String[] stateDefaults) {
         this.id = id;
         this.shape = shape;
         this.solid = solid;
@@ -47,6 +50,8 @@ public final class BlockDefinition {
         this.dropCount = dropCount;
         this.dropMax = dropMax;
         this.tags = tags.clone();
+        this.stateKeys = stateKeys.clone();
+        this.stateDefaults = stateDefaults.clone();
     }
 
     public boolean hasTag(String tag) {
@@ -54,6 +59,12 @@ public final class BlockDefinition {
         for (String t : tags) if (t.equals(tag)) return true;
         return false;
     }
+
+    /** The state properties this block has, in the JS registry's order (empty for most blocks). */
+    public String[] stateKeys() { return stateKeys.clone(); }
+
+    /** Default values for {@link #stateKeys()}, as canonical text. */
+    public String[] stateDefaults() { return stateDefaults.clone(); }
 
     private static final Map<String, BlockDefinition> BY_ID = new HashMap<>(); // lookup only; never iterated
     private static final BlockDefinition[] ALL = GeneratedBlocks.all();

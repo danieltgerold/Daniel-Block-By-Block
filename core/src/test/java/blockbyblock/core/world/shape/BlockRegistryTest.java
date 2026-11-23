@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 /** The generated Java table must say what the JS registry says, field for field (tests/golden/registry/blocks.csv). */
 class BlockRegistryTest {
-    private static final String HEADER = "id,shape,solid,opaque,hardness,breakTicks,requiresTool,preferredTool,harvestLevel,maxStack,falling,dropRule,dropId,dropCount,dropMax,tags";
+    private static final String HEADER = "id,shape,solid,opaque,hardness,breakTicks,requiresTool,preferredTool,harvestLevel,maxStack,falling,dropRule,dropId,dropCount,dropMax,tags,state";
 
     @Test void everyJsBlockMatchesFieldForField() throws Exception {
         var path = GoldenCsv.dir().resolve("registry").resolve("blocks.csv");
@@ -43,6 +43,8 @@ class BlockRegistryTest {
             assertEquals(r[12].isEmpty() ? null : r[12], d.dropItem, "dropItem " + r[0]);
             assertEquals(Integer.parseInt(r[13]), d.dropCount, "dropCount " + r[0]);
             assertEquals(Integer.parseInt(r[14]), d.dropMax, "dropMax " + r[0]);
+            assertEquals(r[16], BlockState.defaults(d).toString(), "default state " + r[0]);
+            assertEquals(r[16].isEmpty() ? 0 : r[16].split("\\|").length, d.stateKeys().length, "state keys " + r[0]);
             for (String tag : r[15].isEmpty() ? new String[0] : r[15].split("\\|")) assertTrue(d.hasTag(tag), r[0] + " tag " + tag);
         }
     }

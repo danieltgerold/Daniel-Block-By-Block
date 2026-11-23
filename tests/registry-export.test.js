@@ -26,6 +26,25 @@ test('every registered block is exported once with its gameplay fields', () => {
   assert.ok(rows.find(r => r.id === 'oak.log').tags.includes('wood.logs'));
 });
 
+test('block default states are exported as ordered keys with canonical string values', () => {
+  const rows = blockRows(BLOCK_TYPES), by = id => rows.find(r => r.id === id);
+  assert.deepEqual([by('oak.door').stateKeys, by('oak.door').stateValues], [['facing', 'hinge', 'open', 'half'], ['north', 'left', 'false', 'lower']]);
+  assert.deepEqual([by('furnace').stateKeys, by('furnace').stateValues], [['facing', 'lit'], ['north', 'false']]);
+  assert.deepEqual([by('oak.log').stateKeys, by('oak.log').stateValues], [['axis'], ['y']]);
+  assert.deepEqual([by('oak.leaves').stateKeys, by('oak.leaves').stateValues], [['persistent', 'distance'], ['true', '7']]);
+  assert.deepEqual([by('farmland').stateKeys, by('farmland').stateValues], [['moisture', 'dryTicks'], ['0', '0']]);
+  assert.deepEqual(by('oak.stairs').stateKeys, ['facing', 'half', 'shape']);
+  assert.deepEqual([by('water').stateKeys, by('water').stateValues], [[], []], 'water level/falling live on the world block');
+  assert.deepEqual(by('stone').stateKeys, []);
+});
+
+test('state values the table cannot represent are refused', () => {
+  const block = state => new Map([['x', { id: 'x', collisionShape: 'cube', solid: true, opaque: true, tags: [], drops: 'self', defaultState: state }]]);
+  assert.throws(() => blockRows(block({ mystery: 1 })), /x.*mystery/);
+  assert.throws(() => blockRows(block({ axis: { nested: true } })), /x.*axis/);
+  assert.throws(() => blockRows(block({ moisture: 1.5 })), /x.*moisture/);
+});
+
 test('drop rules that are functions are recognised by behaviour, and unknown ones are refused', () => {
   const slab = ({ block }) => [{ id: block.id, count: block.state?.type === 'double' ? 2 : 1 }];
   assert.equal(classifyDrops({ id: 'x.slab', drops: slab }).dropRule, 'slab');
