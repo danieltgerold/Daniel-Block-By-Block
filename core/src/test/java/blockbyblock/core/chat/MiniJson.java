@@ -5,7 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Just enough JSON to read the golden TSV cells: strings, null, numbers, arrays and empty objects. */
+/** Just enough JSON to read the golden TSV cells: strings, booleans, null, numbers, arrays and objects. */
 final class MiniJson {
     private final String text;
     private int pos;
@@ -35,9 +35,16 @@ final class MiniJson {
             pos++;
             Map<String, Object> map = new LinkedHashMap<>();
             if (text.charAt(pos) == '}') { pos++; return map; }
-            throw new IllegalArgumentException("Non-empty objects are not needed");
+            while (true) {
+                String key = string();
+                pos++; // the colon
+                map.put(key, value());
+                if (text.charAt(pos++) == '}') return map;
+            }
         }
         if (text.startsWith("null", pos)) { pos += 4; return null; }
+        if (text.startsWith("true", pos)) { pos += 4; return Boolean.TRUE; }
+        if (text.startsWith("false", pos)) { pos += 5; return Boolean.FALSE; }
         int start = pos;
         while (pos < text.length() && "+-.eE0123456789".indexOf(text.charAt(pos)) >= 0) pos++;
         return Double.valueOf(text.substring(start, pos));

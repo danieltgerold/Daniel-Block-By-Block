@@ -16,6 +16,7 @@ import { generateShapes } from './shapes.mjs';
 import { generateWorld } from './world.mjs';
 import { generateChatNames } from './chatnames.mjs';
 import { generateNumbers } from './numbers.mjs';
+import { generateCommands } from './commands.mjs';
 
 const DEFAULT_OUT = new URL('../../tests/golden/', import.meta.url).pathname;
 
@@ -182,6 +183,7 @@ export function generate(outDir = DEFAULT_OUT) {
   generateWorld(outDir);
   generateChatNames(outDir);
   generateNumbers(outDir);
+  generateCommands(outDir);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) generate(process.argv[2] ?? DEFAULT_OUT);
