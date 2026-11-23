@@ -15,6 +15,7 @@ import { generateCrafting } from './crafting.mjs';
 import { generateInventory } from './inventory.mjs';
 import { generateVitals } from './vitals.mjs';
 import { generateMining } from './mining.mjs';
+import { generateDrops } from './drops.mjs';
 import { generateCurrent } from './current-fixtures.mjs';
 import { generateShapes } from './shapes.mjs';
 import { generateWorld } from './world.mjs';
@@ -183,6 +184,7 @@ export function generate(outDir = DEFAULT_OUT) {
   generateInventory(outDir);
   generateVitals(outDir);
   generateMining(outDir);
+  generateDrops(outDir);
   generateCurrent(outDir);
   generateShapes(outDir);
   generateWorld(outDir);
