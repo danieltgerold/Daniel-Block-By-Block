@@ -7,7 +7,22 @@ import java.util.List;
 final class InventoryTrace {
     private InventoryTrace() {}
 
+    /** State that lives outside the player inventory across operations: the world's furnace. */
+    static final class Ctx { FurnaceEntity furnace; }
+
+    static ItemStack parseStack(String part) {
+        if (part.equals("-")) return null;
+        int x = part.lastIndexOf('x');
+        return new ItemStack(part.substring(0, x), Long.parseLong(part.substring(x + 1)));
+    }
+
     static String stackText(ItemStack s) { return s == null ? "-" : s.toString(); }
+
+    static String furnaceText(FurnaceEntity f) {
+        if (f == null) return "-";
+        return stackText(f.slot(0)) + "/" + stackText(f.slot(1)) + "/" + stackText(f.slot(2)) + "/b" + f.burnTime + "/d" + f.burnDuration
+            + "/c" + f.cookTime + "/r" + (f.recipeId == null ? "-" : f.recipeId);
+    }
 
     static int[] target(String name) {
         return switch (name) {
@@ -39,7 +54,7 @@ final class InventoryTrace {
     }
 
     /** Applies one op; returns the "ret" field. Drops are appended to {@code drops}. */
-    static String apply(PlayerInventory inv, String op, List<ItemStack> drops) {
+    static String apply(PlayerInventory inv, String op, List<ItemStack> drops, Ctx ctx) {
         String[] t = op.split(":", -1);
         String name = t[0];
         switch (name) {
@@ -77,11 +92,36 @@ final class InventoryTrace {
             case "dropcarried": inv.dropCarried(drops::add); return "-";
             case "reload": inv.load(inv.save()); return "-";
             case "load": inv.load(parseLoad(op.substring(5))); return "-";
+            case "furnacenew": {
+                String[] f = t[1].split("\\|");
+                ctx.furnace = new FurnaceEntity(parseStack(f[0]), parseStack(f[1]), parseStack(f[2]),
+                    Integer.parseInt(f[3]), Integer.parseInt(f[4]), Integer.parseInt(f[5]));
+                inv.openFurnace(ctx.furnace);
+                return "-";
+            }
+            case "furnaceopen": if (ctx.furnace != null) inv.openFurnace(ctx.furnace); return "-";
+            case "furnaceclose": inv.closeFurnace(); return "-";
+            case "ftick": {
+                int n = Integer.parseInt(t[1]);
+                // At most 400 ticks per recorded operation.
+                for (int i = 0; i < n && ctx.furnace != null; i++) ctx.furnace.tick();
+                return "-";
+            }
+            case "takeout": return inv.takeFurnaceOutputTo(Integer.parseInt(t[1])) ? "1" : "0";
+            case "fillinput": {
+                var r = inv.fillFurnaceInput(t[1].equals("1"), t[2]);
+                return switch (r) {
+                    case NONE -> "ok";
+                    case MISSING -> "no:missing";
+                    case SPACE -> "no:space";
+                    case CLOSED -> "no:closed";
+                };
+            }
             default: throw new IllegalArgumentException("unknown op " + op);
         }
     }
 
-    static String state(PlayerInventory inv, List<ItemStack> drops, String ret) {
+    static String state(PlayerInventory inv, List<ItemStack> drops, String ret, Ctx ctx) {
         StringBuilder slots = new StringBuilder();
         // 50 slots at most.
         for (int i = 0; i < 50; i++) if (inv.get(i) != null) slots.append(slots.length() == 0 ? "" : "|").append(i).append(':').append(stackText(inv.get(i)));
@@ -91,6 +131,7 @@ final class InventoryTrace {
         String out = result == null ? "-" : result.recipe.outputId + "x" + result.recipe.outputCount;
         return "sel=" + inv.selected() + ";cur=" + stackText(inv.cursor()) + ";slots=" + (slots.length() == 0 ? "-" : slots)
             + ";craft=" + (inv.craftingActive() ? Integer.toString(inv.craftingSize()) : "off") + ";out=" + out
+            + ";furnace=" + furnaceText(ctx.furnace) + ";open=" + (inv.furnaceOpen() ? 1 : 0)
             + ";drops=" + (dropText.length() == 0 ? "-" : dropText) + ";ret=" + ret;
     }
 }

@@ -15,6 +15,8 @@ class InventoryParityTest {
 
     @Test void craftingOperationsMatchJsStateByState() throws Exception { replay("crafting.csv", 2860); }
 
+    @Test void furnaceOperationsMatchJsStateByState() throws Exception { replay("furnace.csv", 2890); }
+
     private static void replay(String file, int minRows) throws Exception {
         var path = GoldenCsv.dir().resolve("inventory").resolve(file);
         assertEquals("seed,step,op,state", Files.readAllLines(path).get(0), "fixture schema");
@@ -22,13 +24,14 @@ class InventoryParityTest {
         assertTrue(rows.size() >= minRows, "fixture shrank");
         List<String> mismatches = new ArrayList<>();
         PlayerInventory inv = null;
+        InventoryTrace.Ctx ctx = new InventoryTrace.Ctx();
         List<ItemStack> drops = new ArrayList<>();
         String seed = "";
         for (String[] r : rows) {
-            if (!r[0].equals(seed)) { seed = r[0]; drops.clear(); inv = new PlayerInventory(drops::add); }
+            if (!r[0].equals(seed)) { seed = r[0]; drops.clear(); inv = new PlayerInventory(drops::add); ctx = new InventoryTrace.Ctx(); }
             drops.clear();
-            String ret = InventoryTrace.apply(inv, r[2], drops);
-            String actual = InventoryTrace.state(inv, drops, ret);
+            String ret = InventoryTrace.apply(inv, r[2], drops, ctx);
+            String actual = InventoryTrace.state(inv, drops, ret, ctx);
             if (!actual.equals(r[3]) && mismatches.size() < 4)
                 mismatches.add("seed " + r[0] + " step " + r[1] + " op " + r[2] + "\n  expected " + r[3] + "\n  actual   " + actual);
             if (!actual.equals(r[3])) break; // later steps depend on this one

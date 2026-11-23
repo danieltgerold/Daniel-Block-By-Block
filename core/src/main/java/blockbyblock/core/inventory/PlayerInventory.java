@@ -39,18 +39,39 @@ public final class PlayerInventory {
 
     public PlayerInventory(DropSink onDrop) { this.onDrop = onDrop; }
 
-    public ItemStack get(int index) { return index >= 0 && index < SLOT_COUNT ? slots[index] : null; }
+    private FurnaceEntity furnace;
+    static final int FURNACE_INPUT = 51, FURNACE_FUEL = 52, FURNACE_OUTPUT = 53;
+
+    /** The stack in a slot, including the three furnace slots while a furnace is open. */
+    private ItemStack at(int index) {
+        if (index >= 0 && index < SLOT_COUNT) return slots[index];
+        if (furnace != null && index >= FURNACE_INPUT && index <= FURNACE_OUTPUT) return furnace.slot(index - FURNACE_INPUT);
+        return null;
+    }
+
+    private void put(int index, ItemStack stack) {
+        if (index >= 0 && index < SLOT_COUNT) slots[index] = stack;
+        else if (furnace != null && index >= FURNACE_INPUT && index <= FURNACE_OUTPUT) furnace.setSlot(index - FURNACE_INPUT, stack);
+    }
+
+    public ItemStack get(int index) { return at(index); }
+    public boolean furnaceOpen() { return furnace != null; }
     public ItemStack cursor() { return cursor; }
     public int selected() { return selected; }
     public ItemStack mainHand() { return slots[selected]; }
     public ItemStack offhand() { return slots[OFFHAND]; }
 
     public boolean isSlot(int index) {
-        return index >= 0 && (index < 41 || craftActive && index >= CRAFT_START && index < CRAFT_START + craftSize * craftSize);
+        return index >= 0 && (index < 41 || craftActive && index >= CRAFT_START && index < CRAFT_START + craftSize * craftSize
+            || furnace != null && index >= FURNACE_INPUT && index <= FURNACE_OUTPUT);
     }
 
     public boolean accepts(int index, String id) {
-        return ItemDefinition.exists(id) && isSlot(index) && (index < 36 || index == OFFHAND || index >= CRAFT_START);
+        if (index == FURNACE_OUTPUT) return false;
+        boolean item = ItemDefinition.exists(id);
+        if (index == FURNACE_FUEL) return furnace != null && item && Recipes.fuelTicks(id) > 0;
+        if (index == FURNACE_INPUT) return furnace != null && item;
+        return item && isSlot(index) && (index < 36 || index == OFFHAND || index >= CRAFT_START);
     }
 
     private static int maxStack(String id) { return ItemDefinition.forId(id).maxStack; }
@@ -62,7 +83,7 @@ public final class PlayerInventory {
         long total = indices == STORAGE && ItemStack.same(offhand(), incoming) ? max - offhand().count : 0;
         // At most 36 indices.
         for (int i : indices) {
-            if (accepts(i, id) && (slots[i] == null || ItemStack.same(slots[i], incoming))) total += max - (slots[i] == null ? 0 : slots[i].count);
+            if (accepts(i, id) && (at(i) == null || ItemStack.same(at(i), incoming))) total += max - (at(i) == null ? 0 : at(i).count);
         }
         return total;
     }
@@ -83,11 +104,11 @@ public final class PlayerInventory {
         int max = maxStack(id);
         for (boolean empty : new boolean[] {false, true}) for (int i : empty ? indices : partials) {
             if (remaining == 0) break;
-            ItemStack stack = slots[i];
+            ItemStack stack = at(i);
             if (!accepts(i, id) || (empty ? stack != null : !ItemStack.same(stack, incoming))) continue;
             long amount = Math.min(remaining, max - (stack == null ? 0 : stack.count));
             if (amount != 0) {
-                slots[i] = new ItemStack(id, (stack == null ? 0 : stack.count) + amount, damage);
+                put(i, new ItemStack(id, (stack == null ? 0 : stack.count) + amount, damage));
                 remaining -= amount;
             }
         }
@@ -99,32 +120,39 @@ public final class PlayerInventory {
     public boolean consumeSelected() {
         ItemStack stack = mainHand();
         if (stack == null) return false;
-        if (--stack.count == 0) slots[selected] = null;
+        if (--stack.count == 0) put(selected, null);
         return true;
     }
 
     public void click(int index, int button) {
-        ItemStack stack = get(index);
-        if (!isSlot(index)) {
-            // Furnace output and non-slots: nothing to do without an open furnace.
+        ItemStack stack = at(index);
+        if (index == FURNACE_OUTPUT && cursor != null) {
+            if (stack == null || !stack.id.equals(cursor.id)) return;
+            long n = Math.min(button == 2 ? 1 : stack.count, maxStack(stack.id) - cursor.count);
+            if (n > 0) {
+                cursor.count += n;
+                stack.count -= n;
+                if (stack.count == 0) put(index, null);
+            }
             return;
         }
+        if (!isSlot(index)) return;
         if (cursor == null) {
             if (stack == null) return;
             long count = button == 2 ? (stack.count + 1) / 2 : stack.count;
             cursor = stack.copyWithCount(count);
             stack.count -= count;
-            if (stack.count == 0) slots[index] = null;
+            if (stack.count == 0) put(index, null);
         } else if (accepts(index, cursor.id)) {
             if (stack == null || ItemStack.same(stack, cursor)) {
                 long amount = Math.min(button == 2 ? 1 : cursor.count, maxStack(cursor.id) - (stack == null ? 0 : stack.count));
-                slots[index] = cursor.copyWithCount((stack == null ? 0 : stack.count) + amount);
+                put(index, cursor.copyWithCount((stack == null ? 0 : stack.count) + amount));
                 cursor.count -= amount;
                 if (cursor.count == 0) cursor = null;
             } else {
                 ItemStack swapped = cursor;
                 cursor = stack;
-                slots[index] = swapped;
+                put(index, swapped);
             }
         }
     }
@@ -136,13 +164,13 @@ public final class PlayerInventory {
         List<Integer> eligible = new ArrayList<>();
         // Duplicates are dropped, keeping the first occurrence.
         for (int i : new LinkedHashSet<>(indices)) {
-            if (accepts(i, cursor.id) && (slots[i] == null || ItemStack.same(slots[i], cursor))
-                && (slots[i] == null ? 0 : slots[i].count) < maxStack(cursor.id)) eligible.add(i);
+            if (accepts(i, cursor.id) && (at(i) == null || ItemStack.same(at(i), cursor))
+                && (at(i) == null ? 0 : at(i).count) < maxStack(cursor.id)) eligible.add(i);
         }
         long share = button == 2 ? 1 : cursor.count / (eligible.isEmpty() ? 1 : eligible.size());
         long left = cursor.count;
         for (int i : eligible) {
-            long count = Math.min(Math.min(share, left), maxStack(cursor.id) - (slots[i] == null ? 0 : slots[i].count));
+            long count = Math.min(Math.min(share, left), maxStack(cursor.id) - (at(i) == null ? 0 : at(i).count));
             if (count != 0) { plan.put(i, count); left -= count; }
         }
         return plan;
@@ -151,23 +179,27 @@ public final class PlayerInventory {
     public void drag(List<Integer> indices, int button) {
         for (Map.Entry<Integer, Long> step : dragPlan(indices, button).entrySet()) {
             int i = step.getKey();
-            slots[i] = cursor.copyWithCount((slots[i] == null ? 0 : slots[i].count) + step.getValue());
+            put(i, cursor.copyWithCount((at(i) == null ? 0 : at(i).count) + step.getValue()));
             cursor.count -= step.getValue();
         }
         if (cursor != null && cursor.count == 0) cursor = null;
     }
 
     public void shift(int index) {
-        ItemStack stack = get(index);
+        ItemStack stack = at(index);
         if (stack == null) return;
         int[] target = index < 9 ? MAIN : index < 36 ? HOTBAR : STORAGE;
+        if (furnace != null && index < 36) {
+            if (Recipes.smeltingFor(stack.id) != null) target = new int[] {FURNACE_INPUT};
+            else if (Recipes.fuelTicks(stack.id) > 0) target = new int[] {FURNACE_FUEL};
+        }
         long remaining = insert(stack.id, stack.count, target, stack.damage);
         // The JS keeps the old stack object here, even if insert wrote over its own slot (offhand into itself).
-        slots[index] = remaining != 0 ? stack.copyWithCount(remaining) : null;
+        put(index, remaining != 0 ? stack.copyWithCount(remaining) : null);
     }
 
     public void shiftMatching(String id, boolean fromHotbar, boolean fromCraft) {
-        for (int i : fromCraft ? craftIndices() : fromHotbar ? HOTBAR : MAIN) if (slots[i] != null && slots[i].id.equals(id)) shift(i);
+        for (int i : fromCraft ? craftIndices() : fromHotbar ? HOTBAR : MAIN) if (at(i) != null && at(i).id.equals(id)) shift(i);
     }
 
     /** Gathers matching stacks into the cursor (double-click); a null id means "whatever the cursor holds". */
@@ -181,38 +213,40 @@ public final class PlayerInventory {
         for (int i = 36; i <= 39; i++) order[n++] = i;
         int max = maxStack(id);
         int[] craft = craftActive ? craftIndices() : new int[0];
-        int[] all = new int[order.length + craft.length];
+        int[] oven = furnace != null ? new int[] {FURNACE_INPUT, FURNACE_FUEL, FURNACE_OUTPUT} : new int[0];
+        int[] all = new int[order.length + craft.length + oven.length];
         System.arraycopy(order, 0, all, 0, order.length);
         System.arraycopy(craft, 0, all, order.length, craft.length);
+        System.arraycopy(oven, 0, all, order.length + craft.length, oven.length);
         for (int i : all) {
-            ItemStack stack = slots[i];
+            ItemStack stack = at(i);
             if (stack == null || !stack.id.equals(id)) continue;
             if (cursor == null) cursor = stack.copyWithCount(0);
             if (!ItemStack.same(stack, cursor)) continue;
             long amount = Math.min(stack.count, max - cursor.count);
             cursor.count += amount;
             stack.count -= amount;
-            if (stack.count == 0) slots[i] = null;
+            if (stack.count == 0) put(i, null);
         }
         if (cursor != null && cursor.count == 0) cursor = null;
     }
 
     public boolean swap(int a, int b) {
         if (!isSlot(a) || !isSlot(b)) return false;
-        ItemStack left = slots[a], right = slots[b];
+        ItemStack left = at(a), right = at(b);
         if ((left != null && !accepts(b, left.id)) || (right != null && !accepts(a, right.id))) return false;
-        slots[a] = right;
-        slots[b] = left;
+        put(a, right);
+        put(b, left);
         return true;
     }
 
     public boolean drop(int index, boolean whole) {
-        ItemStack stack = get(index);
+        ItemStack stack = at(index);
         if (stack == null) return false;
         long count = whole ? stack.count : 1;
         onDrop.drop(stack.copyWithCount(count));
         stack.count -= count;
-        if (stack.count == 0) slots[index] = null;
+        if (stack.count == 0) put(index, null);
         return true;
     }
 
@@ -259,6 +293,7 @@ public final class PlayerInventory {
     }
 
     public void close() {
+        closeFurnace();
         endCrafting();
         if (cursor != null) {
             ItemStack held = cursor;
@@ -287,6 +322,7 @@ public final class PlayerInventory {
 
     /** Loads a save, repairing bad entries: unknown ids and non-positive or fractional counts vanish, oversize stacks overflow. */
     public void load(SavedInventory data) {
+        closeFurnace();
         craftActive = false;
         cursor = null;
         for (int i = 0; i < SLOT_COUNT; i++) slots[i] = null;
@@ -562,5 +598,65 @@ public final class PlayerInventory {
             }
         }
         return new FillResult(false, 0, canMakeRecipe(recipe) ? "Not enough inventory space to rearrange the grid." : "Missing ingredients.");
+    }
+
+    // ---- Furnace (port of the furnace parts of PlayerInventory in src/inventory.js) ----
+
+    /** Opens a furnace screen onto an entity; its three slots appear as slots 51-53. */
+    public void openFurnace(FurnaceEntity entity) {
+        closeFurnace();
+        endCrafting();
+        furnace = entity;
+    }
+
+    public void closeFurnace() { furnace = null; }
+
+    /** Moves the furnace output into a slot; false when nothing moves. */
+    public boolean takeFurnaceOutputTo(int index) {
+        ItemStack out = furnace == null ? null : furnace.slot(FurnaceEntity.OUTPUT), target = at(index);
+        if (out == null || !accepts(index, out.id) || target != null && !target.id.equals(out.id)) return false;
+        long n = Math.min(out.count, maxStack(out.id) - (target == null ? 0 : target.count));
+        if (n == 0) return false;
+        put(index, new ItemStack(out.id, (target == null ? 0 : target.count) + n));
+        out.count -= n;
+        if (out.count == 0) furnace.setSlot(FurnaceEntity.OUTPUT, null);
+        return true;
+    }
+
+    /** Result of {@link #fillFurnaceInput}; the reason is a code, not display text. */
+    public enum FillFailure { NONE, CLOSED, MISSING, SPACE }
+
+    /**
+     * Moves up to a stack of an input item into the furnace (recipe-book click). An input with no smelting
+     * recipe falls back to sand, because the JS passes the recipe through a default parameter.
+     */
+    public FillFailure fillFurnaceInput(boolean maximum, String inputId) {
+        var recipe = Recipes.smeltingFor(inputId);
+        if (recipe == null) recipe = Recipes.smeltingFor("sand");
+        if (furnace == null || recipe == null) return FillFailure.CLOSED;
+        ItemStack[] working = copySlots();
+        ItemStack old = ItemStack.copyOf(furnace.slot(FurnaceEntity.INPUT));
+        String input = recipe.input;
+        long available = old != null && old.id.equals(input) ? old.count : 0;
+        for (int i : STORAGE) if (working[i] != null && working[i].id.equals(input)) available += working[i].count;
+        if (available == 0) return FillFailure.MISSING;
+        long count = maximum ? Math.min(64, available) : 1, need = count;
+        if (old != null && old.id.equals(input)) {
+            long n = Math.min(need, old.count);
+            need -= n;
+            old.count -= n;
+        }
+        for (int i : STORAGE) {
+            if (working[i] != null && working[i].id.equals(input) && need != 0) {
+                long n = Math.min(need, working[i].count);
+                need -= n;
+                working[i].count -= n;
+                if (working[i].count == 0) working[i] = null;
+            }
+        }
+        if (old != null && old.count > 0 && insertInto(working, old) != 0) return FillFailure.SPACE;
+        for (int i : STORAGE) slots[i] = working[i];
+        furnace.setSlot(FurnaceEntity.INPUT, new ItemStack(input, count));
+        return FillFailure.NONE;
     }
 }
