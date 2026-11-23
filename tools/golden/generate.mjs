@@ -13,6 +13,7 @@ import { jumpVelocityForHeight } from '../../src/player-settings.js';
 import { formatBool, formatNumber } from './format.mjs';
 import { generateCrafting } from './crafting.mjs';
 import { generateInventory } from './inventory.mjs';
+import { generateVitals } from './vitals.mjs';
 import { generateCurrent } from './current-fixtures.mjs';
 import { generateShapes } from './shapes.mjs';
 import { generateWorld } from './world.mjs';
@@ -179,6 +180,7 @@ export function generate(outDir = DEFAULT_OUT) {
   writeCsv(dir, 'expected.csv', 'hit,x,y,z,nx,ny,nz,distance', runRaycast(rayEdits, cases));
   generateCrafting(outDir);
   generateInventory(outDir);
+  generateVitals(outDir);
   generateCurrent(outDir);
   generateShapes(outDir);
   generateWorld(outDir);
