@@ -63,7 +63,15 @@ final class InventoryTrace {
             case "drop": return inv.drop(Integer.parseInt(t[1]), t[2].equals("1")) ? "1" : "0";
             case "dropcursor": inv.dropCursor(t[1].equals("1")); return "-";
             case "pick": return inv.pick(t[1], t[2].equals("1")) ? "1" : "0";
-            case "shiftmatching": inv.shiftMatching(t[1], t[2].equals("1")); return "-";
+            case "shiftmatching": inv.shiftMatching(t[1], t[2].equals("1"), t.length > 3 && t[3].equals("1")); return "-";
+            case "begin": inv.beginCrafting(Integer.parseInt(t[1])); return "-";
+            case "end": inv.endCrafting(); return "-";
+            case "take": return Integer.toString(inv.takeCrafted(PlayerInventory.Destination.valueOf(t[1].toUpperCase()), t[2].equals("1"), Integer.parseInt(t[3])));
+            case "fill": {
+                var r = inv.fillCraftingGrid(t[1], t[2].equals("1"));
+                return r.ok ? "ok" + r.crafts : "no:" + r.reason;
+            }
+            case "canmake": return inv.canMakeRecipe(blockbyblock.core.recipe.Recipes.recipe(t[1])) ? "1" : "0";
             case "capacity": return Long.toString(inv.capacity(t[1], target(t[2]), 0));
             case "close": inv.close(); return "-";
             case "dropcarried": inv.dropCarried(drops::add); return "-";
@@ -79,7 +87,10 @@ final class InventoryTrace {
         for (int i = 0; i < 50; i++) if (inv.get(i) != null) slots.append(slots.length() == 0 ? "" : "|").append(i).append(':').append(stackText(inv.get(i)));
         StringBuilder dropText = new StringBuilder();
         for (ItemStack d : drops) dropText.append(dropText.length() == 0 ? "" : "|").append(stackText(d));
+        CraftMatch result = inv.craftingResult();
+        String out = result == null ? "-" : result.recipe.outputId + "x" + result.recipe.outputCount;
         return "sel=" + inv.selected() + ";cur=" + stackText(inv.cursor()) + ";slots=" + (slots.length() == 0 ? "-" : slots)
+            + ";craft=" + (inv.craftingActive() ? Integer.toString(inv.craftingSize()) : "off") + ";out=" + out
             + ";drops=" + (dropText.length() == 0 ? "-" : dropText) + ";ret=" + ret;
     }
 }

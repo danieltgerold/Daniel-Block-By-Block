@@ -1,11 +1,15 @@
 package blockbyblock.core.inventory;
 
 import blockbyblock.core.item.ItemDefinition;
+import blockbyblock.core.recipe.Ingredient;
+import blockbyblock.core.recipe.RecipeDefinition;
+import blockbyblock.core.recipe.Recipes;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Port of PlayerInventory in src/inventory.js: the hotbar/main/offhand slots, the held cursor stack and
@@ -30,6 +34,8 @@ public final class PlayerInventory {
     private ItemStack cursor;
     private int selected;
     private final DropSink onDrop;
+    private int craftSize = 2;
+    private boolean craftActive;
 
     public PlayerInventory(DropSink onDrop) { this.onDrop = onDrop; }
 
@@ -39,10 +45,12 @@ public final class PlayerInventory {
     public ItemStack mainHand() { return slots[selected]; }
     public ItemStack offhand() { return slots[OFFHAND]; }
 
-    public boolean isSlot(int index) { return index >= 0 && index < 41; }
+    public boolean isSlot(int index) {
+        return index >= 0 && (index < 41 || craftActive && index >= CRAFT_START && index < CRAFT_START + craftSize * craftSize);
+    }
 
     public boolean accepts(int index, String id) {
-        return ItemDefinition.exists(id) && isSlot(index) && (index < 36 || index == OFFHAND);
+        return ItemDefinition.exists(id) && isSlot(index) && (index < 36 || index == OFFHAND || index >= CRAFT_START);
     }
 
     private static int maxStack(String id) { return ItemDefinition.forId(id).maxStack; }
@@ -158,8 +166,8 @@ public final class PlayerInventory {
         slots[index] = remaining != 0 ? stack.copyWithCount(remaining) : null;
     }
 
-    public void shiftMatching(String id, boolean fromHotbar) {
-        for (int i : fromHotbar ? HOTBAR : MAIN) if (slots[i] != null && slots[i].id.equals(id)) shift(i);
+    public void shiftMatching(String id, boolean fromHotbar, boolean fromCraft) {
+        for (int i : fromCraft ? craftIndices() : fromHotbar ? HOTBAR : MAIN) if (slots[i] != null && slots[i].id.equals(id)) shift(i);
     }
 
     /** Gathers matching stacks into the cursor (double-click); a null id means "whatever the cursor holds". */
@@ -172,7 +180,11 @@ public final class PlayerInventory {
         order[n++] = OFFHAND;
         for (int i = 36; i <= 39; i++) order[n++] = i;
         int max = maxStack(id);
-        for (int i : order) {
+        int[] craft = craftActive ? craftIndices() : new int[0];
+        int[] all = new int[order.length + craft.length];
+        System.arraycopy(order, 0, all, 0, order.length);
+        System.arraycopy(craft, 0, all, order.length, craft.length);
+        for (int i : all) {
             ItemStack stack = slots[i];
             if (stack == null || !stack.id.equals(id)) continue;
             if (cursor == null) cursor = stack.copyWithCount(0);
@@ -212,14 +224,19 @@ public final class PlayerInventory {
         if (cursor.count == 0) cursor = null;
     }
 
-    /** Returns crafting-grid items to storage; with no grid open there is nothing to return. */
-    private void endCrafting() {
+    /** Closes the crafting grid, returning its items to storage (what does not fit is dropped). */
+    public void endCrafting() {
+        returnCraftingItems();
+        craftActive = false;
+    }
+
+    private void returnCraftingItems() {
         List<ItemStack> overflow = new ArrayList<>();
         for (int i = CRAFT_START; i < CRAFT_START + 9; i++) {
             ItemStack stack = slots[i];
             slots[i] = null;
             if (stack != null) {
-                long left = insertStack(stack);
+                long left = insertInto(slots, stack);
                 if (left != 0) overflow.add(stack.copyWithCount(left));
             }
         }
@@ -227,7 +244,7 @@ public final class PlayerInventory {
     }
 
     /** insertItemStacks over STORAGE: merge into matching stacks first, then empty slots. */
-    private long insertStack(ItemStack stack) {
+    private static long insertInto(ItemStack[] slots, ItemStack stack) {
         long left = stack.count;
         int cap = maxStack(stack.id);
         for (boolean empty : new boolean[] {false, true}) for (int i : STORAGE) {
@@ -270,6 +287,7 @@ public final class PlayerInventory {
 
     /** Loads a save, repairing bad entries: unknown ids and non-positive or fractional counts vanish, oversize stacks overflow. */
     public void load(SavedInventory data) {
+        craftActive = false;
         cursor = null;
         for (int i = 0; i < SLOT_COUNT; i++) slots[i] = null;
         List<ItemStack> overflow = new ArrayList<>();
@@ -314,5 +332,235 @@ public final class PlayerInventory {
         }
         for (int i : MAIN) if (slots[i] != null && slots[i].id.equals(id)) return swap(i, selected);
         return false;
+    }
+
+    // ---- Crafting session (port of CraftingSession in src/crafting.js) ----
+
+    public boolean craftingActive() { return craftActive; }
+    public int craftingSize() { return craftSize; }
+
+    private int[] craftIndices() {
+        int[] indices = new int[craftSize * craftSize];
+        for (int i = 0; i < indices.length; i++) indices[i] = CRAFT_START + i;
+        return indices;
+    }
+
+    private ItemStack[] craftGrid() {
+        ItemStack[] grid = new ItemStack[craftSize * craftSize];
+        for (int i = 0; i < grid.length; i++) grid[i] = slots[CRAFT_START + i];
+        return grid;
+    }
+
+    /** The recipe the open grid currently makes, or null. Recomputed on demand; the JS caches it by grid contents. */
+    public CraftMatch craftingResult() { return craftActive ? RecipeMatcher.match(craftGrid(), craftSize) : null; }
+
+    public void beginCrafting(int size) {
+        if (size != 2 && size != 3) throw new IllegalArgumentException("Unsupported crafting grid");
+        if (craftActive) endCrafting();
+        craftSize = size;
+        craftActive = true;
+    }
+
+    private ItemStack[] copySlots() {
+        ItemStack[] copy = new ItemStack[SLOT_COUNT];
+        for (int i = 0; i < SLOT_COUNT; i++) copy[i] = ItemStack.copyOf(slots[i]);
+        return copy;
+    }
+
+    /** Where a crafted result goes. */
+    public enum Destination { CURSOR, INVENTORY, SLOT, DROP }
+
+    /** Takes the crafting result once, or as many times as the same recipe keeps matching; returns the crafts made. */
+    public int takeCrafted(Destination destination, boolean repeat, int slot) {
+        if (!craftActive) return 0;
+        int crafts = 0;
+        String recipeId = null;
+        // At most 9*64 ingredients can be consumed. The grid is never refilled automatically.
+        for (int n = 0; n < (repeat ? 576 : 1); n++) {
+            CraftMatch match = RecipeMatcher.match(craftGrid(), craftSize);
+            if (match == null) break;
+            if (recipeId != null && !recipeId.equals(match.recipe.id)) break;
+            recipeId = match.recipe.id;
+            String outputId = match.recipe.outputId;
+            int outputCount = match.recipe.outputCount, cap = maxStack(outputId);
+            ItemStack[] working = copySlots();
+            ItemStack newCursor = ItemStack.copyOf(cursor);
+            ItemStack output = new ItemStack(outputId, outputCount);
+            switch (destination) {
+                case INVENTORY:
+                    if (insertInto(working, output) != 0) return finishTake(crafts);
+                    break;
+                case CURSOR:
+                    if (newCursor != null && !newCursor.id.equals(outputId) || (newCursor == null ? 0 : newCursor.count) + outputCount > cap) return finishTake(crafts);
+                    newCursor = new ItemStack(outputId, (newCursor == null ? 0 : newCursor.count) + outputCount);
+                    break;
+                case SLOT: {
+                    boolean inGrid = slot >= CRAFT_START && slot < CRAFT_START + craftSize * craftSize;
+                    if (!accepts(slot, outputId) || inGrid) return finishTake(crafts);
+                    ItemStack at = working[slot];
+                    if (at != null && !at.id.equals(outputId) || (at == null ? 0 : at.count) + outputCount > cap) return finishTake(crafts);
+                    working[slot] = new ItemStack(outputId, (at == null ? 0 : at.count) + outputCount);
+                    break;
+                }
+                default:
+                    break;
+            }
+            for (int i = 0; i < match.cellCount(); i++) {
+                int at = CRAFT_START + match.index(i);
+                working[at].count -= match.count(i);
+                if (working[at].count == 0) working[at] = null;
+            }
+            System.arraycopy(working, 0, slots, 0, SLOT_COUNT);
+            cursor = newCursor;
+            crafts++;
+            if (destination == Destination.DROP) onDrop.drop(new ItemStack(outputId, outputCount));
+        }
+        return crafts;
+    }
+
+    private static int finishTake(int crafts) { return crafts; }
+
+    private Map<String, Long> craftResources() {
+        Map<String, Long> counts = new LinkedHashMap<>(); // first-seen order is observable through candidate order
+        int[] grid = craftIndices();
+        int[] all = new int[STORAGE.length + grid.length];
+        System.arraycopy(STORAGE, 0, all, 0, STORAGE.length);
+        System.arraycopy(grid, 0, all, STORAGE.length, grid.length);
+        for (int i : all) if (slots[i] != null) counts.merge(slots[i].id, slots[i].count, Long::sum);
+        return counts;
+    }
+
+    /** One ingredient placement chosen by {@link #assignments}: a grid cell, the item to put there, and how many. */
+    public static final class Assignment {
+        public final int index;
+        public final String id;
+        public final long count;
+
+        Assignment(int index, String id, long count) {
+            this.index = index;
+            this.id = id;
+            this.count = count;
+        }
+    }
+
+    private static final class Input {
+        final Ingredient ingredient;
+        final int index;
+        final List<String> candidates;
+
+        Input(Ingredient ingredient, int index, List<String> candidates) {
+            this.ingredient = ingredient;
+            this.index = index;
+            this.candidates = candidates;
+        }
+    }
+
+    /** Backtracking search for items that can fill {@code crafts} crafts of a recipe; the first plan {@code accept} approves wins. */
+    private <T> T assignments(RecipeDefinition recipe, int crafts, Function<List<Assignment>, T> accept) {
+        Map<String, Long> counts = craftResources();
+        Ingredient[] layout = new Ingredient[craftSize * craftSize];
+        for (int i = 0; i < recipe.cellCount(); i++) {
+            if (recipe.cell(i) == null) continue;
+            layout[recipe.width != 0 ? (i / recipe.width) * craftSize + i % recipe.width : i] = recipe.cell(i);
+        }
+        List<String> ids = new ArrayList<>(counts.keySet());
+        List<Input> inputs = new ArrayList<>();
+        for (int index = 0; index < layout.length; index++) {
+            if (layout[index] == null) continue;
+            List<String> candidates = new ArrayList<>();
+            for (String id : ids) {
+                ItemDefinition item = ItemDefinition.forId(id);
+                if (layout[index].matches(id, item) && item.maxStack >= (long) layout[index].count * crafts) candidates.add(id);
+            }
+            inputs.add(new Input(layout[index], index, candidates));
+        }
+        // Stable sort: fewest candidates first, then grid position.
+        inputs.sort((a, b) -> a.candidates.size() != b.candidates.size() ? Integer.compare(a.candidates.size(), b.candidates.size()) : Integer.compare(a.index, b.index));
+        return visit(inputs, 0, crafts, counts, new ArrayList<>(), accept);
+    }
+
+    private <T> T visit(List<Input> inputs, int depth, int crafts, Map<String, Long> counts, List<Assignment> chosen,
+                        Function<List<Assignment>, T> accept) {
+        if (depth == inputs.size()) return accept.apply(new ArrayList<>(chosen));
+        Input in = inputs.get(depth);
+        long need = (long) in.ingredient.count * crafts;
+        Input prior = depth > 0 ? inputs.get(depth - 1) : null;
+        // Bounded by the items present in storage and the grid.
+        for (String id : in.candidates) {
+            // Avoid equivalent permutations of identical group slots.
+            if (prior != null && sameIngredient(prior.ingredient, in.ingredient) && id.compareTo(chosen.get(depth - 1).id) < 0) continue;
+            if (counts.getOrDefault(id, 0L) < need) continue;
+            counts.put(id, counts.get(id) - need);
+            chosen.add(new Assignment(in.index, id, need));
+            T plan = visit(inputs, depth + 1, crafts, counts, chosen, accept);
+            chosen.remove(chosen.size() - 1);
+            counts.put(id, counts.get(id) + need);
+            if (plan != null) return plan;
+        }
+        return null;
+    }
+
+    private static boolean sameIngredient(Ingredient a, Ingredient b) {
+        return a.kind == b.kind && a.value().equals(b.value()) && a.count == b.count;
+    }
+
+    public boolean canMakeRecipe(RecipeDefinition recipe) {
+        return craftActive && (craftSize == 2 ? recipe.fitsGrid2 : recipe.fitsGrid3) && assignments(recipe, 1, plan -> plan) != null;
+    }
+
+    /** Result of {@link #fillCraftingGrid}. */
+    public static final class FillResult {
+        public final boolean ok;
+        public final int crafts;
+        public final String reason;
+
+        FillResult(boolean ok, int crafts, String reason) {
+            this.ok = ok;
+            this.crafts = crafts;
+            this.reason = reason;
+        }
+    }
+
+    /** Moves ingredients from storage and the grid into the grid for one recipe (recipe book click). */
+    public FillResult fillCraftingGrid(String recipeId, boolean maximum) {
+        RecipeDefinition recipe = Recipes.recipe(recipeId);
+        if (!craftActive || recipe == null || !(craftSize == 2 ? recipe.fitsGrid2 : recipe.fitsGrid3))
+            return new FillResult(false, 0, "Recipe does not fit this grid.");
+        int[] gridIndices = craftIndices();
+        for (int crafts = maximum ? 64 : 1; crafts >= 1; crafts--) {
+            ItemStack[] plan = assignments(recipe, crafts, assignment -> {
+                ItemStack[] working = copySlots();
+                ItemStack[] oldGrid = new ItemStack[gridIndices.length];
+                for (int g = 0; g < gridIndices.length; g++) oldGrid[g] = ItemStack.copyOf(working[gridIndices[g]]);
+                for (int i : gridIndices) working[i] = null;
+                for (Assignment target : assignment) {
+                    long need = target.count;
+                    for (ItemStack stack : oldGrid) {
+                        if (stack != null && stack.id.equals(target.id) && need != 0) {
+                            long n = Math.min(need, stack.count);
+                            stack.count -= n;
+                            need -= n;
+                        }
+                    }
+                    for (int i : STORAGE) {
+                        if (working[i] != null && working[i].id.equals(target.id) && need != 0) {
+                            long n = Math.min(need, working[i].count);
+                            working[i].count -= n;
+                            need -= n;
+                            if (working[i].count == 0) working[i] = null;
+                        }
+                    }
+                    if (need != 0) return null;
+                    working[CRAFT_START + target.index] = new ItemStack(target.id, target.count);
+                }
+                for (ItemStack stack : oldGrid) if (stack != null && stack.count > 0 && insertInto(working, stack) != 0) return null;
+                return working;
+            });
+            if (plan != null) {
+                System.arraycopy(plan, 0, slots, 0, SLOT_COUNT);
+                return new FillResult(true, crafts, null);
+            }
+        }
+        return new FillResult(false, 0, canMakeRecipe(recipe) ? "Not enough inventory space to rearrange the grid." : "Missing ingredients.");
     }
 }

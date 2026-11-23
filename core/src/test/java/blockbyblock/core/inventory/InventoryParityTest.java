@@ -11,11 +11,15 @@ import org.junit.jupiter.api.Test;
 
 /** Replays every recorded JS inventory operation and compares the full state after each one. */
 class InventoryParityTest {
-    @Test void basicOperationsMatchJsStateByState() throws Exception {
-        var path = GoldenCsv.dir().resolve("inventory").resolve("basic.csv");
+    @Test void basicOperationsMatchJsStateByState() throws Exception { replay("basic.csv", 2864); }
+
+    @Test void craftingOperationsMatchJsStateByState() throws Exception { replay("crafting.csv", 2860); }
+
+    private static void replay(String file, int minRows) throws Exception {
+        var path = GoldenCsv.dir().resolve("inventory").resolve(file);
         assertEquals("seed,step,op,state", Files.readAllLines(path).get(0), "fixture schema");
         List<String[]> rows = GoldenCsv.read(path);
-        assertTrue(rows.size() >= 2864, "fixture shrank");
+        assertTrue(rows.size() >= minRows, "fixture shrank");
         List<String> mismatches = new ArrayList<>();
         PlayerInventory inv = null;
         List<ItemStack> drops = new ArrayList<>();

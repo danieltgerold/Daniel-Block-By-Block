@@ -4,6 +4,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PlayerInventory, ITEMS, HOTBAR, MAIN, STORAGE } from '../../src/inventory.js';
+import { RECIPES } from '../../src/recipes.js';
 
 const lcg = seed => () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
 export const stackText = s => s ? `${s.id}x${s.count}${(s.damage ?? 0) ? `d${s.damage}` : ''}` : '-';
@@ -12,17 +13,36 @@ export const TARGETS = { storage: STORAGE, main: MAIN, hotbar: HOTBAR };
 export function stateText(inv, drops, ret) {
   const slots = [];
   for (let i = 0; i < 50; i++) if (inv.slots[i]) slots.push(`${i}:${stackText(inv.slots[i])}`);
+  const out = inv.crafting.output;
   return [`sel=${inv.selected}`, `cur=${stackText(inv.cursor)}`, `slots=${slots.join('|') || '-'}`,
+    `craft=${inv.crafting.active ? inv.crafting.size : 'off'}`, `out=${out ? `${out.id}x${out.count}` : '-'}`,
     `drops=${drops.map(stackText).join('|') || '-'}`, `ret=${ret}`].join(';');
 }
 
+const RECIPE_IDS = [...RECIPES.recipes.keys()];
+// Recipes the crafting pool can actually satisfy, so random traces craft instead of mostly failing.
+const LIKELY = ['oak.planks', 'pine.planks', 'sticks', 'crafting.table', 'oak.slab', 'pine.slab', 'oak.fence', 'pine.door', 'oak.stairs', 'pine.stairs', 'furnace',
+  'stone.bricks', 'stone.slab', 'stone.stairs', 'stone.wall', 'cobblestone.slab', 'wood.pickaxe', 'wood.axe', 'stone.pickaxe', 'stone.sword', 'iron.pickaxe',
+  'chiseled.stone.bricks', 'polished.granite', 'lapis.unpack', 'iron.block'];
+const CRAFT_POOL = ['oak.planks', 'pine.planks', 'oak.log', 'pine.log', 'stick', 'cobblestone', 'stone', 'iron.ingot', 'coal', 'diamond', 'granite', 'stone.bricks', 'stone.slab', 'lapis.block'];
 const POOL = ['stone', 'cobblestone', 'oak.planks', 'pine.planks', 'stick', 'coal', 'raw.porkchop', 'sand', 'bucket', 'water.bucket', 'stone.pickaxe', 'iron.ingot'];
 
-function randomOp(rand, step) {
+function randomOp(rand, step, crafting = false) {
   const pick = list => list[Math.floor(rand() * list.length)];
   const n = max => Math.floor(rand() * max);
-  const index = () => n(rand() < 0.9 ? 41 : 54);
+  const index = () => crafting ? n(rand() < 0.93 ? 50 : 54) : n(rand() < 0.9 ? 41 : 54);
   const roll = rand();
+  if (crafting) {
+    const r = rand();
+    const recipe = () => rand() < 0.75 ? LIKELY[Math.floor(rand() * LIKELY.length)] : RECIPE_IDS[Math.floor(rand() * RECIPE_IDS.length)];
+    if (r < 0.08) return `begin:${rand() < 0.4 ? 2 : 3}`;
+    if (r < 0.10) return 'end';
+    if (r < 0.26) return `take:${pick(['cursor', 'inventory', 'slot', 'drop', 'cursor', 'inventory'])}:${n(2)}:${n(54)}`;
+    if (r < 0.40) return `fill:${recipe()}:${n(2)}`;
+    if (r < 0.44) return `canmake:${recipe()}`;
+    if (r < 0.62) return `insert:${pick(CRAFT_POOL)}:${1 + n(rand() < 0.4 ? 70 : 16)}:${pick(['storage', 'storage', 'main', 'hotbar'])}:0`;
+    if (r < 0.65) return `shiftmatching:${pick(CRAFT_POOL)}:${n(2)}:${n(2)}`;
+  }
   if (roll < 0.14) return `insert:${pick(POOL)}:${rand() < 0.2 ? 60 + n(200) : 1 + n(40)}:${pick(Object.keys(TARGETS))}:${n(4)}`;
   if (roll < 0.34) return `click:${index()}:${pick([0, 0, 2])}`;
   if (roll < 0.42) return `drag:${Array.from({ length: 1 + n(6) }, index).join('|')}:${pick([0, 2])}`;
@@ -74,7 +94,12 @@ export function applyOp(inv, op, drops) {
     case 'drop': return yes(inv.drop(Number(a[0]), a[1] === '1'));
     case 'dropcursor': inv.dropCursor(a[0] === '1'); return '-';
     case 'pick': return yes(inv.pick(a[0], { creative: a[1] === '1' }));
-    case 'shiftmatching': inv.shiftMatching(a[0], a[1] === '1'); return '-';
+    case 'shiftmatching': inv.shiftMatching(a[0], a[1] === '1', a[2] === '1'); return '-';
+    case 'begin': inv.crafting.begin(Number(a[0])); return '-';
+    case 'end': inv.crafting.end(); return '-';
+    case 'take': return String(inv.crafting.take({ destination: a[0], repeat: a[1] === '1', slot: Number(a[2]) }));
+    case 'fill': { const r = inv.crafting.fill(a[0], a[1] === '1'); return r.ok ? `ok${r.crafts}` : `no:${r.reason}`; }
+    case 'canmake': return yes(inv.crafting.canMake(RECIPES.recipes.get(a[0])));
     case 'capacity': return String(inv.capacity(a[0], TARGETS[a[1]]));
     case 'close': inv.close(); return '-';
     case 'dropcarried': inv.dropCarried(stack => drops.push(stack)); return '-';
@@ -84,13 +109,13 @@ export function applyOp(inv, op, drops) {
   }
 }
 
-export function inventoryRows(seed, steps) {
+export function inventoryRows(seed, steps, crafting = false) {
   const rand = lcg(seed), drops = [];
   const inv = new PlayerInventory({ onDrop: stack => drops.push({ ...stack }) });
   const rows = [];
   for (let step = 0; step < steps; step++) {
     drops.length = 0;
-    const op = randomOp(rand, step);
+    const op = randomOp(rand, step, crafting);
     const ret = applyOp(inv, op, drops);
     rows.push(`${step},${op},${stateText(inv, drops, ret)}`);
   }
@@ -112,6 +137,20 @@ const DIRECTED = {
   load: ['insert:stone:100:storage:0', 'load:0=stonex200|1=oak.planksx64|9=stickx3:cobblestonex70:4', 'close', 'reload', 'dropcarried'],
 };
 
+const CRAFTING_DIRECTED = {
+  sticks: ['insert:oak.planks:8:storage:0', 'begin:2', 'click:0:0', 'click:41:2', 'click:43:2', 'take:cursor:0:0', 'take:cursor:1:0', 'click:41:2', 'take:inventory:1:0', 'end'],
+  table: ['insert:pine.planks:12:storage:0', 'begin:2', 'fill:crafting.table:1', 'take:inventory:1:0', 'take:drop:0:0', 'end'],
+  fillMax: ['insert:oak.planks:64:storage:0', 'insert:stick:20:storage:0', 'begin:3', 'fill:oak.fence:1', 'take:inventory:1:0', 'fill:oak.door:0', 'take:slot:0:8', 'canmake:oak.stairs', 'end', 'close'],
+  mixedPlanks: ['insert:oak.planks:1:hotbar:0', 'insert:pine.planks:1:main:0', 'begin:2', 'fill:sticks:0', 'take:cursor:0:0', 'end'],
+  overflow: ['insert:stone:2304:storage:0', 'begin:3', 'insert:oak.planks:4:hotbar:0', 'fill:oak.slab:1', 'end', 'close'],
+  tools: ['insert:stone.bricks:4:storage:0', 'insert:cobblestone:20:storage:0', 'insert:stick:8:storage:0', 'begin:3', 'fill:stone.pickaxe:0', 'take:inventory:0:0', 'fill:stone.shovel:1', 'take:cursor:1:0', 'end'],
+  pineFirstSticks: ['insert:pine.planks:1:hotbar:0', 'insert:oak.planks:1:main:0', 'begin:2', 'fill:sticks:0', 'take:inventory:1:0', 'end'],
+  recipeChange: ['insert:oak.planks:6:storage:0', 'begin:2', 'click:0:0', 'click:41:2', 'click:41:2', 'click:42:2', 'click:43:2', 'click:43:2', 'click:44:2',
+    'take:slot:0:41', 'take:slot:0:42', 'take:inventory:1:0', 'take:cursor:1:0', 'end'],
+  gridSlot: ['insert:oak.planks:2:storage:0', 'begin:2', 'click:0:0', 'click:41:2', 'click:43:2', 'take:slot:0:42', 'take:slot:0:5', 'take:slot:0:40'],
+  switchGrid: ['insert:oak.log:3:storage:0', 'begin:2', 'fill:oak.planks:1', 'begin:3', 'begin:2', 'take:inventory:1:0', 'end'],
+};
+
 export function generateInventory(outDir) {
   const dir = join(outDir, 'inventory');
   mkdirSync(dir, { recursive: true });
@@ -122,4 +161,11 @@ export function generateInventory(outDir) {
     ops.forEach((op, step) => { drops.length = 0; const ret = applyOp(inv, op, drops); rows.push(`${name},${step},${op},${stateText(inv, drops, ret)}`); });
   }
   writeFileSync(join(dir, 'basic.csv'), ['seed,step,op,state', ...rows].join('\n') + '\n');
+  const crafting = [];
+  for (const [seed, steps] of [[31, 700], [77, 700], [2468, 700], [13579, 700]]) crafting.push(...inventoryRows(seed, steps, true).map(r => `${seed},${r}`));
+  for (const [name, ops] of Object.entries(CRAFTING_DIRECTED)) {
+    const drops = [], inv = new PlayerInventory({ onDrop: stack => drops.push({ ...stack }) });
+    ops.forEach((op, step) => { drops.length = 0; const ret = applyOp(inv, op, drops); crafting.push(`${name},${step},${op},${stateText(inv, drops, ret)}`); });
+  }
+  writeFileSync(join(dir, 'crafting.csv'), ['seed,step,op,state', ...crafting].join('\n') + '\n');
 }
