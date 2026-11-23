@@ -1,0 +1,7 @@
+id,input,output,count,ticks
+sand.glass,sand,glass,1,200
+porkchop.cooked,raw.porkchop,cooked.porkchop,1,200
+iron.ore.smelt,iron.ore,iron.ingot,1,200
+gold.ore.smelt,gold.ore,gold.ingot,1,200
+cobblestone.smelt,cobblestone,stone,1,200
+stone.bricks.smelt,stone.bricks,cracked.stone.bricks,1,200
