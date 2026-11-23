@@ -38,6 +38,13 @@ test('block default states are exported as ordered keys with canonical string va
   assert.deepEqual(by('stone').stateKeys, []);
 });
 
+test('blocks with a behaviour are marked, and unknown behaviours are refused', () => {
+  const rows = blockRows(BLOCK_TYPES);
+  assert.deepEqual(rows.filter(r => r.behavior).map(r => `${r.id}:${r.behavior}`), ['grass.block:grass', 'farmland:farmland']);
+  const unknown = new Map([['x', { id: 'x', collisionShape: 'cube', solid: true, opaque: true, tags: [], drops: 'self', behavior: { tick() {} } }]]);
+  assert.throws(() => blockRows(unknown), /x.*behavior/);
+});
+
 test('state values the table cannot represent are refused', () => {
   const block = state => new Map([['x', { id: 'x', collisionShape: 'cube', solid: true, opaque: true, tags: [], drops: 'self', defaultState: state }]]);
   assert.throws(() => blockRows(block({ mystery: 1 })), /x.*mystery/);

@@ -29,11 +29,13 @@ public final class BlockDefinition {
     private final String[] tags;
     private final String[] stateKeys;
     private final String[] stateDefaults;
+    /** "grass" or "farmland" for blocks that react to neighbour changes; null otherwise. */
+    public final String behavior;
 
     BlockDefinition(String id, Shape shape, boolean solid, boolean opaque, double hardness, double breakTicks,
                     boolean requiresTool, String preferredTool, int harvestLevel, int maxStack, boolean falling,
                     DropRule dropRule, String dropItem, int dropCount, int dropMax, String[] tags,
-                    String[] stateKeys, String[] stateDefaults) {
+                    String[] stateKeys, String[] stateDefaults, String behavior) {
         this.id = id;
         this.shape = shape;
         this.solid = solid;
@@ -52,6 +54,7 @@ public final class BlockDefinition {
         this.tags = tags.clone();
         this.stateKeys = stateKeys.clone();
         this.stateDefaults = stateDefaults.clone();
+        this.behavior = behavior;
     }
 
     public boolean hasTag(String tag) {

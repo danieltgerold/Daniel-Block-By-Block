@@ -63,6 +63,11 @@ final class WorldStorage {
     static BlockState defaults(BlockDefinition d) { return BlockState.defaults(d); }
 
     boolean setBlock(double x, double y, double z, String id, BlockState state, int level, boolean falling) {
+        return setBlock(x, y, z, id, state, level, falling, true);
+    }
+
+    /** Stores the edit; with {@code reshapeStairs} false the caller owns stair updates (the rules layer orders them after neighbour reactions). */
+    boolean setBlock(double x, double y, double z, String id, BlockState state, int level, boolean falling, boolean reshapeStairs) {
         if (!safe(x) || !safe(y) || !safe(z)) return false;
         if (id != null) {
             BlockDefinition d;
@@ -74,13 +79,20 @@ final class WorldStorage {
         WorldBlock next = new WorldBlock(x, y, z, id, state, level, falling);
         if (same(previous, next)) return false;
         setInternal(next, previous);
-        if (isStair(previous) || isStair(next)) updateStairs(x, y, z);
+        if (reshapeStairs && (isStair(previous) || isStair(next))) updateStairs(x, y, z);
         return true;
     }
 
-    private static boolean sameState(BlockState a, BlockState b) { return a == b || a != null && a.equals(b); }
+    static boolean sameState(BlockState a, BlockState b) { return a == b || a != null && a.equals(b); }
 
-    private static boolean same(WorldBlock a, WorldBlock b) {
+    /** Every stored edit, including air edits that hide base blocks (order unspecified). */
+    java.util.List<WorldBlock> allEdits() {
+        java.util.List<WorldBlock> all = new java.util.ArrayList<>();
+        for (var cells : edits.values()) all.addAll(cells.values());
+        return all;
+    }
+
+    static boolean same(WorldBlock a, WorldBlock b) {
         if (a == null || a.id == null) return b == null || b.id == null;
         return b != null && a.id.equals(b.id) && sameState(a.state, b.state)
             && (!a.water() || a.level == b.level && a.falling == b.falling);
@@ -142,7 +154,7 @@ final class WorldStorage {
             && e.z + 1 >= min[2] - eps && e.z <= max[2] + eps && e.y + 1.5 >= min[1] - eps && e.y <= max[1] + eps;
     }
 
-    private static boolean isStair(WorldBlock b) { return b != null && b.definition != null && b.definition.shape == Shape.STAIRS; }
+    static boolean isStair(WorldBlock b) { return b != null && b.definition != null && b.definition.shape == Shape.STAIRS; }
     private WorldBlock neighbor(WorldBlock b, int direction) {
         int[] d = DIRECTIONS[direction]; return blockAt(b.x + d[0], b.y, b.z + d[1]);
     }
@@ -155,7 +167,8 @@ final class WorldStorage {
         return compatible(side, b.state.half) && side.state.facing.equals(b.state.facing);
     }
 
-    private String stairShape(WorldBlock b) {
+    /** The shape a stair block should take given its neighbours. */
+    String stairShape(WorldBlock b) {
         int f = facing(b.state.facing); WorldBlock front = neighbor(b, f);
         if (compatible(front, b.state.half) && facing(front.state.facing) % 2 != f % 2
             && !guarded(b, (facing(front.state.facing) + 2) % 4))

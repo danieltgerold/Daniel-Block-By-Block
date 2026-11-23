@@ -51,6 +51,8 @@ public final class VoxelWorld {
     }
 
     /** Get the base Y coordinate of the world. */
+    WorldStorage storage() { return storage; }
+
     public double getBaseY() { return storage.baseY; }
 
     /** Get the terrain layers array. */
