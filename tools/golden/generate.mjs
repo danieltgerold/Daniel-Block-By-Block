@@ -11,6 +11,8 @@ import { createPlayer, stepPlayer, DEFAULT_WALK_SPEED } from '../../src/movement
 import { BLOCK_REACH, VoxelWorld } from '../../src/voxel-world.js';
 import { jumpVelocityForHeight } from '../../src/player-settings.js';
 import { formatBool, formatNumber } from './format.mjs';
+import { generateCrafting } from './crafting.mjs';
+import { generateInventory } from './inventory.mjs';
 import { generateCurrent } from './current-fixtures.mjs';
 import { generateShapes } from './shapes.mjs';
 import { generateWorld } from './world.mjs';
@@ -175,6 +177,8 @@ export function generate(outDir = DEFAULT_OUT) {
   writeCsv(dir, 'edits.csv', 'x,y,z,solid', rayEdits.map(formatEdit));
   writeCsv(dir, 'cases.csv', 'ox,oy,oz,dx,dy,dz,reach', cases.map(c => c.map(formatNumber).join(',')));
   writeCsv(dir, 'expected.csv', 'hit,x,y,z,nx,ny,nz,distance', runRaycast(rayEdits, cases));
+  generateCrafting(outDir);
+  generateInventory(outDir);
   generateCurrent(outDir);
   generateShapes(outDir);
   generateWorld(outDir);
