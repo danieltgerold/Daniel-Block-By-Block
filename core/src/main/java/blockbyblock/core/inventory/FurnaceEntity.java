@@ -12,6 +12,8 @@ public final class FurnaceEntity {
     public int cookTime;
     /** The smelting recipe id seen on the last tick, or null. */
     public String recipeId;
+    /** Set when the furnace block is destroyed; a removed furnace no longer ticks. */
+    public boolean removed;
 
     public FurnaceEntity() {}
 
@@ -38,6 +40,7 @@ public final class FurnaceEntity {
 
     /** One game tick. */
     public void tick() {
+        if (removed) return;
         if (burnTime > 0) burnTime--;
         SmeltingRecipe recipe = recipe();
         boolean valid = canCook();
