@@ -22,7 +22,7 @@ export class DroppedItems {
       vx: velocity.x ?? 0, vy: velocity.y ?? .08, vz: velocity.z ?? 0,
       lots: [{ count, expires: this.time + 300, pickup: this.time + (thrown ? 2 : 0) }] };
     // Thrown items get their launch physics before joining a nearby pile.
-    const target = !thrown && !ITEMS.get(id)?.durability && this.piles.filter(p => sameStack({id:p.item,...p.stackData},{id,...stackData}) && Math.hypot(p.x - pile.x, p.y - pile.y, p.z - pile.z) <= 2)
+    const target = !thrown && !ITEMS.get(id)?.durability && this.piles.filter(p => sameStack({id:p.item,...p.stackData},{id,...stackData}) && Math.sqrt((p.x - pile.x) * (p.x - pile.x) + (p.y - pile.y) * (p.y - pile.y) + (p.z - pile.z) * (p.z - pile.z)) <= 2)
       .sort((a, b) => a.count > b.count ? -1 : a.count < b.count ? 1 : a.id - b.id)[0];
     this.piles.push(pile);
     if (target) return pile.count > target.count ? this.merge(target, pile) : this.merge(pile, target);
@@ -100,7 +100,7 @@ export class DroppedItems {
       const cx = Math.floor(pile.x / 2), cy = Math.floor(pile.y / 2), cz = Math.floor(pile.z / 2);
       let target;
       for (let x = cx - 1; x <= cx + 1 && !target; x++) for (let y = cy - 1; y <= cy + 1 && !target; y++) for (let z = cz - 1; z <= cz + 1 && !target; z++) {
-        target = buckets.get(`${stackKey({id:pile.item,...pile.stackData})}:${x},${y},${z}`)?.find(p => Math.hypot(p.x - pile.x, p.y - pile.y, p.z - pile.z) <= 2);
+        target = buckets.get(`${stackKey({id:pile.item,...pile.stackData})}:${x},${y},${z}`)?.find(p => Math.sqrt((p.x - pile.x) * (p.x - pile.x) + (p.y - pile.y) * (p.y - pile.y) + (p.z - pile.z) * (p.z - pile.z)) <= 2);
       }
       if (target) this.merge(pile, target);
       else {

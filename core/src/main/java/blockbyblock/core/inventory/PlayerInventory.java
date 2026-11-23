@@ -117,6 +117,20 @@ public final class PlayerInventory {
 
     public void select(int index) { selected = (index + 9) % 9; }
 
+    /**
+     * Wears the held tool by {@code amount}; a tool worn past its durability breaks and leaves the slot empty.
+     * Returns false for creative mode, items without durability and non-positive amounts.
+     */
+    public boolean damageMainTool(boolean creative, int amount) {
+        ItemStack stack = mainHand();
+        if (stack == null) return false;
+        int durability = ItemDefinition.forId(stack.id).durability;
+        if (creative || durability == 0 || amount <= 0) return false;
+        stack.damage += amount;
+        if (stack.damage > durability) slots[selected] = null;
+        return true;
+    }
+
     public boolean consumeSelected() {
         ItemStack stack = mainHand();
         if (stack == null) return false;
